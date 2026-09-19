@@ -1,0 +1,26 @@
+{
+  "name": "motor-distribucion",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "node scripts/dev.js",
+    "dev:web": "npm run dev -w @motor/web",
+    "dev:api": "npm run dev -w @motor/api",
+    "db:up": "docker compose up -d db",
+    "db:down": "docker compose down",
+    "db:migrate": "npm run migrate -w @motor/db",
+    "db:generate": "npm run generate -w @motor/db",
+    "db:studio": "npm run studio -w @motor/db",
+    "build": "npm run build -w @motor/shared && npm run build -w @motor/db && npm run build -w @motor/api && npm run build -w @motor/web"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0",
+    "typescript": "^5.6.3"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

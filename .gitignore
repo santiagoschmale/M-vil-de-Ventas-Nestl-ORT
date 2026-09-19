@@ -1,0 +1,12 @@
+node_modules/
+dist/
+build/
+.env
+*.log
+.DS_Store
+
+# Prisma
+packages/db/generated/
+
+# Vite
+apps/web/dist/

@@ -1,0 +1,209 @@
+// ============================================================
+// MOTOR DEL MÓVIL DE VENTAS — schema Prisma / Postgres
+//
+// Traducido desde 04-diseno-tecnico/schema-movil-ventas.sql
+// (borrador en T-SQL / SQL Server). Ver NOTAS DE ADAPTACIÓN al
+// final de este archivo para el detalle de cada cambio de motor.
+// ============================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------- CATÁLOGO BASE ----------
+
+model Sku {
+  sku_id    Int     @id @default(autoincrement())
+  codigo    String  @unique @db.VarChar(30)
+  nombre    String  @db.VarChar(150)
+  categoria String? @db.VarChar(80)
+  activo    Boolean @default(true)
+
+  objetivos      ObjetivoTotal[]
+  participaciones Participacion[]
+
+  @@map("sku")
+}
+
+model Canal {
+  canal_id          Int     @id @default(autoincrement())
+  nombre            String  @unique @db.VarChar(60) // Catering, Vending, Mayoristas, KAM, Soluciones
+  // PROVISORIO: profundidad de apertura por canal (supuesto bloqueante #1).
+  // Permite que el motor sepa hasta qué nivel baja cada canal sin
+  // cambiar el modelo cuando llegue la respuesta de Nestlé.
+  profundidad_maxima String @default("canal") @db.VarChar(20)
+  // valores esperados: 'canal' | 'territorio' | 'vendedor' | 'distribuidor'
+
+  territorios Territorio[]
+  reglas      ReglaDistribucion[]
+
+  @@map("canal")
+}
+
+model Territorio {
+  territorio_id Int    @id @default(autoincrement())
+  nombre        String @db.VarChar(80)
+  canal_id      Int
+  canal         Canal  @relation(fields: [canal_id], references: [canal_id])
+
+  vendedores Vendedor[]
+
+  @@map("territorio")
+}
+
+model Vendedor {
+  vendedor_id   Int        @id @default(autoincrement())
+  codigo        String     @unique @db.VarChar(30) // anonimizable (A/B/C) según acuerdo con Nestlé
+  territorio_id Int
+  territorio    Territorio @relation(fields: [territorio_id], references: [territorio_id])
+  activo        Boolean    @default(true)
+
+  @@map("vendedor")
+}
+
+model Distribuidor {
+  distribuidor_id Int     @id @default(autoincrement())
+  codigo          String  @unique @db.VarChar(30)
+  nombre          String? @db.VarChar(150)
+  activo          Boolean @default(true)
+
+  @@map("distribuidor")
+}
+
+// ---------- OBJETIVO TOTAL (input de Contraloría) ----------
+
+model ObjetivoTotal {
+  objetivo_id    Int      @id @default(autoincrement())
+  sku_id         Int
+  sku            Sku      @relation(fields: [sku_id], references: [sku_id])
+  periodo        String   @db.Char(7) // formato 'YYYY-MM'
+  kilos          Decimal  @db.Decimal(14, 3)
+  facturacion    Decimal  @db.Decimal(14, 2)
+  creado_por     String?  @db.VarChar(80) // Contraloría
+  fecha_creacion DateTime @default(now()) @db.Timestamptz(6)
+
+  @@unique([sku_id, periodo], map: "UQ_ObjetivoTotal")
+  @@map("objetivo_total")
+}
+
+// ---------- PARTICIPACIÓN (el corazón del reparto en cascada) ----------
+// Modelo genérico: no hay una tabla por nivel, hay un tipo de entidad
+// + un id lógico. Esto es lo que permite que la cascada tenga
+// profundidad variable por canal sin rediseñar nada.
+// entidad_id es una FK lógica a Canal/Territorio/Vendedor/Distribuidor
+// según entidad_tipo — no se modela como relación de Prisma porque
+// Prisma no soporta FKs polimórficas; se valida en la capa de aplicación.
+
+model Participacion {
+  participacion_id        BigInt   @id @default(autoincrement())
+  sku_id                   Int
+  sku                      Sku      @relation(fields: [sku_id], references: [sku_id])
+  periodo                  String   @db.Char(7)
+  entidad_tipo             String   @db.VarChar(20) // 'canal' | 'territorio' | 'vendedor' | 'distribuidor'
+  entidad_id               Int
+  parent_participacion_id  BigInt?
+  parent                   Participacion?  @relation("ParticipacionJerarquia", fields: [parent_participacion_id], references: [participacion_id])
+  hijos                    Participacion[] @relation("ParticipacionJerarquia")
+  porcentaje               Decimal  @db.Decimal(9, 6) // ej: 0.103000 = 10.3%
+  origen                   String   @db.VarChar(20) // 'historico' | 'manual'
+  kilos_calculados         Decimal? @db.Decimal(14, 3) // resultado ya aplicado sobre el nivel padre
+  aprobado                 Boolean  @default(false)
+  modificado_por           String?  @db.VarChar(80)
+  fecha_modificacion       DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([sku_id, periodo, entidad_tipo, entidad_id], map: "IX_Participacion_lookup")
+  @@map("participacion")
+}
+
+// Cuadratura como REGLA, no como columna de control posterior:
+// vista que sirve de base para validar que los hijos de un mismo
+// padre sumen 1 (100%) antes de permitir aprobar la etapa.
+// La vista se crea vía SQL manual en la migración inicial (ver
+// packages/db/prisma/migrations/.../migration.sql) — Prisma no
+// modela vistas de solo lectura en el schema por defecto.
+// La aplicación debe bloquear (o alertar) el paso a "aprobado = true"
+// cuando suma_participacion <> 1 dentro de una tolerancia definida.
+
+// ---------- EXCEPCIONES (habilitar/deshabilitar antes de ejecutar) ----------
+
+model Excepcion {
+  excepcion_id   Int      @id @default(autoincrement())
+  entidad_tipo   String   @db.VarChar(20) // 'sku' | 'vendedor' | 'distribuidor'
+  entidad_id     Int
+  periodo        String   @db.Char(7)
+  activo         Boolean  @default(true) // false = deshabilitado para este período
+  motivo         String?  @db.VarChar(200)
+  creado_por     String?  @db.VarChar(80)
+  fecha_creacion DateTime @default(now()) @db.Timestamptz(6)
+
+  @@map("excepcion")
+}
+
+// ---------- HISTÓRICO (con versionado de reglas, no solo resultado) ----------
+// Guarda el snapshot completo del período aprobado, no solo el número final.
+
+model MovilAprobado {
+  movil_id         Int      @id @default(autoincrement())
+  periodo          String   @unique @db.Char(7)
+  aprobado_por     String   @db.VarChar(80) // Sales Planning Lead
+  fecha_aprobacion DateTime @default(now()) @db.Timestamptz(6)
+  // NVARCHAR(MAX) -> jsonb: en Postgres conviene tipar el snapshot como
+  // JSON real (permite indexar/consultar) en vez de texto plano.
+  snapshot_json    Json     @db.JsonB
+
+  @@map("movil_aprobado")
+}
+
+// ---------- REGLAS DE NEGOCIO (back office, sin hardcodear) ----------
+// PROVISORIO: estructura mínima hasta tener ejemplos reales de reglas
+// por canal (punto pendiente con Fernanda).
+
+model ReglaDistribucion {
+  regla_id        Int     @id @default(autoincrement())
+  canal_id        Int
+  canal           Canal   @relation(fields: [canal_id], references: [canal_id])
+  nombre          String  @db.VarChar(120)
+  tipo            String  @db.VarChar(30) // 'tope' | 'estacional' | 'base_calculo' | otro (a definir)
+  parametros_json Json?   @db.JsonB
+  activo          Boolean @default(true)
+
+  @@map("regla_distribucion")
+}
+
+// ============================================================
+// NOTAS DE ADAPTACIÓN (SQL Server -> Postgres/Prisma)
+// ============================================================
+// 1. INT/BIGINT IDENTITY -> Int/BigInt @default(autoincrement())
+//    (Postgres usa SERIAL/IDENTITY por debajo, Prisma lo genera solo).
+// 2. BIT -> Boolean.
+// 3. VARCHAR(n)/CHAR(n) -> String @db.VarChar(n) / @db.Char(n)
+//    (mismos límites de longitud que el original).
+// 4. DECIMAL(p,s) -> Decimal @db.Decimal(p,s) (numeric en Postgres,
+//    misma precisión exacta, no hay pérdida de escala).
+// 5. DATETIME2 + SYSUTCDATETIME() -> DateTime @db.Timestamptz(6)
+//    + @default(now()). Postgres guarda el instante en UTC
+//    internamente; timestamptz es el equivalente correcto (evita
+//    el problema de "hora local ambigua" que tenía DATETIME2 puro).
+// 6. NVARCHAR(MAX) usado para JSON (snapshot_json, parametros_json)
+//    -> Json @db.JsonB. Postgres tiene tipo JSON nativo indexable;
+//    aprovecharlo es mejor que guardar texto plano y parsear a mano.
+// 7. entidad_tipo + entidad_id (FK polimórfica) se mantiene tal cual:
+//    ni SQL Server ni Prisma/Postgres tienen una forma nativa mejor
+//    de modelar "una FK que apunta a distintas tablas según un tipo"
+//    sin agregar complejidad que no pidió el diseño. Se valida en
+//    la capa de aplicación (packages/db o apps/api), no en la DB.
+// 8. La vista vw_CuadraturaPorPadre se recrea con CREATE VIEW estándar
+//    (compatible 1:1 en Postgres) agregada a mano en la migración
+//    inicial, porque Prisma no gestiona vistas de solo lectura salvo
+//    que se active la preview feature "views" (no la necesitamos:
+//    la view es solo para queries de validación, no para el Client).
+// 9. Nombres de tabla mapeados a snake_case (@@map) porque Postgres
+//    baja a minúsculas los identificadores sin comillas — así se evita
+//    tener que escribir "Sku", "MovilAprobado" entre comillas en SQL
+//    manual o en el cliente de psql.
+// ============================================================
