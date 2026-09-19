@@ -144,6 +144,26 @@ model Excepcion {
   @@map("excepcion")
 }
 
+// ---------- INTERACCIÓN HUMANA (auditoría de ajustes manuales) ----------
+// Registra qué se tocó a mano y por qué: un ajuste manual de porcentaje
+// en Participacion, deshabilitar/habilitar una Excepcion, o aprobar una
+// etapa. La razón es obligatoria — la UI no deja guardar sin ella.
+// Mismo patrón entidad_tipo + entidad_id que Participacion/Excepcion:
+// FK lógica, se valida en la capa de aplicación.
+
+model InteraccionHumana {
+  interaccion_id Int      @id @default(autoincrement())
+  entidad_tipo   String   @db.VarChar(20) // 'participacion' | 'excepcion'
+  entidad_id     BigInt
+  accion         String   @db.VarChar(30) // 'ajuste_manual' | 'deshabilitar' | 'habilitar' | 'aprobacion'
+  motivo         String   @db.VarChar(200) // obligatorio, a diferencia de Excepcion.motivo
+  realizado_por  String   @db.VarChar(80)
+  fecha          DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([entidad_tipo, entidad_id], map: "IX_InteraccionHumana_lookup")
+  @@map("interaccion_humana")
+}
+
 // ---------- HISTÓRICO (con versionado de reglas, no solo resultado) ----------
 // Guarda el snapshot completo del período aprobado, no solo el número final.
 

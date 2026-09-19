@@ -132,6 +132,24 @@ CREATE TABLE Excepcion (
     fecha_creacion  DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME()
 );
 
+-- ---------- INTERACCIÓN HUMANA (auditoría de ajustes manuales) ----------
+-- Registra qué se tocó a mano y por qué: ajuste manual de porcentaje,
+-- deshabilitar/habilitar una excepción, o aprobar una etapa. La razón
+-- (motivo) es obligatoria, a diferencia de Excepcion.motivo.
+
+CREATE TABLE InteraccionHumana (
+    interaccion_id INT IDENTITY PRIMARY KEY,
+    entidad_tipo   VARCHAR(20) NOT NULL,
+    entidad_id     BIGINT NOT NULL,
+    accion         VARCHAR(30) NOT NULL,      -- 'ajuste_manual' | 'deshabilitar' | 'habilitar' | 'aprobacion'
+    motivo         VARCHAR(200) NOT NULL,
+    realizado_por  VARCHAR(80) NOT NULL,
+    fecha          DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME()
+);
+
+CREATE INDEX IX_InteraccionHumana_lookup
+    ON InteraccionHumana (entidad_tipo, entidad_id);
+
 -- ---------- HISTÓRICO (con versionado de reglas, no solo resultado) ----------
 -- Guarda el snapshot completo del período aprobado, no solo el número final.
 

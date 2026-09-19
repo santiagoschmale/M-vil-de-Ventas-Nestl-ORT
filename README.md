@@ -34,7 +34,7 @@ sus relaciones): `packages/db/tablas/`, un archivo por tabla.
 **Para levantar el schema sin pasar por Prisma** (por ejemplo si
 alguien solo necesita la base para probar algo puntual, sin tocar
 código), hay dos variantes — usar la que le quede más cómoda a cada
-uno, las dos crean las mismas 10 tablas:
+uno, las dos crean las mismas 11 tablas:
 
 - `packages/db/schema-completo.sql` (Postgres) — se corre con `psql`
   contra el Postgres de `docker-compose.yml`.
