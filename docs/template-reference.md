@@ -1,0 +1,210 @@
+# Template de scaffold — monorepo React + FastAPI (referencia)
+
+> **Qué es esto:** el template que genera el portal IDP (Backstage) de Nestlé, compartido por el tech lead como *"ejemplo de lo que estarían recibiendo"*. No es el repo final de trabajo: es el punto de partida que el generador entrega. Los nombres con `${{ values.name }}` son placeholders del scaffolder.
+
+**Stack** — Frontend: React 18, Vite, TypeScript, MUI, Zustand, React Router, Vitest, MSW. Backend: Python 3.11, FastAPI, Uvicorn, librerías internas `nbra-*`, nose2/mutmut/black/flake8/pylint.
+**CI/CD** — `.github/workflows/ci.yaml` invoca dos veces el reusable workflow de plataforma (`nbra-platform-workflows`), un job por componente.
+**Local** — frontend: `npm ci && npm run dev` (MSW mockea `/api/*`, no hace falta backend). Backend: `make deps && python3 app.py` en `:3000` con `IS_LOCAL=true`.
+
+## Estructura de archivos
+
+```
+.github/
+  CODEOWNERS
+  workflows/
+    ci.yaml
+.gitignore
+README.md
+backend/
+  Dockerfile
+  Makefile
+  README.md
+  app.py
+  requirements.dev.txt
+  requirements.txt
+  src/
+    config/
+      __init__.py
+      logger.py
+    middleware/
+      __init__.py
+      error_handler.py
+    routes/
+      __init__.py
+      health.py
+  tests/
+    __init__.py
+    routes/
+      __init__.py
+      test_health.py
+    test_app.py
+catalog-info.yaml
+frontend/
+  .npmrc
+  Dockerfile
+  README.md
+  auto-imports.d.ts
+  index.html
+  package-lock.json
+  package.json
+  src/
+    infra/
+      http/
+        axiosHttpClient.ts
+        index.ts
+    main.tsx
+    mocks/
+      handlers.ts
+      profile/
+        profile.mock.ts
+      server.ts
+      tokens/
+        tokens.mock.ts
+      users/
+        users.mock.ts
+      worker.ts
+    presentation/
+      Router.test.tsx
+      Router.tsx
+      components/
+        shared/
+          ActionButton/
+            ActionButton.styles.ts
+            ActionButton.test.tsx
+            ActionButton.tsx
+          AlertDialog/
+            AlertDialog.test.tsx
+            AlertDialog.tsx
+            index.ts
+          Base/
+            Base.styles.ts
+            Base.test.tsx
+            Base.tsx
+            index.ts
+          CircularProgressWithLabel/
+            CircularProgressWithLabel.tsx
+          ConditionalRendering/
+            ConditionalRendering.spec.tsx
+            ConditionalRendering.test.tsx
+            ConditionalRendering.tsx
+          Fallback/
+            Fallback.spec.tsx
+            Fallback.test.tsx
+            Fallback.tsx
+            index.ts
+          FilterTextField/
+            FilterTextField.test.tsx
+            FilterTextField.tsx
+          FormDialog/
+            FormDialog.styles.ts
+            FormDialog.test.tsx
+            FormDialog.tsx
+            index.ts
+          IconMenu/
+            IconMenu.spec.tsx
+            IconMenu.test.tsx
+            IconMenu.tsx
+            index.ts
+          LeftMenu/
+            LeftMenu.styles.ts
+            LeftMenu.test.tsx
+            LeftMenu.tsx
+            index.ts
+          Loading/
+            Loading.spec.tsx
+            Loading.styles.ts
+            Loading.test.tsx
+            Loading.tsx
+            index.ts
+          Logo/
+            Logo.spec.tsx
+            Logo.styles.ts
+            Logo.test.tsx
+            Logo.tsx
+            index.ts
+          Multiselect/
+            Multiselect.spec.tsx
+            Multiselect.test.tsx
+            Multiselect.tsx
+            index.ts
+          Profile/
+            Profile.spec.tsx
+            Profile.styles.ts
+            Profile.test.tsx
+            Profile.tsx
+            index.ts
+          SMFields/
+            SMFields.test.tsx
+            SMFields.tsx
+            index.ts
+          SMRoles/
+            SMRoles.test.tsx
+            SMRoles.tsx
+            index.ts
+          SnackBar/
+            SnackBar.test.tsx
+            SnackBar.tsx
+            index.ts
+          StripedDataGrid/
+            StripedDataGrid.style.tsx
+            StripedDataGrid.test.tsx
+            StripedDataGrid.tsx
+          UploadFile/
+            UploadFileComponent.styles.ts
+            UploadFileComponent.test.tsx
+            UploadFileComponent.tsx
+            index.ts
+      pages/
+        Home/
+          Home.test.tsx
+          Home.tsx
+        Tokens/
+          Token.tsx
+          Tokens.styles.ts
+          Tokens.test.tsx
+          Tokens.tsx
+          index.ts
+        Users/
+          User.styles.ts
+          User.tsx
+          Users.test.tsx
+          Users.tsx
+          index.ts
+      utils/
+        formUtils.spec.ts
+        formUtils.test.ts
+        formUtils.ts
+    setupTests.ts
+    stores/
+      index.ts
+      useProfile/
+        index.ts
+        useProfile.spec.ts
+        useProfile.test.ts
+        useProfile.ts
+        useProfile.type.ts
+      useSnackbarProps/
+        index.ts
+        useSnackbarProps.spec.ts
+        useSnackbarProps.test.ts
+        useSnackbarProps.ts
+        useSnackbarProps.type.ts
+      useTokens/
+        index.ts
+        useToken.test.ts
+        useToken.ts
+        useTokens.type.ts
+      useUsers/
+        index.ts
+        useUsers.test.ts
+        useUsers.ts
+        useUsers.type.ts
+    theme.tsx
+    vite-env.d.ts
+  tsconfig.json
+  vite.config.ts
+  vitest.config.ts
+```
+
+## Assets estáticos (omitidos del árbol)
+`frontend/public/` — 34 archivos (fuentes, íconos, logos).
