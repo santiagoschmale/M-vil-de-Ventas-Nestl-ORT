@@ -1,0 +1,49 @@
+# Checks de cada PR. Provisorio: en el repo real de Nestlé el pipeline lo
+# declara la plataforma (nbra-platform-workflows) y este archivo se reemplaza.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  node:
+    name: TypeScript (build, lint, formato)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Generar cliente de Prisma
+        run: npm run db:generate
+      - name: Build (chequea tipos)
+        run: npm run build
+      - run: npm run lint
+      - run: npm run format:check
+
+  python:
+    name: Python excel-service (black, flake8)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/excel-service
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: apps/excel-service/requirements*.txt
+      - run: pip install -r requirements-dev.txt
+      - run: black --check .
+      - run: flake8 .
+      - name: La app importa
+        run: python -c "import app.main"

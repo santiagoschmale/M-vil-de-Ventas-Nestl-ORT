@@ -9,7 +9,10 @@
 const { spawnSync, spawn } = require("node:child_process");
 
 function run(cmd, args) {
-  const result = spawnSync(cmd, args, { stdio: "inherit", shell: process.platform === "win32" });
+  const result = spawnSync(cmd, args, {
+    stdio: "inherit",
+    shell: process.platform === "win32",
+  });
   if (result.status !== 0) {
     console.error(`\nFalló: ${cmd} ${args.join(" ")}`);
     process.exit(result.status ?? 1);
@@ -39,8 +42,10 @@ const dev = spawn(
   "npx",
   [
     "concurrently",
-    "-n", "api,web",
-    "-c", "blue,green",
+    "-n",
+    "api,web",
+    "-c",
+    "blue,green",
     "npm run dev -w @motor/api",
     "npm run dev -w @motor/web",
   ],
