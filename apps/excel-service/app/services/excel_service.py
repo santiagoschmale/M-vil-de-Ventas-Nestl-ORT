@@ -12,11 +12,7 @@ def exportar_participacion_a_excel(db: Session, periodo: str) -> BytesIO:
     Sirve de plantilla para el resto de las exportaciones (ObjetivoTotal,
     histórico de MovilAprobado, etc): misma forma, distinta query.
     """
-    filas = (
-        db.query(Participacion)
-        .filter(Participacion.periodo == periodo)
-        .all()
-    )
+    filas = db.query(Participacion).filter(Participacion.periodo == periodo).all()
 
     df = pd.DataFrame(
         [
@@ -39,7 +35,9 @@ def exportar_participacion_a_excel(db: Session, periodo: str) -> BytesIO:
     return buffer
 
 
-def importar_participacion_desde_excel(db: Session, periodo: str, archivo: BytesIO) -> int:
+def importar_participacion_desde_excel(
+    db: Session, periodo: str, archivo: BytesIO
+) -> int:
     """Lee un .xlsx con el mismo formato de exportar_participacion_a_excel
     y crea filas de Participacion nuevas (origen='manual').
 

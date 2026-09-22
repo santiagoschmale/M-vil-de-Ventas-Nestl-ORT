@@ -24,5 +24,7 @@ def exportar(periodo: str, db: Session = Depends(get_db)):
 @router.post("/importar/{periodo}")
 async def importar(periodo: str, archivo: UploadFile, db: Session = Depends(get_db)):
     contenido = await archivo.read()
-    cantidad = excel_service.importar_participacion_desde_excel(db, periodo, BytesIO(contenido))
+    cantidad = excel_service.importar_participacion_desde_excel(
+        db, periodo, BytesIO(contenido)
+    )
     return {"filas_insertadas": cantidad}
