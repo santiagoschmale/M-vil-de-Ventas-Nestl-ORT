@@ -27,7 +27,7 @@ from openpyxl import Workbook
 from openpyxl.styles import Font
 
 from src.domain.arbol import Nodo, Problema, recalcular
-from src.domain.cruce import Celda, ResultadoCruce, cruzar
+from src.domain.cruce import Celda, Grupo, ResultadoCruce, cruzar
 from src.importer.entradas import (
     KILOS,
     PLATA,
@@ -40,6 +40,21 @@ from src.importer.entradas import (
     leer_input2,
     normalizar,
 )
+
+
+@dataclass(frozen=True)
+class Regla:
+    """
+    Lo que define el planner: en `canal`, los SKUs de `categorias` suman a lo sumo
+    (tope), al menos (mínimo) o exactamente (fijo) un % del total del canal. Un %
+    para kilos y otro para NNS, independientes; None = en esa unidad no aplica.
+    """
+    id: str
+    canal: str
+    categorias: frozenset[str]
+    limite: str  # tope | minimo | fijo
+    kilos: Decimal | None
+    nns: Decimal | None
 
 
 @dataclass
@@ -65,6 +80,7 @@ def armar(
     problemas: list[Problema] | None = None,
     apertura: dict[Celda, dict[str, Decimal]] | None = None,
     entidades_apagadas: set[str] | frozenset[str] = frozenset(),
+    reglas: list[Regla] | tuple[Regla, ...] = (),
 ) -> Recorrido:
     """
     `apagados`: SKUs que el planner saca del mes (ON/OFF). No se reparten; si su
@@ -75,6 +91,9 @@ def armar(
     apertura se reparte entre sus entidades con largest remainder, en kilos y en
     plata por separado. `entidades_apagadas` (distribuidores, vendedores) salen del
     reparto en todas las celdas y su parte va a los demás de la misma celda (A1).
+
+    `reglas`: cada una se lleva a un grupo por unidad (kilos y NNS por separado),
+    con los SKUs activos de sus categorías.
     """
     problemas = list(problemas or [])
     apagados = frozenset(apagados)
@@ -90,12 +109,14 @@ def armar(
         problemas.append(Problema("aviso", f"El canal {c} está en la base del mes anterior pero no en el input 2: "
                                            f"no se reparte.", bloque="base"))
 
+    grupos_kilos, grupos_plata = _grupos(reglas, activos, por_nombre, problemas)
     kilos = cruzar(
         filas={s: o.kilos for s, o in activos.items()},
         columnas={c: t.kilos for c, t in canales.items()},
         base=base,
         decimales=KILOS,
         fijas=fijas_kilos,
+        grupos=grupos_kilos,
     )
     hay_plata = all(o.nns is not None for o in activos.values()) and all(t.plata is not None for t in canales.values())
     plata = None
@@ -106,11 +127,39 @@ def armar(
             base=base,
             decimales=PLATA,
             fijas=fijas_plata,
+            grupos=grupos_plata,
         )
     entidades_apagadas = frozenset(entidades_apagadas)
     aperturas = _abrir(kilos, plata, apertura or {}, entidades_apagadas, problemas, por_nombre)
     return Recorrido(objetivos=objetivos, canales=canales, kilos=kilos, plata=plata, problemas=problemas,
                      apagados=apagados, aperturas=aperturas, entidades_apagadas=entidades_apagadas)
+
+
+def _grupos(reglas, activos, por_nombre, problemas) -> tuple[list[Grupo], list[Grupo]]:
+    """
+    Cada regla, en los SKUs activos de sus categorías. Canales y categorías se
+    cruzan sin importar tildes ni mayúsculas. Una regla de un canal que no está en
+    el input 2 no se aplica y se avisa; una categoría sin SKUs se avisa, pero la
+    regla se aplica igual (un mínimo sobre nada es imposible y lo informa el cruce).
+    """
+    kilos, plata = [], []
+    categorias = {normalizar(o.categoria or "") for o in activos.values()}
+    for regla in sorted(reglas, key=lambda r: r.id):
+        canal = por_nombre.get(normalizar(regla.canal))
+        if canal is None:
+            problemas.append(Problema("aviso", f"La regla {regla.id} es del canal {regla.canal}, que no está en el "
+                                               f"input 2 de este mes: no se aplica.", bloque="reglas"))
+            continue
+        pedidas = {normalizar(c): c for c in regla.categorias}
+        vacias = sorted(c for n, c in pedidas.items() if n not in categorias)
+        if vacias:
+            problemas.append(Problema("aviso", f"La regla {regla.id} incluye {', '.join(vacias)}, pero ningún SKU "
+                                               f"activo del input 1 es de esa categoría.", bloque="reglas"))
+        skus = frozenset(s for s, o in activos.items() if normalizar(o.categoria or "") in pedidas)
+        for porcentaje, destino in ((regla.kilos, kilos), (regla.nns, plata)):
+            if porcentaje is not None:
+                destino.append(Grupo(regla.id, canal, skus, regla.limite, porcentaje))
+    return kilos, plata
 
 
 def _abrir(kilos, plata, apertura, apagadas, problemas, por_nombre) -> dict[Celda, Nodo]:
