@@ -6,9 +6,13 @@ export default defineConfig({
         globals: true,
         environment: 'jsdom',
         setupFiles: ['./src/setupTests.ts'],
+        // Cada worker carga jsdom y MUI enteros: con uno por núcleo el pico pasaba 2 GB.
+        maxWorkers: 2,
+        minWorkers: 1,
         coverage: {
           provider: 'v8',
-          enabled: true,
+          // `npm test` la pide con --coverage (y CI); una corrida suelta no la necesita.
+          enabled: false,
           reporter: [
             'text',
             'html',
