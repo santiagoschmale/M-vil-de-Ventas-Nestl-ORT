@@ -18,7 +18,21 @@ export type Inconsistencia = {
   skus: string[];
   canales: string[];
   diferencia: Monto | null;
+  reglas: string[];
 };
+
+export type Limite = 'tope' | 'minimo' | 'fijo';
+
+/** Lo que carga el planner. Los % van como texto; null = en esa unidad no aplica. */
+export type DatosRegla = {
+  canal: string;
+  categorias: string[];
+  limite: Limite;
+  kilos: string | null;
+  nns: string | null;
+};
+
+export type Regla = DatosRegla & Ajuste & { id: string };
 
 export type Problema = {
   severidad: 'error' | 'aviso';
@@ -43,6 +57,8 @@ export type Estado = {
     entidades: (Ajuste & { nombre: string })[];
   };
   fijas: Record<Unidad, (Ajuste & { sku: string; canal: string; valor: Monto })[]>;
+  reglas: Regla[];
+  opciones: { canales: string[]; categorias: string[] };
   historial: Ajuste[];
 };
 
@@ -91,4 +107,7 @@ export type TUseMovil = {
   fijar: (sku: string, canal: string, monto: string, motivo: string) => Resultado;
   desfijar: (sku: string, canal: string, motivo: string) => Resultado;
   apertura: (sku: string, canal: string) => Promise<Apertura | null>;
+  agregarRegla: (datos: DatosRegla, motivo: string) => Resultado;
+  editarRegla: (id: string, datos: DatosRegla, motivo: string) => Resultado;
+  eliminarRegla: (id: string, motivo: string) => Resultado;
 };

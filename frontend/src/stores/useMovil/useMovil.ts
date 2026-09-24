@@ -25,6 +25,12 @@ const avisar = (message: string, severity: 'success' | 'error') =>
 
 const ruta = (...partes: string[]) => partes.map(encodeURIComponent).join('/');
 
+// Después de tocar una regla, lo que el planner quiere saber es si el móvil sigue cerrando.
+const resumenCierre = (e: Estado) => {
+  if (e.faltan.length) return '';
+  return e.cierra.kilos && e.cierra.plata ? ' Kilos y pesos cierran.' : ' Revisá "Para revisar": hay algo que no cierra.';
+};
+
 type Opciones = {
   exito?: (estado: Estado) => string;
   // Desde un diálogo el error se muestra ahí, junto al campo; si no, como aviso.
@@ -122,6 +128,16 @@ export const useMovil = create<TUseMovil>((set, get) => {
     desfijar: (sku, canal, motivo) =>
       cambiar(() => api.delete(`/movil/celdas/${ruta(get().unidad, sku, canal)}`, { data: { motivo } }),
         enDialogo(() => 'La celda vuelve a calculada.')),
+
+    agregarRegla: (datos, motivo) =>
+      cambiar(() => api.post('/movil/reglas', { ...datos, motivo }),
+        enDialogo(e => `Regla ${e.reglas[e.reglas.length - 1]?.id} agregada.${resumenCierre(e)}`)),
+    editarRegla: (id, datos, motivo) =>
+      cambiar(() => api.put(`/movil/reglas/${ruta(id)}`, { ...datos, motivo }),
+        enDialogo(e => `Regla ${id} guardada.${resumenCierre(e)}`)),
+    eliminarRegla: (id, motivo) =>
+      cambiar(() => api.delete(`/movil/reglas/${ruta(id)}`, { data: { motivo } }),
+        enDialogo(e => `Regla ${id} eliminada.${resumenCierre(e)}`)),
 
     apertura: async (sku, canal) => {
       try {

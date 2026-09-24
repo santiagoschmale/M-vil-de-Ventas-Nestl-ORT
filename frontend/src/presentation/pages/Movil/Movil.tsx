@@ -11,8 +11,10 @@ import { Estado, Unidad } from '../../../stores/useMovil/useMovil.type';
 import { formatear, UNIDADES } from './formato';
 import { AVENA, CIERRA, NO_CIERRA } from './estilo';
 import { Matriz } from './Matriz';
+import { Reglas } from './Reglas';
 
 const ACCIONES: Record<string, string> = {
+  agregar_regla: 'Agregó una regla', editar_regla: 'Editó una regla', eliminar_regla: 'Eliminó una regla',
   cargar_input1: 'Cargó el input 1', cargar_input2: 'Cargó el input 2', cargar_base: 'Cargó la base',
   apagar_sku: 'Apagó un SKU', prender_sku: 'Prendió un SKU',
   apagar_entidad: 'Apagó un distribuidor o vendedor', prender_entidad: 'Prendió un distribuidor o vendedor',
@@ -166,6 +168,10 @@ export const MovilPage = () => {
     avisos && `${avisos} ${avisos === 1 ? 'aviso' : 'avisos'}`,
   ].filter(Boolean).join(' · ') || 'Nada';
   const cierraTodo = estado.cierra.kilos && estado.cierra.plata;
+  const chocan = new Set([...estado.inconsistencias.kilos, ...estado.inconsistencias.plata].flatMap(i => i.reglas)).size;
+  const resumenReglas = estado.reglas.length
+    ? `${estado.reglas.length} ${estado.reglas.length === 1 ? 'regla' : 'reglas'}${chocan ? ` · ${chocan} ${chocan === 1 ? 'choca' : 'chocan'}` : ''}`
+    : 'Ninguna';
 
   return (
     <Box sx={{ position: 'relative' }}>
@@ -203,6 +209,10 @@ export const MovilPage = () => {
           resumen={<Dato>{estado.faltan.length ? `Falta: ${estado.faltan.join(', ')}` : 'Las tres cargadas'}</Dato>}
         >
           <Entradas estado={estado} />
+        </Seccion>
+
+        <Seccion titulo="Reglas" abierta={chocan > 0} resumen={<Dato>{resumenReglas}</Dato>}>
+          <Reglas estado={estado} />
         </Seccion>
 
         {estado.faltan.length === 0 && (
