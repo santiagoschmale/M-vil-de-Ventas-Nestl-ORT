@@ -18,6 +18,7 @@ from collections import deque
 from decimal import Decimal
 
 INFINITO = None  # capacidad sin tope
+COSTO = Decimal("1e-15")
 
 
 class FlujoMaximo:
@@ -131,11 +132,17 @@ def flujo_de_costo_minimo(
     ofertas: dict[str, int],
     demandas: dict[str, int],
     arcos: dict[tuple[str, str], Decimal],
+    intermedios: list[tuple[str, str, int, Decimal]] = (),
 ) -> dict[tuple[str, str], int] | None:
     """
-    Transporte 0/1: cada arco (oferta, demanda) lleva 0 o 1 unidad, cada oferta
+    Transporte 0/1: cada arco (oferta, destino) lleva 0 o 1 unidad, cada oferta
     entrega exactamente su cantidad y cada demanda recibe exactamente la suya, con
     costo total mínimo. Devuelve {arco: 0|1}, o None si no hay forma de cumplir.
+
+    `intermedios`: nodos entre ofertas y demandas (las reglas del cruce). Un arco
+    puede ir de una oferta a un intermedio, y cada tupla (desde, hasta, capacidad,
+    costo) une un intermedio con otro o con una demanda. Un destino que no está en
+    `demandas` es un intermedio.
 
     Caminos más cortos sucesivos con potenciales (Dijkstra sobre costos
     reducidos). Hay a lo sumo una unidad por arco, así que las iteraciones son a
@@ -144,6 +151,11 @@ def flujo_de_costo_minimo(
     total = sum(ofertas.values())
     if total != sum(demandas.values()):
         return None
+    # Costos a 15 decimales: sobra para elegir qué celda sube, y las sumas quedan exactas
+    # en la precisión de Decimal (con 50 dígitos, redondear las sumas arma ciclos
+    # negativos de 1e-26 en los que Dijkstra no termina).
+    arcos = {k: v.quantize(COSTO) for k, v in arcos.items()}
+    intermedios = [(a, b, cap, costo.quantize(COSTO)) for a, b, cap, costo in intermedios]
     fuente, sumidero = "\0fuente", "\0sumidero"
     grafo: dict[str, list[list]] = {fuente: [], sumidero: []}
 
@@ -153,18 +165,28 @@ def flujo_de_costo_minimo(
         grafo[a].append([b, cap, costo, len(grafo[b])])
         grafo[b].append([a, 0, -costo, len(grafo[a]) - 1])
 
+    def destino(d):
+        return ("d:" if d in demandas else "g:") + d
+
     for o, cantidad in ofertas.items():
         arista(fuente, "o:" + o, cantidad, Decimal(0))
     for (o, d), costo in arcos.items():
-        arista("o:" + o, "d:" + d, 1, costo)
+        arista("o:" + o, destino(d), 1, costo)
+    for desde, hasta, capacidad, costo in intermedios:
+        arista("g:" + desde, destino(hasta), capacidad, costo)
     for d, cantidad in demandas.items():
         arista("d:" + d, sumidero, cantidad, Decimal(0))
 
-    # Potenciales iniciales: el grafo es un DAG fuente -> ofertas -> demandas -> sumidero.
-    potencial = {n: Decimal(0) for n in grafo}
-    for (o, d), costo in arcos.items():
-        potencial["d:" + d] = min(potencial["d:" + d], costo)
-    potencial[sumidero] = min((potencial["d:" + d] for d in demandas), default=Decimal(0))
+    if intermedios:
+        potencial = _potenciales(grafo, fuente)
+    else:
+        # El grafo es un DAG fuente -> ofertas -> demandas -> sumidero.
+        potencial = {n: Decimal(0) for n in grafo}
+        for (o, d), costo in arcos.items():
+            potencial["d:" + d] = min(potencial["d:" + d], costo)
+        potencial[sumidero] = min((potencial["d:" + d] for d in demandas), default=Decimal(0))
+    if potencial is None:
+        return None
 
     orden = {n: i for i, n in enumerate(grafo)}  # desempate determinístico en el heap
     enviado = 0
@@ -186,8 +208,11 @@ def flujo_de_costo_minimo(
                     heapq.heappush(heap, (nd, orden[m], m))
         if sumidero not in dist:
             return None
-        for n, d_n in dist.items():
-            potencial[n] += d_n
+        # A los que no se alcanzaron les toca la distancia máxima: así ningún costo
+        # reducido queda negativo en la vuelta siguiente (con nodos intermedios pasa).
+        lejos = max(dist.values())
+        for n in potencial:
+            potencial[n] += dist.get(n, lejos)
         # una unidad por el camino (los arcos del medio tienen capacidad 1)
         n = sumidero
         while n != fuente:
@@ -199,6 +224,27 @@ def flujo_de_costo_minimo(
         enviado += 1
 
     return {
-        (o, d): 1 - next(a[1] for a in grafo["o:" + o] if a[0] == "d:" + d)
+        (o, d): 1 - next(a[1] for a in grafo["o:" + o] if a[0] == destino(d))
         for (o, d) in arcos
     }
+
+
+def _potenciales(grafo: dict[str, list[list]], fuente: str) -> dict[str, Decimal] | None:
+    """
+    Distancias más cortas desde la fuente con costos negativos (Bellman-Ford): los
+    potenciales iniciales que dejan todos los costos reducidos >= 0. El grafo es un
+    DAG, así que no hay ciclos negativos. Los nodos no alcanzables quedan en 0.
+    """
+    dist = {fuente: Decimal(0)}
+    for _ in range(len(grafo)):
+        cambio = False
+        for n, aristas in grafo.items():
+            if n not in dist:
+                continue
+            for m, cap, costo, _ in aristas:
+                if cap > 0 and (m not in dist or dist[n] + costo < dist[m]):
+                    dist[m] = dist[n] + costo
+                    cambio = True
+        if not cambio:
+            return {n: dist.get(n, Decimal(0)) for n in grafo}
+    return None  # ciclo negativo: no puede pasar con un DAG
