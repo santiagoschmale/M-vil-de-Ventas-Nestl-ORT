@@ -78,12 +78,12 @@ Documento vivo. Última actualización: después de la reunión con la referente
 
 | # | Pregunta | Prioridad |
 |---|---|---|
-| R1 | **Base del porcentaje**: "25% por vendedor en Córdoba" ¿de qué total? | Alta |
+| R1 | **Base del porcentaje**: implementado como % del total del canal (ejemplo del cliente); confirmar para todas y para las de vendedor | Alta |
 | R2 | En qué nivel del árbol actúa cada tipo de regla | Alta |
-| R3 | Tope compartido ("Córdoba y Buenos Aires no supera 15%"): ¿cada uno o la suma? | Alta |
-| R4 | Si una regla no se puede cumplir: ¿el sistema recorta y redistribuye, o avisa? | Alta |
-| R5 | Prioridad entre reglas que se contradicen | Media |
-| R6 | ¿Una regla puede aplicar sobre kilos y precio a la vez? | Media |
+| ~~R3~~ | ~~Tope compartido~~ — **Respondido**: no hay; cada regla es de un canal con su % | — |
+| ~~R4~~ | ~~Regla contra histórico~~ — **Respondido**: vale la regla, se recorta y redistribuye. Si no se puede cumplir con los datos, se marca | — |
+| ~~R5~~ | ~~Prioridad entre reglas~~ — **Respondido**: no hay; se marca el conflicto | — |
+| ~~R6~~ | ~~Kilos y precio a la vez~~ — **Respondido**: independientes, un % para kilos y otro para NNS en la misma regla | — |
 | R7 | Validar el catálogo de tipos con los 4 o 5 ejemplos reales que envía el cliente | Alta |
 
 **Del equipo**

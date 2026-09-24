@@ -223,13 +223,35 @@ Las reglas **se heredan de un mes al siguiente**. [confirmado]
 Una regla que no entra en ningún tipo del catálogo requiere desarrollo. El cliente
 envía 4 o 5 ejemplos reales para validar que el catálogo alcanza. [confirmado]
 
+### Respuestas del negocio (reunión de reglas, sep 2026)
+
+1. **Tope compartido**: el ejemplo "Córdoba y Buenos Aires no supera 15%" era
+   hipotético. Cuando haya regla, se define **cada mes un % para cada canal**: no
+   hay topes que sumen dos canales. [confirmado]
+2. **Regla contra histórico**: si la regla choca con el histórico, **vale la
+   regla**: se recorta y el resto se redistribuye. [confirmado]
+3. **Reglas que se contradicen**: el sistema **marca el conflicto**; no hay orden
+   de prioridad. [confirmado]
+4. **Kilos y plata**: cada regla es independiente y en el mismo cuadro lleva un %
+   para kilos y un % para NNS. [confirmado]
+
+Implementado en el cruce (`domain/cruce.py`, tests en `test_reglas.py`): tope,
+mínimo y fijo en % del total del canal para una o más categorías.
+
 ### Puntos abiertos [a confirmar]
 
-1. **Base del porcentaje**: "25%" ¿de qué total: del canal, del territorio?
-2. **Tope compartido**: "Córdoba y Buenos Aires no supera 15%", ¿cada uno o la suma?
-3. **Choque entre reglas**: si dos reglas no pueden cumplirse juntas, se marca;
-   ¿hay una prioridad?
-4. **Kilos y plata**: ¿una regla puede aplicar sobre las dos a la vez?
+1. **Base del porcentaje**: el ejemplo "Café + Chocolatería · mínimo 30% del total
+   del canal" dice del canal, y así está implementado. Falta confirmar que vale
+   para todas las reglas.
+2. **Reglas debajo del canal**: "En Córdoba ningún vendedor supera el 25%" actúa
+   en la apertura, no en el cruce. Falta confirmar que va (y la base del %).
+3. **Valor fijo en kilos** ("Córdoba siempre 2.500 kg"): a nivel canal ya es el
+   input 2. ¿Hay valores fijos en kilos para una categoría dentro de un canal, o
+   solo en %?
+4. **Segmento como alcance**: hace falta saber qué categorías forman cada segmento.
+5. **Dos reglas del mismo canal que comparten solo parte de las categorías**
+   (Café + Chocolatería y Chocolatería + Mixes): hoy se informan y no se
+   calculan. ¿Se da en la práctica?
 
 ---
 
