@@ -1,0 +1,103 @@
+# Motor del móvil — notas
+
+Estado, decisiones y gotchas del motor. Lo lee el equipo y Claude Code antes de
+tocar `domain/`, `importer/` o `movil/`.
+
+## Cómo está armado
+
+```
+importer/entradas.py   input 1 (Excel), input 2 (tabla pegada), base y apertura del mes anterior
+domain/cruce.py        cruce SKU × canal: filas = input 1, columnas = input 2
+domain/flujo.py        flujo máximo y de costo mínimo (sin dependencias)
+domain/reparto.py      largest remainder: repartir un total por pesos relativos
+domain/arbol.py        árbol con valor y estado, fijado, ON/OFF, agregado
+movil/recorrido.py     encadena todo y exporta el Excel; también es la línea de comandos
+```
+
+El dominio no importa FastAPI, ni la base, ni openpyxl. Se testea sin levantar nada.
+
+## Correrlo
+
+```
+cd backend
+python3.13 -m venv .venv && PATH="$PWD/.venv/bin:$PATH" make deps-local
+PATH="$PWD/.venv/bin:$PATH" make test
+
+.venv/bin/python -m src.movil.recorrido \
+    --input1 ../data/sample/input1_objetivo.xlsx \
+    --input2 ../data/sample/input2_canales.tsv \
+    --base ../data/sample/base_mes_anterior.xlsx \
+    --salida movil.xlsx
+```
+
+Con la muestra tal cual frena en el SKU nuevo sin base (A4), a propósito. Los datos
+de prueba se regeneran con `data/sample/generar_muestra.py` (semilla y fecha
+fijas: mismos bytes).
+
+## El cruce SKU × canal
+
+1. **Chequeos directos**, todos juntos: los dos inputs suman lo mismo, cada SKU se
+   vendió en algún canal, cada canal tuvo algún SKU. Si todo lo de un SKU o un
+   canal está fijado, el mensaje lo dice.
+2. **Factibilidad por flujo máximo.** Si no hay reparto posible, el corte mínimo
+   dice qué canales piden más de lo que pueden darles los SKUs que se venden ahí
+   (condición de Hall), separado en grupos que no comparten SKUs.
+3. **Celdas que en toda solución quedan en 0** (con base, pero sin lugar): se sacan
+   y se avisan. Sin esto el ajuste converge muy lento.
+4. **Ajuste biproporcional (RAS / IPF)** desde la base, en Decimal con 50 dígitos.
+   Corta si se estanca.
+5. **Redondeo controlado**: cada celda al piso o al techo, elegido por flujo de
+   costo mínimo para que filas y columnas cierren exacto, prefiriendo las de mayor
+   resto (largest remainder en dos dimensiones).
+
+Kilos y plata se cruzan por separado, con la misma base: el ajuste escala filas y
+columnas, así que el precio distinto de cada canal lo absorbe solo.
+
+## Debajo del canal
+
+Cada celda del cruce con apertura del mes anterior es la raíz de un árbol: el
+valor se reparte entre distribuidores o vendedores con `arbol.recalcular`. Las
+entidades apagadas salen en todas las celdas y su parte va a las demás de la misma
+celda. El cruce no cambia al apagar un distribuidor.
+
+## Supuestos (a confirmar con el cliente)
+
+- **A1**: al apagar una entidad, su parte se reparte proporcional al histórico.
+- **A2**: el input 2 cierra exacto. Si admite margen (±500 kg), es un parámetro
+  nuevo del cruce: las columnas pasan a ser rangos.
+- **A3**: formato de la apertura (hoy formato largo en una hoja de la base).
+- **A4**: SKU o entidad sin reparto previo: error explícito, no se inventa.
+- **A10**: los vendedores cuelgan de Directa y de cada territorio.
+- **A11** (2 SKUs en los dos segmentos): **lo resuelve el cruce**. Es una fila con
+  base en canales de los dos segmentos; el ajuste la parte según los totales de
+  cada canal. No hace falta una regla aparte.
+- Una celda con base 0 ("aplica con cero") recibe 0: el ajuste biproporcional no
+  hace crecer un cero. Si el planner quiere darle algo, la fija.
+
+## Gotchas
+
+- **`Decimal("10") == Decimal("10.000")` es verdadero.** Comparar valores no
+  alcanza para saber si un monto salió con los decimales de su unidad: los tests
+  miran también el exponente.
+- **El orden de carga no puede cambiar el resultado.** El cruce ordena filas,
+  columnas y base antes de todo; con restos empatados el desempate del flujo
+  dependía del orden de inserción.
+- **Excel guarda floats.** Se convierten con `Decimal(repr(x))` en un solo lugar
+  (`_celda`). Es el único punto donde entra un float.
+- **Números pegados**: formato argentino si tiene forma de miles con punto
+  (13.000, 1.234,56); si no, punto decimal. "1.234" se lee mil doscientos treinta
+  y cuatro. Acepta `$` adelante; un espacio en el medio no se adivina.
+- **Input 2 separado por comas con coma decimal** parte las celdas: la fila con
+  más columnas que el encabezado se rechaza, no se lee a medias.
+- **Códigos de SKU**: solo dígitos se normalizan (`00123` = `123`). Canales: se
+  cruzan sin importar tildes, mayúsculas ni espacios.
+- **Librerías `nbra-*`**: no existen en los registros públicos y no hay que
+  pedirlas ahí (dependency confusion). `make deps-local` usa `local_shims/`.
+
+## Falta
+
+- Reglas (catálogo de tipos): tope o mínimo en %, valor fijo, dónde se vende un
+  SKU. Hoy solo existen el total por canal (input 2) y las celdas fijadas.
+- Margen del input 2 (A2).
+- API y pantalla central (input 2, reglas, inconsistencias).
+- Persistencia en Postgres.
