@@ -108,22 +108,25 @@ def cruzar(
         celdas = {k: _a_decimal(unidades.get(k, 0), decimales) for k in semillas if k[0] in r and k[1] in c}
         return ResultadoCruce(celdas=celdas, **extra)
 
+    # Chequeos directos: se juntan todos antes de cortar, para que el planner vea
+    # todos los problemas de una vez y no uno por vuelta.
+    inconsistencias = []
     total_filas, total_columnas = sum(r.values()), sum(c.values())
     if total_filas != total_columnas:
         dif = _a_decimal(abs(total_filas - total_columnas), decimales)
-        return ResultadoCruce(celdas=None, inconsistencias=[Inconsistencia(
+        inconsistencias.append(Inconsistencia(
             "totales_distintos",
             f"El objetivo por SKU (input 1) suma {_a_decimal(total_filas, decimales)} y los totales por canal "
             f"(input 2) suman {_a_decimal(total_columnas, decimales)}: difieren en {dif}.",
             diferencia=dif,
-        )])
+        ))
 
     # Las fijadas se descuentan de su fila y su columna.
     for (s, k), v in fijadas.items():
         r[s] -= v
         c[k] -= v
     total_filas -= sum(fijadas.values())
-    inconsistencias = [
+    inconsistencias += [
         Inconsistencia("fijado_excede", f"Lo fijado en el SKU {s} supera su objetivo en {_a_decimal(-v, decimales)}.",
                        skus=(s,), diferencia=_a_decimal(-v, decimales))
         for s, v in sorted(r.items()) if v < 0
@@ -132,8 +135,6 @@ def cruzar(
                        canales=(k,), diferencia=_a_decimal(-v, decimales))
         for k, v in sorted(c.items()) if v < 0
     ]
-    if inconsistencias:
-        return ResultadoCruce(celdas=None, inconsistencias=inconsistencias)
 
     # Celdas que pueden recibir algo: base positiva, sin fijar, con fila y columna por repartir.
     soporte = {
@@ -144,13 +145,25 @@ def cruzar(
     columnas_con_sku = {k for _, k in soporte}
     sin_canal = [s for s, v in r.items() if v > 0 and s not in filas_con_canal]
     sin_sku = [k for k, v in c.items() if v > 0 and k not in columnas_con_sku]
-    inconsistencias = [
-        Inconsistencia("sku_sin_canal", f"El SKU {s} tiene objetivo pero no tiene reparto previo en ningún canal "
-                       f"(caso A4: SKU sin reparto previo, regla pendiente).", skus=(s,))
+    filas_fijadas = {k[0] for k in fijadas}
+    columnas_fijadas = {k[1] for k in fijadas}
+
+    def sin_celdas_libres(que: str, nombre: str, falta: int, fijado: bool) -> str:
+        if fijado:
+            return (f"Lo fijado en el {que} {nombre} no alcanza su total y no le quedan celdas libres: "
+                    f"faltan {_a_decimal(falta, decimales)}.")
+        if que == "SKU":
+            return (f"El SKU {nombre} tiene objetivo pero no tiene reparto previo en ningún canal "
+                    f"(caso A4: SKU sin reparto previo, regla pendiente).")
+        return f"El canal {nombre} tiene total pero ningún SKU se vendió ahí el mes anterior."
+
+    inconsistencias += [
+        Inconsistencia("sku_sin_canal", sin_celdas_libres("SKU", s, r[s], s in filas_fijadas), skus=(s,),
+                       diferencia=_a_decimal(r[s], decimales))
         for s in sin_canal
     ] + [
-        Inconsistencia("canal_sin_sku", f"El canal {k} tiene total pero ningún SKU se vendió ahí el mes anterior.",
-                       canales=(k,))
+        Inconsistencia("canal_sin_sku", sin_celdas_libres("canal", k, c[k], k in columnas_fijadas), canales=(k,),
+                       diferencia=_a_decimal(c[k], decimales))
         for k in sin_sku
     ]
     if inconsistencias:

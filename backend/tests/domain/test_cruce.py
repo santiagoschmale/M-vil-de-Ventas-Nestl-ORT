@@ -375,9 +375,15 @@ def test_totales_distintos_muestra_los_totales_cargados_aunque_haya_fijadas():
         fijas={("A", "X"): D("30")},
         decimales=0,
     )
-    (inc,) = r.inconsistencias
-    assert "100" in inc.mensaje and "90" in inc.mensaje
-    assert inc.diferencia == D("10")
+    por_tipo = {i.tipo: i for i in r.inconsistencias}
+    assert set(por_tipo) == {"totales_distintos", "canal_sin_sku"}
+    totales = por_tipo["totales_distintos"]
+    assert "suma 100 " in totales.mensaje and "suman 90:" in totales.mensaje
+    assert totales.diferencia == D("10")
+    # X pide 60 y su única celda está fijada en 30: faltan 30, y el mensaje dice por qué.
+    x = por_tipo["canal_sin_sku"]
+    assert x.canales == ("X",) and x.diferencia == D("30")
+    assert "fijado" in x.mensaje and "vendió" not in x.mensaje
 
 
 def test_faltantes_independientes_se_informan_por_separado():
@@ -403,3 +409,34 @@ def test_no_se_puede_fijar_una_celda_de_un_sku_o_canal_que_no_esta_en_los_inputs
     base = {("A", "X"): D(1), ("apagado", "X"): D(1)}
     assert _lanza_error(filas={"A": D("10")}, columnas={"X": D("10")}, base=base,
                         fijas={("apagado", "X"): D("1")})
+
+
+def test_los_chequeos_directos_se_informan_todos_juntos():
+    """Totales distintos y un SKU sin base: el planner los ve a los dos en la misma vuelta."""
+    r = cruzar(
+        filas={"A": D("10"), "nuevo": D("5")},
+        columnas={"X": D("12")},
+        base={("A", "X"): D(1)},
+    )
+    assert sorted(i.tipo for i in r.inconsistencias) == ["sku_sin_canal", "totales_distintos"]
+
+
+def test_cada_monto_sale_con_exactamente_los_decimales_de_su_unidad():
+    """
+    Decimal("10") == Decimal("10.000") es verdadero en Python: comparar valores no
+    alcanza. Kilos salen con 3 decimales y plata con 2, siempre, también los ceros.
+    """
+    filas, columnas, base = _caso_grande()
+    for decimales in (3, 2, 0):
+        filas_q = {s: v.quantize(D(1).scaleb(-decimales), rounding="ROUND_DOWN") for s, v in filas.items()}
+        total = sum(filas_q.values())
+        columnas_q = {k: v.quantize(D(1).scaleb(-decimales), rounding="ROUND_DOWN") for k, v in columnas.items()}
+        ultimo = sorted(columnas_q)[-1]
+        columnas_q[ultimo] += total - sum(columnas_q.values())
+        r = cruzar(filas=filas_q, columnas=columnas_q, base=base, decimales=decimales)
+        assert r.celdas, r.inconsistencias
+        for celda, valor in r.celdas.items():
+            assert valor.as_tuple().exponent == -decimales, (decimales, celda, valor)
+    # También las diferencias que se informan.
+    r = cruzar(filas={"A": D("100")}, columnas={"X": D("90")}, base={("A", "X"): D(1)}, decimales=2)
+    assert str(r.inconsistencias[0].diferencia) == "10.00"
