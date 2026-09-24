@@ -149,3 +149,6 @@ __pycache__/
 # Backend local
 backend/.venv/
 backend/.requirements.publicas.txt
+
+# Salidas locales del recorrido
+backend/movil*.xlsx

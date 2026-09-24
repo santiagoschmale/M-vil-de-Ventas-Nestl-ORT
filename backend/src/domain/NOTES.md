@@ -30,9 +30,19 @@ PATH="$PWD/.venv/bin:$PATH" make test
     --salida movil.xlsx
 ```
 
-Con la muestra tal cual frena en el SKU nuevo sin base (A4), a propósito. Los datos
-de prueba se regeneran con `data/sample/generar_muestra.py` (semilla y fecha
-fijas: mismos bytes).
+Con la muestra tal cual frena en el SKU nuevo sin base (A4), a propósito. Para ver
+un móvil que cierra, apagar ese SKU y usar el input 2 sin él:
+
+```
+.venv/bin/python -m src.movil.recorrido \
+    --input1 ../data/sample/input1_objetivo.xlsx \
+    --input2 ../data/sample/input2_sin_sku_nuevo.tsv \
+    --base ../data/sample/base_mes_anterior.xlsx \
+    --apagar 90020900 --salida movil.xlsx
+```
+
+Los datos de prueba se regeneran con `data/sample/generar_muestra.py`: semilla,
+fechas y horas internas del zip fijas, así que regenerar da los mismos bytes.
 
 ## El cruce SKU × canal
 

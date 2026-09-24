@@ -12,6 +12,8 @@ Salida (en data/sample/):
   Segunda hoja "Apertura anterior": cómo se abrió cada celda debajo del canal
   (SKU, canal, entidad, kilos): distribuidores en Distribuidores, vendedores en
   Directa, Córdoba y Rosario (supuesto A10: cada territorio con sus vendedores).
+- input2_sin_sku_nuevo.tsv: el input 2 sin el SKU nuevo. Con --apagar 90020900 el
+  móvil cierra.
 - input2_distribuidores_imposible.tsv: el ejemplo del cliente. Distribuidores pide
   más de lo que pueden darle los SKUs que se venden ahí.
 
@@ -24,10 +26,11 @@ Semilla fija: correrlo dos veces da lo mismo.
 """
 
 import random
+import re
+import zipfile
+from datetime import datetime
 from decimal import Decimal as D
 from pathlib import Path
-
-from datetime import datetime
 
 from openpyxl import Workbook
 
@@ -36,6 +39,30 @@ rnd = random.Random(2026)
 KG = D("0.001")
 CENTAVO = D("0.01")
 FECHA = datetime(2026, 9, 1)  # fija: regenerar da los mismos bytes
+
+
+def guardar(libro, nombre: str) -> None:
+    """
+    Guarda el Excel con fechas fijas. Un .xlsx es un zip: cada archivo interno lleva la
+    hora de escritura y docProps/core.xml la fecha de modificado. Sin fijar las dos,
+    dos corridas dan bytes distintos.
+    """
+    libro.properties.created = libro.properties.modified = FECHA
+    ruta = AQUI / nombre
+    libro.save(ruta)
+    with zipfile.ZipFile(ruta) as z:
+        partes = [(i.filename, z.read(i.filename)) for i in z.infolist()]
+    # openpyxl pisa la fecha de modificado con la hora actual al guardar: se vuelve a fijar.
+    iso = FECHA.strftime("%Y-%m-%dT%H:%M:%SZ").encode()
+    partes = [
+        (n, re.sub(rb"(<dcterms:modified[^>]*>)[^<]*(</dcterms:modified>)", rb"\g<1>" + iso + rb"\g<2>", d)
+         if n == "docProps/core.xml" else d)
+        for n, d in partes
+    ]
+    with zipfile.ZipFile(ruta, "w", zipfile.ZIP_DEFLATED) as z:
+        for nombre_parte, datos in partes:
+            z.writestr(zipfile.ZipInfo(nombre_parte, date_time=FECHA.timetuple()[:6]), datos,
+                       compress_type=zipfile.ZIP_DEFLATED)
 
 INGREDIENTES = ["Catering", "Vending", "Mayoristas", "KAM Ingredientes"]
 SOLUCIONES = ["Distribuidores", "Directa (BA)", "Córdoba", "Rosario", "KAM Sol"]
@@ -124,8 +151,7 @@ nuevo = sku(900)  # SKU nuevo: tiene objetivo pero no estaba el mes anterior (A4
 hoja.append(["Soluciones", "Café en cápsula x50", int(nuevo), 125000.0, 10.0, 129375.0, "AR"])
 hoja.append(["Ingredientes", "Leche en polvo 1kg", int(sku(950)), 0.0, 0.0, 0.0, "UY"])  # otro país, en cero
 hoja.append(["Ingredientes", "Café soluble 1kg (repetido)", int(skus[0]["codigo"]), 1.0, 1.0, 1.0, "AR"])  # código repetido
-wb.properties.created = wb.properties.modified = FECHA
-wb.save(AQUI / "input1_objetivo.xlsx")
+guardar(wb, "input1_objetivo.xlsx")
 
 # ---------------------------------------------------------------------------
 # Input 2: totales por canal (tabla pegada)
@@ -150,6 +176,8 @@ kilos_canal_con_nuevo["Directa (BA)"] += D(10)
 plata_canal_con_nuevo = dict(plata_canal)
 plata_canal_con_nuevo["Directa (BA)"] += D(125000)
 escribir_input2("input2_canales.tsv", kilos_canal_con_nuevo, plata_canal_con_nuevo)
+# Lo que haría el planner si apaga el SKU nuevo: saca sus 10 kg (y su plata) de Directa.
+escribir_input2("input2_sin_sku_nuevo.tsv", kilos_canal, plata_canal)
 
 # El ejemplo del cliente: el planner le pide a Distribuidores 1.000 kg más de lo que
 # pueden darle todos los SKUs que se venden ahí juntos, y se lo saca a los otros canales
@@ -199,8 +227,7 @@ for (codigo, canal), v in sorted(base.items()):
         if r < 0.2:
             continue  # no aplica
         apertura.append([int(codigo), canal, entidad, 0.0 if r < 0.25 else float(rnd.randint(10, 900))])
-wb.properties.created = wb.properties.modified = FECHA
-wb.save(AQUI / "base_mes_anterior.xlsx")
+guardar(wb, "base_mes_anterior.xlsx")
 
 print(f"{len(skus)} SKUs con base, {len(base)} celdas, {len(obsoletos)} en cero, 1 nuevo.")
 print(f"Kilos totales: {sum(kilos_sku.values()) + 10}")
