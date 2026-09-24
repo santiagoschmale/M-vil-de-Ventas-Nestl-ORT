@@ -86,28 +86,43 @@ def cruzar(
     if type(decimales) is not int or decimales < 0:
         raise ErrorDeCruce(f"decimales tiene que ser un entero >= 0, llegó {decimales!r}.")
     fijas = dict(fijas or {})
-    r = {s: _unidades(v, decimales, f"objetivo del SKU {s}") for s, v in filas.items()}
-    c = {k: _unidades(v, decimales, f"total del canal {k}") for k, v in columnas.items()}
+    # Orden canónico: todo lo que sigue recorre filas, columnas y base ordenadas, así
+    # el resultado no depende del orden de carga (tampoco en los desempates).
+    r = {s: _unidades(v, decimales, f"objetivo del SKU {s}") for s, v in sorted(filas.items())}
+    c = {k: _unidades(v, decimales, f"total del canal {k}") for k, v in sorted(columnas.items())}
     semillas = {}
-    for celda, peso in base.items():
+    for celda, peso in sorted(base.items()):
         _exigir_decimal(peso, f"base de {celda}")
         if peso < 0:
             raise ErrorDeCruce(f"La base de {celda} es negativa: {peso}.")
         semillas[celda] = peso
     fijadas = {}
-    for celda, v in fijas.items():
+    for celda, v in sorted(fijas.items()):
         if celda not in semillas:
             raise ErrorDeCruce(f"No se puede fijar {celda}: el SKU no se vende en ese canal.")
+        if celda[0] not in r or celda[1] not in c:
+            raise ErrorDeCruce(f"No se puede fijar {celda}: el SKU o el canal no están en los inputs del mes.")
         fijadas[celda] = _unidades(v, decimales, f"valor fijado de {celda}")
 
     def resultado(unidades: dict[Celda, int], **extra) -> ResultadoCruce:
         celdas = {k: _a_decimal(unidades.get(k, 0), decimales) for k in semillas if k[0] in r and k[1] in c}
         return ResultadoCruce(celdas=celdas, **extra)
 
+    total_filas, total_columnas = sum(r.values()), sum(c.values())
+    if total_filas != total_columnas:
+        dif = _a_decimal(abs(total_filas - total_columnas), decimales)
+        return ResultadoCruce(celdas=None, inconsistencias=[Inconsistencia(
+            "totales_distintos",
+            f"El objetivo por SKU (input 1) suma {_a_decimal(total_filas, decimales)} y los totales por canal "
+            f"(input 2) suman {_a_decimal(total_columnas, decimales)}: difieren en {dif}.",
+            diferencia=dif,
+        )])
+
     # Las fijadas se descuentan de su fila y su columna.
     for (s, k), v in fijadas.items():
-        r[s] = r.get(s, 0) - v
-        c[k] = c.get(k, 0) - v
+        r[s] -= v
+        c[k] -= v
+    total_filas -= sum(fijadas.values())
     inconsistencias = [
         Inconsistencia("fijado_excede", f"Lo fijado en el SKU {s} supera su objetivo en {_a_decimal(-v, decimales)}.",
                        skus=(s,), diferencia=_a_decimal(-v, decimales))
@@ -120,23 +135,15 @@ def cruzar(
     if inconsistencias:
         return ResultadoCruce(celdas=None, inconsistencias=inconsistencias)
 
-    total_filas, total_columnas = sum(r.values()), sum(c.values())
-    if total_filas != total_columnas:
-        dif = _a_decimal(abs(total_filas - total_columnas), decimales)
-        return ResultadoCruce(celdas=None, inconsistencias=[Inconsistencia(
-            "totales_distintos",
-            f"El objetivo por SKU (input 1) suma {_a_decimal(total_filas, decimales)} y los totales por canal "
-            f"(input 2) suman {_a_decimal(total_columnas, decimales)}: difieren en {dif}.",
-            diferencia=dif,
-        )])
-
     # Celdas que pueden recibir algo: base positiva, sin fijar, con fila y columna por repartir.
     soporte = {
         k: w for k, w in semillas.items()
         if w > 0 and k not in fijadas and r.get(k[0], 0) > 0 and c.get(k[1], 0) > 0
     }
-    sin_canal = sorted(s for s, v in r.items() if v > 0 and not any(k[0] == s for k in soporte))
-    sin_sku = sorted(k for k, v in c.items() if v > 0 and not any(x[1] == k for x in soporte))
+    filas_con_canal = {s for s, _ in soporte}
+    columnas_con_sku = {k for _, k in soporte}
+    sin_canal = [s for s, v in r.items() if v > 0 and s not in filas_con_canal]
+    sin_sku = [k for k, v in c.items() if v > 0 and k not in columnas_con_sku]
     inconsistencias = [
         Inconsistencia("sku_sin_canal", f"El SKU {s} tiene objetivo pero no tiene reparto previo en ningún canal "
                        f"(caso A4: SKU sin reparto previo, regla pendiente).", skus=(s,))
@@ -152,15 +159,15 @@ def cruzar(
     # Factibilidad: ¿algún reparto cumple todo con las celdas permitidas?
     red = _red(r, c, soporte)
     if red.maximo("fuente", "sumidero") < total_filas:
-        return ResultadoCruce(celdas=None, inconsistencias=[_deficit(red, r, c, soporte, decimales)])
+        return ResultadoCruce(celdas=None, inconsistencias=_deficits(red, r, c, soporte, decimales))
 
     # Celdas que en cualquier solución quedan en cero: se sacan del ajuste y se avisan.
     comp = red.componentes()
     forzadas = sorted(k for k in soporte if red.flujo("s:" + k[0], "c:" + k[1]) == 0
                       and comp["s:" + k[0]] != comp["c:" + k[1]])
     avisos = [
-        f"El SKU {s} tiene base en el canal {k}, pero tiene que quedar en 0 ahí para que cierren "
-        f"los totales (otros SKUs cubren todo {k})."
+        f"El SKU {s} tiene base en el canal {k}, pero en cualquier reparto que cierre los totales "
+        f"esa celda queda en 0."
         for s, k in forzadas
     ]
     for k in forzadas:
@@ -210,26 +217,51 @@ def _red(r: dict[str, int], c: dict[str, int], soporte: Mapping[Celda, Decimal])
     return red
 
 
-def _deficit(red: FlujoMaximo, r, c, soporte, decimales: int) -> Inconsistencia:
+def _deficits(red: FlujoMaximo, r, c, soporte, decimales: int) -> list[Inconsistencia]:
     """
     Del corte mínimo: los canales del lado del sumidero necesitan más de lo que
-    suman los SKUs que se venden ahí (condición de Hall).
+    suman los SKUs que se venden ahí (condición de Hall). Se separan en grupos que
+    no comparten SKUs, para que cada faltante se informe con su propia diferencia.
     """
     lado_fuente = red.alcanzables("fuente")
-    canales = tuple(sorted(k for k in c if "c:" + k not in lado_fuente and c[k] > 0))
-    skus = tuple(sorted({s for (s, k) in soporte if k in canales}))
-    necesitan = sum(c[k] for k in canales)
-    pueden = sum(r[s] for s in skus)
-    dif = _a_decimal(necesitan - pueden, decimales)
-    nombres = ", ".join(canales)
-    return Inconsistencia(
-        "canales_sin_volumen",
-        f"{nombres} {'necesita' if len(canales) == 1 else 'necesitan'} {_a_decimal(necesitan, decimales)}, pero "
-        f"los SKUs que se venden ahí suman {_a_decimal(pueden, decimales)} en total: faltan {dif}.",
-        skus=skus,
-        canales=canales,
-        diferencia=dif,
-    )
+    canales = {k for k in c if "c:" + k not in lado_fuente and c[k] > 0}
+    # Grupos: componentes conexas de canales unidos por SKUs que se venden en ambos.
+    grupo = {k: k for k in canales}
+
+    def raiz(k):
+        while grupo[k] != k:
+            grupo[k] = grupo[grupo[k]]
+            k = grupo[k]
+        return k
+
+    canales_de_sku: dict[str, list[str]] = {}
+    for s, k in soporte:
+        if k in canales:
+            canales_de_sku.setdefault(s, []).append(k)
+    for ks in canales_de_sku.values():
+        for k in ks[1:]:
+            grupo[raiz(k)] = raiz(ks[0])
+    grupos: dict[str, list[str]] = {}
+    for k in sorted(canales):
+        grupos.setdefault(raiz(k), []).append(k)
+
+    inconsistencias = []
+    for ks in grupos.values():
+        skus = tuple(sorted(s for s, kk in canales_de_sku.items() if set(kk) & set(ks)))
+        necesitan = sum(c[k] for k in ks)
+        pueden = sum(r[s] for s in skus)
+        if necesitan <= pueden:
+            continue  # este grupo solo no es el problema
+        dif = _a_decimal(necesitan - pueden, decimales)
+        inconsistencias.append(Inconsistencia(
+            "canales_sin_volumen",
+            f"{', '.join(ks)} {'necesita' if len(ks) == 1 else 'necesitan'} {_a_decimal(necesitan, decimales)}, "
+            f"pero los SKUs que se venden ahí suman {_a_decimal(pueden, decimales)} en total: faltan {dif}.",
+            skus=skus,
+            canales=tuple(ks),
+            diferencia=dif,
+        ))
+    return inconsistencias
 
 
 def _ajuste_biproporcional(
@@ -249,6 +281,7 @@ def _ajuste_biproporcional(
     with localcontext() as ctx:
         ctx.prec = PRECISION
         m = {k: Decimal(soporte[k]) for k in celdas}
+        referencia = Decimal("Infinity")
         for iteracion in range(1, MAX_ITERACIONES + 1):
             for s, ks in por_fila.items():
                 factor = Decimal(r[s]) / sum(m[k] for k in ks)
@@ -261,6 +294,12 @@ def _ajuste_biproporcional(
             error = max((abs(sum(m[k] for k in ks) - r[s]) for s, ks in por_fila.items()), default=Decimal(0))
             if error < TOLERANCIA:
                 return m, iteracion
+            # Sin celdas de borde la convergencia es lineal: si en 100 vueltas el error no
+            # baja a la mitad, está estancado y no tiene sentido seguir quemando CPU.
+            if iteracion % 100 == 0:
+                if error > referencia / 2:
+                    return None, iteracion
+                referencia = error
     return None, MAX_ITERACIONES
 
 
@@ -274,8 +313,11 @@ def _redondeo_controlado(
     Existe siempre que la matriz real tenga filas y columnas enteras (Bacharach).
     """
     pisos = {k: floor(v) for k, v in real.items()}
-    faltan_fila = {s: r[s] - sum(v for k, v in pisos.items() if k[0] == s) for s in r if r[s] > 0}
-    faltan_columna = {x: c[x] - sum(v for k, v in pisos.items() if k[1] == x) for x in c if c[x] > 0}
+    faltan_fila = {s: v for s, v in r.items() if v > 0}
+    faltan_columna = {x: v for x, v in c.items() if v > 0}
+    for (s, x), v in pisos.items():
+        faltan_fila[s] -= v
+        faltan_columna[x] -= v
     if any(v < 0 for v in [*faltan_fila.values(), *faltan_columna.values()]):
         return None
     arcos = {k: -(v - pisos[k]) for k, v in real.items() if v - pisos[k] > 0}

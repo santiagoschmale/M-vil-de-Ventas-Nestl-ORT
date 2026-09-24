@@ -346,3 +346,60 @@ def test_la_factibilidad_coincide_con_la_condicion_de_hall():
         assert (r.celdas is not None) == hall, (base, filas, columnas, r.inconsistencias)
         if r.celdas is not None:
             assert _cierra(r, filas, columnas)
+
+
+# ---------------------------------------------------------------------------
+# Hallazgos del code review
+# ---------------------------------------------------------------------------
+
+def test_con_restos_empatados_el_orden_de_carga_no_cambia_el_resultado():
+    """Base pareja: todos los restos empatan. Cargar los SKUs en otro orden no puede cambiar nada."""
+    columnas = {"X": D("2"), "Y": D("1")}
+    base = {(s, c): D(1) for s in "ABC" for c in columnas}
+    uno = cruzar(filas={"A": D("1"), "B": D("1"), "C": D("1")}, columnas=columnas, base=base, decimales=0)
+    for orden in ("CBA", "BCA", "ACB"):
+        otro = cruzar(
+            filas={s: D("1") for s in orden},
+            columnas=dict(reversed(list(columnas.items()))),
+            base=dict(reversed(list(base.items()))),
+            decimales=0,
+        )
+        assert otro.celdas == uno.celdas, orden
+
+
+def test_totales_distintos_muestra_los_totales_cargados_aunque_haya_fijadas():
+    r = cruzar(
+        filas={"A": D("100")},
+        columnas={"X": D("60"), "Y": D("30")},
+        base={("A", "X"): D(1), ("A", "Y"): D(1)},
+        fijas={("A", "X"): D("30")},
+        decimales=0,
+    )
+    (inc,) = r.inconsistencias
+    assert "100" in inc.mensaje and "90" in inc.mensaje
+    assert inc.diferencia == D("10")
+
+
+def test_faltantes_independientes_se_informan_por_separado():
+    """Dos canales con faltantes que no tienen nada que ver: uno por cada uno, con su diferencia."""
+    r = cruzar(
+        filas={"grande": D("100"), "chico1": D("5"), "chico2": D("3")},
+        columnas={"Distribuidores": D("12"), "Rosario": D("4"), "Mayoristas": D("92")},
+        base={
+            ("grande", "Mayoristas"): D(1),
+            ("chico1", "Distribuidores"): D(1),
+            ("chico2", "Rosario"): D(1),
+        },
+        decimales=0,
+    )
+    faltantes = sorted((i.canales, i.skus, i.diferencia) for i in r.inconsistencias)
+    assert faltantes == [
+        (("Distribuidores",), ("chico1",), D("7")),
+        (("Rosario",), ("chico2",), D("1")),
+    ]
+
+
+def test_no_se_puede_fijar_una_celda_de_un_sku_o_canal_que_no_esta_en_los_inputs():
+    base = {("A", "X"): D(1), ("apagado", "X"): D(1)}
+    assert _lanza_error(filas={"A": D("10")}, columnas={"X": D("10")}, base=base,
+                        fijas={("apagado", "X"): D("1")})
