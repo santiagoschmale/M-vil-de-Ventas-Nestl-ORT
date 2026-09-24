@@ -35,7 +35,8 @@ from src.importer.entradas import (
     numero,
 )
 from src.domain.arbol import Problema
-from src.movil.recorrido import Recorrido, armar
+from src.domain.cruce import LIMITES
+from src.movil.recorrido import Recorrido, Regla, armar
 
 UNIDADES = {"kilos": KILOS, "plata": PLATA}
 
@@ -61,6 +62,12 @@ class Fijada:
 
 
 @dataclass
+class ReglaCargada:
+    regla: Regla
+    ajuste: Ajuste  # el último cambio: quién, cuándo y por qué
+
+
+@dataclass
 class _Entradas:
     objetivos: dict | None = None
     problemas1: list[Problema] = field(default_factory=list)
@@ -80,6 +87,8 @@ class Sesion:
         self.apagados_skus: dict[str, Ajuste] = {}
         self.entidades_apagadas: dict[str, Ajuste] = {}
         self._fijas: dict[str, dict[Celda, Fijada]] = {"kilos": {}, "plata": {}}
+        self.reglas: dict[str, ReglaCargada] = {}
+        self._proxima_regla = 1  # los ids no se reusan: el historial los nombra
         self.historial: list[Ajuste] = []
         self.recorrido: Recorrido | None = None
 
@@ -200,6 +209,45 @@ class Sesion:
             return Ajuste("desfijar", f"{sku} × {canal} en {'kilos' if unidad == 'kilos' else 'pesos'}", autor, cuando, motivo)
         self._aplicar(cambio)
 
+    # --- reglas -------------------------------------------------------------
+
+    def agregar_regla(self, canal: str, categorias, limite: str, kilos: str | None, nns: str | None,
+                      autor: str, cuando: datetime, motivo: str) -> str:
+        motivo = _motivo(motivo)
+        id_ = f"R{self._proxima_regla}"
+        regla = _regla(id_, canal, categorias, limite, kilos, nns)
+
+        def cambio():
+            self._proxima_regla += 1
+            ajuste = Ajuste("agregar_regla", _describir(regla), autor, cuando, motivo)
+            self.reglas[id_] = ReglaCargada(regla, ajuste)
+            return ajuste
+        self._aplicar(cambio)
+        return id_
+
+    def editar_regla(self, id_: str, canal: str, categorias, limite: str, kilos: str | None, nns: str | None,
+                     autor: str, cuando: datetime, motivo: str) -> None:
+        motivo = _motivo(motivo)
+        if id_ not in self.reglas:
+            raise ErrorDeAjuste(f"No hay ninguna regla {id_}.")
+        regla = _regla(id_, canal, categorias, limite, kilos, nns)
+
+        def cambio():
+            ajuste = Ajuste("editar_regla", _describir(regla), autor, cuando, motivo)
+            self.reglas[id_] = ReglaCargada(regla, ajuste)
+            return ajuste
+        self._aplicar(cambio)
+
+    def eliminar_regla(self, id_: str, autor: str, cuando: datetime, motivo: str) -> None:
+        motivo = _motivo(motivo)
+        if id_ not in self.reglas:
+            raise ErrorDeAjuste(f"No hay ninguna regla {id_}.")
+
+        def cambio():
+            regla = self.reglas.pop(id_).regla
+            return Ajuste("eliminar_regla", _describir(regla), autor, cuando, motivo)
+        self._aplicar(cambio)
+
     # --- interno ------------------------------------------------------------
 
     def _unidad(self, unidad: str) -> int:
@@ -218,12 +266,14 @@ class Sesion:
         estaba antes y no queda nada a medias. Si sale bien, va al historial.
         """
         respaldo = (copy.copy(self._e), dict(self.apagados_skus), dict(self.entidades_apagadas),
-                    {u: dict(f) for u, f in self._fijas.items()}, self.recorrido)
+                    {u: dict(f) for u, f in self._fijas.items()}, dict(self.reglas), self._proxima_regla,
+                    self.recorrido)
         try:
             ajuste = cambio()
             self.recorrido = self._recalcular()
         except Exception:
-            self._e, self.apagados_skus, self.entidades_apagadas, self._fijas, self.recorrido = respaldo
+            (self._e, self.apagados_skus, self.entidades_apagadas, self._fijas, self.reglas,
+             self._proxima_regla, self.recorrido) = respaldo
             raise
         self.historial.append(ajuste)
 
@@ -253,6 +303,7 @@ class Sesion:
                 problemas=self._e.problemas1 + self._e.problemas2 + self._e.problemas_base,
                 apertura=self._e.apertura,
                 entidades_apagadas=set(self.entidades_apagadas),
+                reglas=[r.regla for r in self.reglas.values()],
             )
         except ErrorDeCruce as e:
             raise ErrorDeAjuste(str(e)) from e
@@ -260,6 +311,41 @@ class Sesion:
 
 def _con_unidad(valor: Decimal, unidad: str) -> str:
     return f"{a_texto(valor)} kg" if unidad == "kilos" else f"$ {a_texto(valor)}"
+
+
+_NOMBRE_LIMITE = {"tope": "tope", "minimo": "mínimo", "fijo": "fijo"}
+
+
+def _regla(id_, canal, categorias, limite, kilos, nns) -> Regla:
+    """Valida lo que cargó el planner. Una regla que se puede leer pero no cumplir no es un error."""
+    canal = (canal or "").strip()
+    if not canal:
+        raise ErrorDeAjuste("La regla necesita un canal.")
+    categorias = frozenset(c.strip() for c in (categorias or []) if c and c.strip())
+    if not categorias:
+        raise ErrorDeAjuste("La regla necesita al menos una categoría.")
+    if limite not in LIMITES:
+        raise ErrorDeAjuste(f"Límite desconocido: {limite}. Usar tope, mínimo o fijo.")
+    pct_kilos, pct_nns = _porcentaje(kilos, "kilos"), _porcentaje(nns, "NNS")
+    if pct_kilos is None and pct_nns is None:
+        raise ErrorDeAjuste("La regla necesita un % para kilos, para NNS o para los dos.")
+    return Regla(id_, canal, categorias, limite, pct_kilos, pct_nns)
+
+
+def _porcentaje(texto: str | None, unidad: str) -> Decimal | None:
+    if texto is None or not str(texto).strip():
+        return None  # en esa unidad la regla no aplica
+    valor = numero(str(texto).replace("%", ""))
+    if valor is None:
+        raise ErrorDeAjuste(f"El % de {unidad} ('{texto}') no es un número.")
+    if not 0 <= valor <= 100:
+        raise ErrorDeAjuste(f"El % de {unidad} tiene que estar entre 0 y 100.")
+    return valor
+
+
+def _describir(r: Regla) -> str:
+    partes = [f"{a_texto(p)}% {u}" for p, u in ((r.kilos, "kilos"), (r.nns, "NNS")) if p is not None]
+    return f"{r.id}: {r.canal} · {' + '.join(sorted(r.categorias))} · {_NOMBRE_LIMITE[r.limite]} {' y '.join(partes)}"
 
 
 def _motivo(motivo: str | None) -> str:
