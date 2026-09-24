@@ -54,7 +54,8 @@ beforeEach(() => {
   );
 });
 
-describe('MovilPage', () => {
+// Renderiza la pantalla entera con MUI: con toda la suite en paralelo, 5 s no siempre alcanzan.
+describe('MovilPage', { timeout: 15000 }, () => {
   it('muestra los montos tal como vienen, con separadores argentinos y sin redondear', async () => {
     render(<MovilPage />);
     expect(await screen.findByText('1.000,000')).toBeInTheDocument();
@@ -63,7 +64,7 @@ describe('MovilPage', () => {
   });
 
   it('fijar una celda manda el monto como texto con su motivo', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     render(<MovilPage />);
     await user.click(await screen.findByRole('button', { name: '100 en Catering: 1.000,000' }));
     const dialogo = screen.getByRole('dialog');
@@ -83,7 +84,7 @@ describe('MovilPage', () => {
   });
 
   it('apagar un SKU pide motivo y codifica la ruta', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     render(<MovilPage />);
     await user.click(await screen.findByRole('checkbox', { name: 'Apagar 200' }));
     const dialogo = screen.getByRole('dialog');
@@ -99,7 +100,7 @@ describe('MovilPage', () => {
   it('si el backend rechaza el valor, el motivo se ve en el diálogo y no se cierra', async () => {
     const detalle = 'El valor supera el objetivo del SKU 100 (1500.000).';
     server.use(http.put('*/api/movil/celdas/*', () => HttpResponse.json({ detail: detalle }, { status: 422 })));
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     render(<MovilPage />);
     await user.click(await screen.findByRole('button', { name: '100 en Catering: 1.000,000' }));
     const dialogo = screen.getByRole('dialog');

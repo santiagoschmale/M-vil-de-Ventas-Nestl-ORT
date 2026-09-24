@@ -1,5 +1,4 @@
-import React, { useEffect, useState } from 'react';
-import { GroupRounded, GridView } from '@mui/icons-material';
+import React, { useEffect } from 'react';
 import TableChartRoundedIcon from '@mui/icons-material/TableChartRounded';
 import { List, ListItem, ListItemIcon, ListItemText, ListItemButton, Divider } from '@mui/material';
 import { Link, To } from 'react-router-dom';
@@ -8,7 +7,6 @@ import { Profile } from '../Profile';
 import { Logo } from '../Logo';
 import ExpandMoreRoundedIcon from '@mui/icons-material/ExpandMoreRounded';
 import { useProfile } from '../../../../stores/useProfile';
-import KeyRoundedIcon from '@mui/icons-material/KeyRounded';
 
 
 interface SidebarItem {
@@ -19,29 +17,19 @@ interface SidebarItem {
 }
 
 
+// Users y Tokens (admin de la plataforma, hoy con datos simulados) quedan fuera del menú
+// hasta que haya autenticación real: las rutas siguen en Router.tsx.
+const items: SidebarItem[] = [
+  { id: 'movil', icon: <TableChartRoundedIcon />, text: 'Móvil', to: '/' },
+];
+
 const LeftMenu = () => {
 
-  const [items, setItems] = useState<SidebarItem[]>([])
-  const { isAdmin, profile, fetchProfile } = useProfile();
-    
+  const { fetchProfile } = useProfile();
+
   useEffect(() => {
     fetchProfile()
-   }, []);
-  
-   useEffect(() => {
-
-    const userItems: SidebarItem[] = [
-      { id: 'movil', icon: <TableChartRoundedIcon />, text: 'Móvil', to: '/' },
-    ]
-    
-    if(isAdmin()) {
-      userItems.push({ id: 'users', icon: <GroupRounded />, text: 'Users', to: '/users' })
-      userItems.push({ id: 'tokens', icon: <KeyRoundedIcon />, text: 'Tokens', to: '/tokens' })
-    }
-    
-    setItems(userItems)
-   
-  }, [profile]);
+  }, []);
 
   return (
     <>
