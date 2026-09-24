@@ -31,7 +31,7 @@ const LeftMenu = () => {
    useEffect(() => {
 
     const userItems: SidebarItem[] = [
-      { id: 'movil', icon: <TableChartRoundedIcon />, text: 'Móvil del mes', to: '/' },
+      { id: 'movil', icon: <TableChartRoundedIcon />, text: 'Móvil', to: '/' },
     ]
     
     if(isAdmin()) {

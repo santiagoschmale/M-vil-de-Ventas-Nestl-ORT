@@ -15,7 +15,7 @@ const SnackbarGlobal = () => {
 
   return (
     <Snackbar 
-      anchorOrigin={{ vertical: 'top', horizontal: 'right' }} 
+      anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }} // arriba tapaba las acciones de la página 
       open={undefined !== snackbarProps} 
       autoHideDuration={5000} 
       onClose={handlerClose}> 

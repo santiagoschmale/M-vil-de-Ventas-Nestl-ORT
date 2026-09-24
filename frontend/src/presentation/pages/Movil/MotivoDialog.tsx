@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
-import { Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, TextField } from '@mui/material';
+import {
+  Alert, Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, TextField,
+} from '@mui/material';
 
 type Props = {
   titulo: string;
   descripcion: string;
   confirmar: string;
-  onConfirmar: (motivo: string) => Promise<boolean>;
+  onConfirmar: (motivo: string) => Promise<string | null>;
   onCerrar: () => void;
 };
 
@@ -13,14 +15,16 @@ type Props = {
 export const MotivoDialog = ({ titulo, descripcion, confirmar, onConfirmar, onCerrar }: Props) => {
   const [motivo, setMotivo] = useState('');
   const [enviando, setEnviando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const enviar = async (e: React.FormEvent) => {
     e.preventDefault();
     e.stopPropagation(); // en React el submit sube por el portal hasta el diálogo de afuera
     setEnviando(true);
-    const ok = await onConfirmar(motivo.trim());
+    const falla = await onConfirmar(motivo.trim());
     setEnviando(false);
-    if (ok) onCerrar();
+    if (falla) setError(falla);
+    else onCerrar();
   };
 
   return (
@@ -31,8 +35,9 @@ export const MotivoDialog = ({ titulo, descripcion, confirmar, onConfirmar, onCe
         <TextField
           autoFocus fullWidth required label="Motivo" value={motivo}
           onChange={e => setMotivo(e.target.value)}
-          helperText="Queda en el historial del mes."
+          helperText="Queda en el historial, con tu nombre y la hora."
         />
+        {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
       </DialogContent>
       <DialogActions>
         <Button onClick={onCerrar}>Cancelar</Button>

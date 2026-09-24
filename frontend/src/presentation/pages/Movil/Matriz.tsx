@@ -3,7 +3,7 @@ import { Box, Switch, Table, TableBody, TableCell, TableContainer, TableHead, Ta
 import PushPinRoundedIcon from '@mui/icons-material/PushPinRounded';
 import { useMovil } from '../../../stores/useMovil';
 import { Celda, Cruce } from '../../../stores/useMovil/useMovil.type';
-import { formatear } from './formato';
+import { formatear, UNIDADES } from './formato';
 import { APAGADO, AVENA, CIERRA, NO_CIERRA, TINTA, numeros } from './estilo';
 import { CeldaDialog } from './CeldaDialog';
 import { MotivoDialog } from './MotivoDialog';
@@ -25,7 +25,7 @@ export const Matriz = ({ cruce }: { cruce: Cruce }) => {
         </Typography>
       )}
       <TableContainer sx={{ maxHeight: '65vh', border: `1px solid ${AVENA}`, borderRadius: 1 }}>
-        <Table stickyHeader size="small" aria-label={`Matriz SKU por canal en ${cruce.unidad}`}>
+        <Table stickyHeader size="small" aria-label={`Matriz SKU por canal en ${UNIDADES[cruce.unidad].nombre.toLowerCase()}`}>
           <TableHead>
             <TableRow>
               <TableCell sx={{ ...fija, zIndex: 3, background: AVENA, minWidth: 260 }}>SKU</TableCell>
@@ -103,7 +103,7 @@ export const Matriz = ({ cruce }: { cruce: Cruce }) => {
         <MotivoDialog
           titulo={`${prender.activo ? 'Apagar' : 'Prender'} ${prender.codigo}`}
           descripcion={prender.activo
-            ? 'Sale del reparto de este mes en kilos y plata. Sus celdas fijadas quedan en espera.'
+            ? 'Sale del reparto de este mes, en kilos y en pesos. Si tiene celdas fijadas, se guardan y vuelven al prenderlo.'
             : 'Vuelve al reparto según su distribución del mes anterior.'}
           confirmar={prender.activo ? 'Apagar' : 'Prender'}
           onConfirmar={m => cambiarSku(prender.codigo, !prender.activo, m)}

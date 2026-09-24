@@ -5,7 +5,7 @@ import {
 } from '@mui/material';
 import { useMovil } from '../../../stores/useMovil';
 import { Apertura, Celda } from '../../../stores/useMovil/useMovil.type';
-import { formatear } from './formato';
+import { formatear, UNIDADES } from './formato';
 import { APAGADO, TINTA, numeros } from './estilo';
 import { MotivoDialog } from './MotivoDialog';
 
@@ -15,20 +15,20 @@ export const CeldaDialog = ({ sku, descripcion, canal, celda, onCerrar }: Props)
   const { unidad, estado, fijar, desfijar, cambiarEntidad, apertura: traerApertura, ocupado } = useMovil();
   const [monto, setMonto] = useState(formatear(celda.monto));
   const [motivo, setMotivo] = useState('');
+  const [error, setError] = useState<string | null>(null);
   const [apertura, setApertura] = useState<Apertura | null>(null);
   const [entidad, setEntidad] = useState<{ nombre: string; activo: boolean }>();
   const fijada = estado?.fijas[unidad].find(f => f.sku === sku && f.canal === canal);
+  const { simbolo, decimales } = UNIDADES[unidad];
 
-  const cargarApertura = () => traerApertura(sku, canal).then(setApertura);
-  useEffect(() => { cargarApertura(); }, [sku, canal, estado]);
+  useEffect(() => { traerApertura(sku, canal).then(setApertura); }, [sku, canal, estado]);
 
+  const resultado = (falla: string | null) => (falla ? setError(falla) : onCerrar());
   const alFijar = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (await fijar(sku, canal, monto.trim(), motivo.trim())) onCerrar();
+    resultado(await fijar(sku, canal, monto.trim(), motivo.trim()));
   };
-  const alDesfijar = async () => {
-    if (await desfijar(sku, canal, motivo.trim())) onCerrar();
-  };
+  const alDesfijar = async () => resultado(await desfijar(sku, canal, motivo.trim()));
 
   return (
     <Dialog open onClose={onCerrar} maxWidth="sm" fullWidth PaperProps={{ component: 'form', onSubmit: alFijar }}>
@@ -38,7 +38,9 @@ export const CeldaDialog = ({ sku, descripcion, canal, celda, onCerrar }: Props)
       </DialogTitle>
       <DialogContent>
         <Typography variant="h4" sx={{ ...numeros, textAlign: 'left', color: celda.fijada ? TINTA : undefined }}>
-          {formatear(celda.monto)} <Typography component="span" color="text.secondary">{unidad}</Typography>
+          {unidad === 'plata' && <Typography component="span" variant="h4" color="text.secondary">$ </Typography>}
+          {formatear(celda.monto)}
+          {unidad === 'kilos' && <Typography component="span" color="text.secondary"> kg</Typography>}
         </Typography>
         {fijada && (
           <Typography variant="body2" sx={{ color: TINTA, mt: 0.5 }}>
@@ -46,17 +48,18 @@ export const CeldaDialog = ({ sku, descripcion, canal, celda, onCerrar }: Props)
           </Typography>
         )}
 
-        <Box sx={{ display: 'flex', gap: 2, mt: 3 }}>
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mt: 3 }}>
           <TextField
-            label="Nuevo valor" value={monto} onChange={e => setMonto(e.target.value)}
+            label="Nuevo valor" value={monto} onChange={e => { setMonto(e.target.value); setError(null); }}
             inputProps={{ inputMode: 'decimal', style: numeros }} sx={{ width: 180 }}
-            helperText={unidad === 'kilos' ? 'Hasta 3 decimales' : 'Hasta 2 decimales'}
+            helperText={`En ${simbolo}, hasta ${decimales} decimales`}
           />
           <TextField
-            label="Motivo" value={motivo} onChange={e => setMotivo(e.target.value)} fullWidth required
-            helperText="Queda en el historial del mes."
+            label="Motivo" value={motivo} onChange={e => setMotivo(e.target.value)} required
+            sx={{ flex: '1 1 220px' }} helperText="Queda en el historial, con tu nombre y la hora."
           />
         </Box>
+        {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
 
         {apertura && (
           <>
@@ -68,8 +71,8 @@ export const CeldaDialog = ({ sku, descripcion, canal, celda, onCerrar }: Props)
                 <TableRow>
                   <TableCell>Activo</TableCell>
                   <TableCell>Distribuidor o vendedor</TableCell>
-                  <TableCell sx={numeros}>Kilos</TableCell>
-                  <TableCell sx={numeros}>Plata</TableCell>
+                  <TableCell sx={numeros}>{UNIDADES.kilos.nombre}</TableCell>
+                  <TableCell sx={numeros}>{UNIDADES.plata.nombre}</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -98,9 +101,9 @@ export const CeldaDialog = ({ sku, descripcion, canal, celda, onCerrar }: Props)
             Volver a calculado
           </Button>
         )}
-        <Button onClick={onCerrar}>Cerrar</Button>
+        <Button onClick={onCerrar}>Cancelar</Button>
         <Button type="submit" variant="contained" disabled={!motivo.trim() || !monto.trim() || ocupado}>
-          Fijar valor
+          Fijar
         </Button>
       </DialogActions>
 
@@ -108,8 +111,8 @@ export const CeldaDialog = ({ sku, descripcion, canal, celda, onCerrar }: Props)
         <MotivoDialog
           titulo={`${entidad.activo ? 'Apagar' : 'Prender'} ${entidad.nombre}`}
           descripcion={entidad.activo
-            ? `Deja de recibir en todos los SKUs y canales. Lo suyo se reparte entre los demás.`
-            : `Vuelve a recibir según su peso del mes anterior.`}
+            ? 'Deja de recibir en todos los SKUs y canales. Lo suyo se reparte entre los demás.'
+            : 'Vuelve a recibir según su peso del mes anterior.'}
           confirmar={entidad.activo ? 'Apagar' : 'Prender'}
           onConfirmar={m => cambiarEntidad(entidad.nombre, !entidad.activo, m)}
           onCerrar={() => setEntidad(undefined)}

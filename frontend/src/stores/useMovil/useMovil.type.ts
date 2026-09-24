@@ -71,20 +71,24 @@ export type Apertura = {
   entidades: { nombre: string; activo: boolean; peso: string; kilos: Monto; plata: Monto }[];
 };
 
+/** null si salió bien; si no, el mensaje de error para mostrar. */
+type Resultado = Promise<string | null>;
+
 export type TUseMovil = {
   estado?: Estado;
   cruce?: Cruce;
   unidad: Unidad;
   ocupado: boolean;
+  errorDeCarga?: string;
   refrescar: () => Promise<void>;
   elegirUnidad: (unidad: Unidad) => Promise<void>;
-  cargarInput1: (archivo: File) => Promise<boolean>;
-  cargarInput2: (texto: string) => Promise<boolean>;
-  cargarBase: (archivo: File) => Promise<boolean>;
-  cargarMuestra: () => Promise<boolean>;
-  cambiarSku: (sku: string, activo: boolean, motivo: string) => Promise<boolean>;
-  cambiarEntidad: (entidad: string, activo: boolean, motivo: string) => Promise<boolean>;
-  fijar: (sku: string, canal: string, monto: string, motivo: string) => Promise<boolean>;
-  desfijar: (sku: string, canal: string, motivo: string) => Promise<boolean>;
+  cargarInput1: (archivo: File) => Resultado;
+  cargarInput2: (texto: string) => Resultado;
+  cargarBase: (archivo: File) => Resultado;
+  cargarMuestra: () => Resultado;
+  cambiarSku: (sku: string, activo: boolean, motivo: string) => Resultado;
+  cambiarEntidad: (entidad: string, activo: boolean, motivo: string) => Resultado;
+  fijar: (sku: string, canal: string, monto: string, motivo: string) => Resultado;
+  desfijar: (sku: string, canal: string, motivo: string) => Resultado;
   apertura: (sku: string, canal: string) => Promise<Apertura | null>;
 };

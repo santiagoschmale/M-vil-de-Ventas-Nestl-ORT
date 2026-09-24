@@ -7,6 +7,9 @@ const theme = createTheme({
     fontFamily: 'Nestle'
   },
   components: {
+    // Botones en minúscula normal: en mayúsculas los textos se leen peor y se cortan antes.
+    MuiButton: { styleOverrides: { root: { textTransform: 'none' } } },
+    MuiToggleButton: { styleOverrides: { root: { textTransform: 'none' } } },
     MuiCssBaseline: {
       styleOverrides: `
         body {

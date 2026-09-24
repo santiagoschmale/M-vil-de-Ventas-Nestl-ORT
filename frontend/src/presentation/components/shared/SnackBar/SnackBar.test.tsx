@@ -115,8 +115,8 @@ describe('SnackbarGlobal', () => {
     render(<SnackbarGlobal />);
     
     const snackbar = screen.getByTestId('mui-snackbar');
-    expect(snackbar).toHaveAttribute('data-anchor-vertical', 'top');
-    expect(snackbar).toHaveAttribute('data-anchor-horizontal', 'right');
+    expect(snackbar).toHaveAttribute('data-anchor-vertical', 'bottom');
+    expect(snackbar).toHaveAttribute('data-anchor-horizontal', 'center');
   });
   
   it('has 5000ms auto-hide duration', () => {

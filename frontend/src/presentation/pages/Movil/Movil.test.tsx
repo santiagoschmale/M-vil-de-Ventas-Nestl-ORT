@@ -5,6 +5,7 @@ import '@testing-library/jest-dom';
 import { http, HttpResponse } from 'msw';
 import { server } from '../../../mocks/server';
 import { MovilPage } from './Movil';
+import { mensajeDeError } from '../../../stores/useMovil/useMovil';
 import { Cruce, Estado } from '../../../stores/useMovil/useMovil.type';
 
 const vacio = { kilos: [], plata: [] };
@@ -69,7 +70,7 @@ describe('MovilPage', () => {
     const valor = within(dialogo).getByLabelText('Nuevo valor');
     await user.clear(valor);
     await user.type(valor, '1234,5');
-    const fijar = within(dialogo).getByRole('button', { name: 'Fijar valor' });
+    const fijar = within(dialogo).getByRole('button', { name: 'Fijar' });
     expect(fijar).toBeDisabled(); // sin motivo no se puede
     await user.type(within(dialogo).getByRole('textbox', { name: /Motivo/ }), 'acuerdo comercial');
     await user.click(fijar);
@@ -93,5 +94,42 @@ describe('MovilPage', () => {
     expect(pedidos[0]).toEqual({
       metodo: 'PUT', url: '/api/movil/skus/200', cuerpo: { activo: false, motivo: 'SKU nuevo sin historia' },
     });
+  });
+
+  it('si el backend rechaza el valor, el motivo se ve en el diálogo y no se cierra', async () => {
+    const detalle = 'El valor supera el objetivo del SKU 100 (1500.000).';
+    server.use(http.put('*/api/movil/celdas/*', () => HttpResponse.json({ detail: detalle }, { status: 422 })));
+    const user = userEvent.setup();
+    render(<MovilPage />);
+    await user.click(await screen.findByRole('button', { name: '100 en Catering: 1.000,000' }));
+    const dialogo = screen.getByRole('dialog');
+    await user.type(within(dialogo).getByRole('textbox', { name: /Motivo/ }), 'x');
+    await user.click(within(dialogo).getByRole('button', { name: 'Fijar' }));
+
+    expect(await within(dialogo).findByText(detalle)).toBeInTheDocument();
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+  });
+
+  it('exportar se habilita solo cuando kilos y pesos cierran', async () => {
+    server.use(http.get('*/api/movil', () => HttpResponse.json(estado({ cierra: { kilos: true, plata: false } }))));
+    render(<MovilPage />);
+    expect(await screen.findByRole('link', { name: 'Exportar' })).toHaveAttribute('aria-disabled', 'true');
+  });
+});
+
+describe('mensajeDeError', () => {
+  it('sin respuesta es un problema de conexión', () => {
+    expect(mensajeDeError(new Error('Network Error'))).toMatch(/No se pudo conectar/);
+  });
+  it('usa el detalle del backend cuando lo hay', () => {
+    expect(mensajeDeError({ response: { status: 422, data: { detail: 'Todo ajuste necesita un motivo.' } } }))
+      .toBe('Todo ajuste necesita un motivo.');
+  });
+  it('un 500 dice que no se aplicó', () => {
+    expect(mensajeDeError({ response: { status: 500, data: 'Internal server error' } })).toMatch(/no se aplicó/);
+  });
+  it('una validación de formato (lista de pydantic) no muestra inglés técnico', () => {
+    const m = mensajeDeError({ response: { status: 422, data: { detail: [{ msg: 'Input should be a valid string' }] } } });
+    expect(m).not.toMatch(/Input should/);
   });
 });
