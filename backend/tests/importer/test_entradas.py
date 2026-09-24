@@ -131,7 +131,12 @@ def test_input2_sin_encabezado_reconocible_no_se_puede_leer():
 
 def test_base_de_muestra():
     base, problemas = leer_base(MUESTRA / "base_mes_anterior.xlsx")
-    assert len(base) == 183
+    # Cuenta independiente: celdas no vacías del Excel, leído directo.
+    from openpyxl import load_workbook
+
+    filas = list(load_workbook(MUESTRA / "base_mes_anterior.xlsx").active.iter_rows(values_only=True))
+    no_vacias = sum(1 for f in filas[1:] for v in f[2:] if v is not None)
+    assert len(base) == no_vacias > 100
     assert any(v == 0 for v in base.values())  # aplica con cero
     assert problemas == []
 

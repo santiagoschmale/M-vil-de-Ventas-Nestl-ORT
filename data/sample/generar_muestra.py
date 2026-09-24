@@ -24,12 +24,15 @@ import random
 from decimal import Decimal as D
 from pathlib import Path
 
+from datetime import datetime
+
 from openpyxl import Workbook
 
 AQUI = Path(__file__).parent
 rnd = random.Random(2026)
 KG = D("0.001")
 CENTAVO = D("0.01")
+FECHA = datetime(2026, 9, 1)  # fija: regenerar da los mismos bytes
 
 INGREDIENTES = ["Catering", "Vending", "Mayoristas", "KAM Ingredientes"]
 SOLUCIONES = ["Distribuidores", "Directa (BA)", "Córdoba", "Rosario", "KAM Sol"]
@@ -61,6 +64,10 @@ for i in range(101, 126):
 # Dos SKUs que se venden en los dos segmentos: el cruce parte su objetivo solo.
 for s in skus[18:20]:
     s["canales"] = INGREDIENTES + ["Distribuidores", "KAM Sol"]
+
+# Como en el ejemplo del cliente: hay SKUs grandes que no se venden por Distribuidores.
+for s in skus[20:45:2]:
+    s["canales"] = [c for c in s["canales"] if c != "Distribuidores"]
 
 base: dict[tuple[str, str], D] = {}
 for s in skus:
@@ -104,6 +111,7 @@ nuevo = sku(900)  # SKU nuevo: tiene objetivo pero no estaba el mes anterior (A4
 hoja.append(["Soluciones", "Café en cápsula x50", int(nuevo), 125000.0, 10.0, 129375.0, "AR"])
 hoja.append(["Ingredientes", "Leche en polvo 1kg", int(sku(950)), 0.0, 0.0, 0.0, "UY"])  # otro país, en cero
 hoja.append(["Ingredientes", "Café soluble 1kg (repetido)", int(skus[0]["codigo"]), 1.0, 1.0, 1.0, "AR"])  # código repetido
+wb.properties.created = wb.properties.modified = FECHA
 wb.save(AQUI / "input1_objetivo.xlsx")
 
 # ---------------------------------------------------------------------------
@@ -130,11 +138,25 @@ plata_canal_con_nuevo = dict(plata_canal)
 plata_canal_con_nuevo["Directa (BA)"] += D(125000)
 escribir_input2("input2_canales.tsv", kilos_canal_con_nuevo, plata_canal_con_nuevo)
 
-# El ejemplo del cliente: Distribuidores pide mucho más de lo que sus SKUs pueden dar.
+# El ejemplo del cliente: el planner le pide a Distribuidores 1.000 kg más de lo que
+# pueden darle todos los SKUs que se venden ahí juntos, y se lo saca a los otros canales
+# de Soluciones, en proporción, para que los dos inputs sigan sumando lo mismo.
+skus_distribuidores = {x for (x, c), v in base.items() if c == "Distribuidores" and v > 0 and x not in obsoletos}
+pueden = sum(kilos_sku[x] for x in skus_distribuidores)
 imposible_kg = dict(kilos_canal_con_nuevo)
-extra = (imposible_kg["Distribuidores"] * 3).quantize(KG)
+extra = pueden + D(1000) - imposible_kg["Distribuidores"]
 imposible_kg["Distribuidores"] += extra
-imposible_kg["Mayoristas"] -= extra
+otros = [c for c in SOLUCIONES if c != "Distribuidores"]
+total_otros = sum(imposible_kg[c] for c in otros)
+assert extra < total_otros, "el caso imposible no entra en los otros canales de Soluciones"
+restado = D(0)
+for c in otros[:-1]:
+    parte = (extra * imposible_kg[c] / total_otros).quantize(KG)
+    imposible_kg[c] -= parte
+    restado += parte
+imposible_kg[otros[-1]] -= extra - restado
+assert all(v >= 0 for v in imposible_kg.values())
+assert sum(imposible_kg.values()) == sum(kilos_canal_con_nuevo.values())
 escribir_input2("input2_distribuidores_imposible.tsv", imposible_kg, plata_canal_con_nuevo)
 
 # ---------------------------------------------------------------------------
@@ -151,6 +173,7 @@ for s in skus:
         v = base.get((s["codigo"], c))
         fila.append(None if v is None else float(v))  # vacío = no aplica
     hoja.append(fila)
+wb.properties.created = wb.properties.modified = FECHA
 wb.save(AQUI / "base_mes_anterior.xlsx")
 
 print(f"{len(skus)} SKUs con base, {len(base)} celdas, {len(obsoletos)} en cero, 1 nuevo.")
