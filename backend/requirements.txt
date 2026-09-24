@@ -3,5 +3,5 @@
 
 nbra-logger-py==1.1.0
 nbra-envs-python==0.2.2
-uvicorn==0.18.3
-fastapi==0.95.0
+uvicorn==0.53.0
+fastapi==0.141.1

@@ -18,8 +18,8 @@ class TestApp(unittest.TestCase):
         self.assertTrue(len(app.user_middleware) > 0)
         
         # Check if health router is included
-        routes = [route.path for route in app.routes]
-        self.assertIn("/health", routes)
+        # Con FastAPI >= 0.13x los routers incluidos no exponen .path: se mira el OpenAPI.
+        self.assertIn("/health", app.openapi()["paths"])
     
     @patch('app.set_local_variables')
     def test_lifespan(self, mock_set_local_variables):
