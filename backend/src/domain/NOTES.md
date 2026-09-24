@@ -145,6 +145,11 @@ celda. El cruce no cambia al apagar un distribuidor.
 - **MSW en desarrollo**: el front arranca con el worker de msw; lo que no tiene
   mock (todo `/api/movil`) pasa al backend. Si el navegador tiene un worker viejo
   registrado, se traga pedidos: desregistrarlo y recargar.
+- **Reglas muy justas**: el ajuste con reglas converge lento cerca del borde. Si no
+  llega, el reparto cierra y cumple las reglas igual pero se aleja de la base, y se
+  avisa (`_REGLAS_JUSTAS`). En los casos de prueba armados al límite pasa ~3%.
+- **Tests del front y RAM**: `vitest.config.ts` (no `vite.config.ts`, que no manda
+  para los tests) limita a 2 workers; con uno por núcleo el pico pasaba 2 GB.
 - **Librerías `nbra-*`**: no existen en los registros públicos y no hay que
   pedirlas ahí (dependency confusion). `make deps-local` usa `local_shims/`.
 
@@ -153,7 +158,10 @@ celda. El cruce no cambia al apagar un distribuidor.
 - Reglas (catálogo de tipos): tope o mínimo en %, valor fijo, dónde se vende un
   SKU. Hoy solo existen el total por canal (input 2) y las celdas fijadas.
 - Margen del input 2 (A2).
-- Pantalla de reglas (cuando exista el catálogo).
+- Reglas: hoy tope, mínimo y fijo en % del total del canal por categorías (cruce,
+  sesión, API y panel). Faltan las de vendedor dentro de un canal (apertura), la
+  herencia del mes anterior (necesita persistencia) y lo abierto en
+  `docs/entendimiento-negocio.md` §9.
 - Aprobación del móvil por una persona (hoy se exporta sin aprobar).
 - Persistencia en Postgres (otra implementación de `repositorio.py`).
 - Entra ID (otro proveedor en `auth/proveedor.py`).
