@@ -63,6 +63,10 @@ vi.mock('@mui/icons-material', () => ({
   GridView: () => <div data-testid="mock-grid-icon">GridIcon</div>,
 }));
 
+vi.mock('@mui/icons-material/TableChartRounded', () => ({
+  default: () => <div data-testid="mock-table-icon">TableIcon</div>,
+}));
+
 vi.mock('@mui/icons-material/KeyRounded', () => ({
   default: () => <div data-testid="mock-key-icon">KeyIcon</div>,
 }));
@@ -99,12 +103,12 @@ describe('LeftMenu Component', () => {
     expect(mockFetchProfile).toHaveBeenCalledTimes(1);
   });
   
-  it('does not render navigation items for regular users', () => {
+  it('regular users only see the móvil', () => {
     mockIsAdmin.mockReturnValue(false);
     
     render(<LeftMenu />);
     
-    expect(screen.queryAllByTestId('sidebar-link')).toHaveLength(0);
+    expect(screen.queryAllByTestId('sidebar-link')).toHaveLength(1);
   });
   
   it('renders navigation items for admin users', async () => {
@@ -114,19 +118,19 @@ describe('LeftMenu Component', () => {
     
     // Wait for useEffect to update items after profile check
     await waitFor(() => {
-      expect(screen.getAllByTestId('sidebar-link')).toHaveLength(2);
+      expect(screen.getAllByTestId('sidebar-link')).toHaveLength(3);
     });
     
     const listItemButtons = screen.getAllByTestId('mock-list-item-button');
     const listItemTexts = screen.getAllByTestId('mock-list-item-text');
     
     // Check Users navigation item
-    expect(listItemButtons[0]).toHaveAttribute('data-to', '/users');
-    expect(listItemTexts[0]).toHaveTextContent('Users');
+    expect(listItemButtons[1]).toHaveAttribute('data-to', '/users');
+    expect(listItemTexts[1]).toHaveTextContent('Users');
     
     // Check Tokens navigation item
-    expect(listItemButtons[1]).toHaveAttribute('data-to', '/tokens');
-    expect(listItemTexts[1]).toHaveTextContent('Tokens');
+    expect(listItemButtons[2]).toHaveAttribute('data-to', '/tokens');
+    expect(listItemTexts[2]).toHaveTextContent('Tokens');
   });
   
   it('has correct logout link in IconMenu', () => {
@@ -142,7 +146,7 @@ describe('LeftMenu Component', () => {
     mockIsAdmin.mockReturnValue(false);
     const { rerender } = render(<LeftMenu />);
     
-    expect(screen.queryAllByTestId('sidebar-link')).toHaveLength(0);
+    expect(screen.queryAllByTestId('sidebar-link')).toHaveLength(1);
     
     // Update to admin status
     mockIsAdmin.mockReturnValue(true);
@@ -158,7 +162,7 @@ describe('LeftMenu Component', () => {
     
     // Wait for useEffect to update items after profile change
     await waitFor(() => {
-      expect(screen.getAllByTestId('sidebar-link')).toHaveLength(2);
+      expect(screen.getAllByTestId('sidebar-link')).toHaveLength(3);
     });
   });
   
@@ -185,15 +189,17 @@ describe('LeftMenu Component', () => {
     
     // Wait for useEffect to update items after profile check
     await waitFor(() => {
-      expect(screen.getAllByTestId('sidebar-link')).toHaveLength(2);
+      expect(screen.getAllByTestId('sidebar-link')).toHaveLength(3);
     });
     
     const icons = screen.getAllByTestId('mock-list-item-icon');
     
+    expect(icons[0]).toContainElement(screen.getByTestId('mock-table-icon'));
+
     // Users item should have GroupRounded icon
-    expect(icons[0]).toContainElement(screen.getByTestId('mock-group-icon'));
+    expect(icons[1]).toContainElement(screen.getByTestId('mock-group-icon'));
     
     // Tokens item should have KeyRounded icon
-    expect(icons[1]).toContainElement(screen.getByTestId('mock-key-icon'));
+    expect(icons[2]).toContainElement(screen.getByTestId('mock-key-icon'));
   });
 });

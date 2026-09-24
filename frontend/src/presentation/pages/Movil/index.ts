@@ -1,0 +1,1 @@
+export { MovilPage } from './Movil';

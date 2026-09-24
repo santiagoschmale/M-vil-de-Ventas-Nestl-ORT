@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { GroupRounded, GridView } from '@mui/icons-material';
+import TableChartRoundedIcon from '@mui/icons-material/TableChartRounded';
 import { List, ListItem, ListItemIcon, ListItemText, ListItemButton, Divider } from '@mui/material';
 import { Link, To } from 'react-router-dom';
 import { IconMenu } from '../IconMenu';
@@ -29,7 +30,9 @@ const LeftMenu = () => {
   
    useEffect(() => {
 
-    const userItems: SidebarItem[] = []
+    const userItems: SidebarItem[] = [
+      { id: 'movil', icon: <TableChartRoundedIcon />, text: 'Móvil del mes', to: '/' },
+    ]
     
     if(isAdmin()) {
       userItems.push({ id: 'users', icon: <GroupRounded />, text: 'Users', to: '/users' })
