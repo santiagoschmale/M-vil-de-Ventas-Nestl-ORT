@@ -36,6 +36,7 @@ from src.importer.entradas import (
     leer_base,
     leer_input1,
     leer_input2,
+    normalizar,
 )
 
 
@@ -65,6 +66,9 @@ def armar(
     """
     problemas = list(problemas or [])
     apagados = frozenset(apagados)
+    # Los canales se cruzan por nombre: sin importar tildes, mayúsculas ni espacios.
+    por_nombre = {normalizar(c): c for c in canales}
+    base = {(s, por_nombre.get(normalizar(c), c)): w for (s, c), w in base.items()}
     activos = {s: o for s, o in objetivos.items() if s not in apagados and o.kilos > 0}
 
     for s in sorted({s for s, _ in base} - set(objetivos)):

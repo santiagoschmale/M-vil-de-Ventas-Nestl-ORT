@@ -153,3 +153,52 @@ def test_base_negativos_y_textos_se_reportan_y_no_se_usan():
     assert any("negativ" in m for m in errores)
     assert any("#N/A" in m for m in errores)
     assert any("repetido" in m for m in errores)
+
+
+# ---------------------------------------------------------------------------
+# Hallazgos del code review
+# ---------------------------------------------------------------------------
+
+def test_csv_con_comas_y_montos_con_coma_decimal_no_pierde_centavos_en_silencio():
+    """Canal,Kilos,Plata con 1.000.000,50 sin comillas parte el monto: la fila se rechaza y se avisa."""
+    canales, problemas = leer_input2("Canal,Kilos,Plata\nMayoristas,40.000,1.000.000,50\nVending,10,20\n")
+    assert "Mayoristas" not in canales
+    assert any("Mayoristas" in m and "separador" in m for m in _mensajes(problemas, "error"))
+    assert canales["Vending"].plata == D("20.00")
+
+
+def test_montos_pegados_con_signo_pesos_y_espacio_duro():
+    assert numero("$ 1.000.000,50") == D("1000000.50")
+    assert numero("1\xa0000,5") is None  # espacio como separador de miles: ambiguo, no se adivina
+    assert numero("\xa040.000\xa0") == D("40000")
+    assert numero("$-12,5") == D("-12.5")
+
+
+def test_input2_kilos_vacios_es_error_no_cero_silencioso():
+    canales, problemas = leer_input2("Canal\tKilos\nRosario\t\nVending\t10\n")
+    assert any("Rosario" in m and "vac" in m for m in _mensajes(problemas, "error"))
+
+
+def test_sku_con_nns_y_sin_kilos_se_reporta():
+    objetivo, problemas = leer_input1(_excel([["SKU", "Kilos", "NNS"], ["1", 0, 500000]]))
+    assert any("NNS" in m and "kilos" in m.lower() for m in _mensajes(problemas, "error"))
+
+
+def test_el_encabezado_se_busca_en_todas_las_hojas():
+    wb = Workbook()
+    wb.active.title = "Portada"
+    wb.active.append(["Móvil de mayo"])
+    hoja = wb.create_sheet("Objetivo")
+    hoja.append(["SKU", "Kilos"])
+    hoja.append(["1", 10])
+    datos = BytesIO()
+    wb.save(datos)
+    datos.seek(0)
+    objetivo, _ = leer_input1(datos)
+    assert objetivo["1"].kilos == D("10")
+
+
+def test_codigos_con_ceros_a_la_izquierda_cruzan_con_los_numericos():
+    objetivo, _ = leer_input1(_excel([["SKU", "Kilos"], ["00123", 10]]))
+    base, _ = leer_base(_excel([["SKU", "X"], [123, 5]]))
+    assert set(objetivo) == {s for s, _ in base}

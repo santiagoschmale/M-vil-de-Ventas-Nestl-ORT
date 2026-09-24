@@ -155,3 +155,13 @@ def test_con_inconsistencias_el_excel_igual_se_genera_con_la_lista_de_problemas(
     destino.seek(0)
     problemas = list(load_workbook(destino)["Problemas"].iter_rows(values_only=True))
     assert any(NUEVO in " ".join(str(x) for x in fila if x) for fila in problemas)
+
+
+def test_los_nombres_de_canal_de_la_base_cruzan_sin_importar_tildes_ni_mayusculas():
+    from src.importer.entradas import ObjetivoSku, TotalCanal
+
+    objetivos = {"1": ObjetivoSku(D("10"), D("100"), None, "", None, None)}
+    canales = {"Córdoba": TotalCanal(D("10"), D("100"))}
+    r = armar(objetivos, canales, {("1", "cordoba "): D(1)})
+    assert r.kilos.celdas == {("1", "Córdoba"): D("10.000")}
+    assert not any("cordoba" in p.mensaje for p in r.problemas)

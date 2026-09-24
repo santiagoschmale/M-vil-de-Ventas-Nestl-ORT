@@ -80,8 +80,11 @@ def numero(texto: str) -> Decimal | None:
     Si tiene forma de separador de miles con punto (13.000, 1.234.567,89) se lee en
     formato argentino. Si no, el punto es decimal (1234.5). El caso ambiguo "1.234"
     se lee como mil doscientos treinta y cuatro: la tabla viene de un Excel en español.
+    Se acepta el signo $ adelante. Un espacio en el medio no se adivina.
     """
-    t = str(texto).strip()
+    # Excel deja el signo $ y espacios duros al copiar celdas con formato moneda.
+    t = str(texto).replace("\xa0", " ").strip()
+    t = re.sub(r"^\$\s*", "", t).strip()
     if _MILES_AR.fullmatch(t):
         t = t.replace(".", "").replace(",", ".")
     elif _COMA_DECIMAL.fullmatch(t):
@@ -116,6 +119,9 @@ def _codigo(valor) -> str | None:
     if isinstance(valor, float) and valor.is_integer():
         valor = int(valor)
     texto = str(valor).strip()
+    # Solo dígitos: 00123 y 123 son el mismo SKU (un archivo lo guarda como texto y otro como número).
+    if texto.isdigit():
+        texto = str(int(texto))
     return texto or None
 
 
@@ -140,24 +146,26 @@ def _al_paso(valor: Decimal, decimales: int, que: str, sku, problemas: list[Prob
     return redondeado
 
 
-def _filas_de_excel(origen) -> list[list]:
+def _hojas_de_excel(origen) -> list[list[list]]:
     try:
         libro = load_workbook(origen, read_only=True, data_only=True)
     except Exception as e:  # openpyxl lanza de todo según qué esté roto
         raise ErrorDeEntrada(f"No se pudo abrir el archivo como Excel (.xlsx): {e}") from e
     try:
-        return [list(f) for f in libro.worksheets[0].iter_rows(values_only=True)]
+        return [[list(f) for f in hoja.iter_rows(values_only=True)] for hoja in libro.worksheets]
     finally:
         libro.close()
 
 
-def _encabezado(filas: list[list], entrada: str, obligatorios: set[str], que: str) -> tuple[int, dict[str, int]]:
-    for n, fila in enumerate(filas[:30]):
-        cols = _columnas(fila, entrada)
-        if obligatorios <= cols.keys():
-            return n, cols
+def _encabezado(hojas: list[list[list]], entrada: str, obligatorios: set[str], que: str):
+    """La primera hoja (y fila, dentro de las primeras 30) que tenga las columnas obligatorias."""
+    for filas in hojas:
+        for n, fila in enumerate(filas[:30]):
+            cols = _columnas(fila, entrada)
+            if obligatorios <= cols.keys():
+                return filas, n, cols
     nombres = ", ".join(sorted(obligatorios))
-    raise ErrorDeEntrada(f"{que}: no se encontró un encabezado con las columnas {nombres} "
+    raise ErrorDeEntrada(f"{que}: no se encontró un encabezado con las columnas {nombres} en ninguna hoja "
                          f"(nombres aceptados en formato.json).")
 
 
@@ -166,8 +174,7 @@ def _encabezado(filas: list[list], entrada: str, obligatorios: set[str], que: st
 # ---------------------------------------------------------------------------
 
 def leer_input1(origen) -> tuple[dict[str, ObjetivoSku], list[Problema]]:
-    filas = _filas_de_excel(origen)
-    n, cols = _encabezado(filas, "input1", {"sku", "kilos"}, "Input 1")
+    filas, n, cols = _encabezado(_hojas_de_excel(origen), "input1", {"sku", "kilos"}, "Input 1")
     problemas: list[Problema] = []
     if "nns" not in cols:
         problemas.append(Problema("aviso", "El input 1 no tiene columna de NNS: se reparten solo los kilos.",
@@ -211,6 +218,10 @@ def leer_input1(origen) -> tuple[dict[str, ObjetivoSku], list[Problema]]:
         if montos["kilos"] == 0 and not montos["nns"]:
             problemas.append(Problema("aviso", "SKU con objetivo en cero (obsoleto o estacional): no se reparte.",
                                       sku=codigo, bloque="input1"))
+        elif montos["kilos"] == 0:
+            problemas.append(Problema("error", f"SKU con NNS ({montos['nns']}) pero kilos en cero: los kilos son "
+                                               f"esenciales, no se reparte ni en kilos ni en plata.",
+                                      sku=codigo, bloque="input1"))
         objetivos[codigo] = ObjetivoSku(
             kilos=montos["kilos"],
             nns=montos["nns"],
@@ -232,7 +243,8 @@ def leer_input2(texto: str) -> tuple[dict[str, TotalCanal], list[Problema]]:
         raise ErrorDeEntrada("Input 2: la tabla está vacía.")
     separador = "\t" if "\t" in lineas[0] else ";" if ";" in lineas[0] else ","
     filas = list(csv.reader(io.StringIO("\n".join(lineas)), delimiter=separador))
-    n, cols = _encabezado(filas, "input2", {"canal", "kilos"}, "Input 2")
+    filas, n, cols = _encabezado([filas], "input2", {"canal", "kilos"}, "Input 2")
+    ancho = len(filas[n])
     problemas: list[Problema] = []
     if "plata" not in cols:
         problemas.append(Problema("aviso", "El input 2 no tiene columna de plata: se reparten solo los kilos.",
@@ -247,13 +259,24 @@ def leer_input2(texto: str) -> tuple[dict[str, TotalCanal], list[Problema]]:
             problemas.append(Problema("error", f"Canal {canal} repetido en el input 2: se usa la primera fila.",
                                       bloque="input2"))
             continue
+        if len(fila) > ancho:
+            # Típico de pegar separado por comas con montos 1.000,50: la coma decimal parte la celda.
+            problemas.append(Problema("error", f"La fila de {canal} tiene más columnas que el encabezado: revisá "
+                                               f"el separador (con coma decimal, separá con tabulaciones o punto y "
+                                               f"coma). No se usa.", bloque="input2"))
+            continue
         montos = {}
         for nombre, decimales in (("kilos", KILOS), ("plata", PLATA)):
             if nombre not in cols:
                 montos[nombre] = None
                 continue
             crudo = fila[cols[nombre]] if cols[nombre] < len(fila) else ""
-            valor = numero(crudo) if crudo.strip() else Decimal(0)
+            if not crudo.strip():
+                problemas.append(Problema("error", f"{nombre.capitalize()} de {canal} vacío. Se toma 0.",
+                                          bloque="input2"))
+                montos[nombre] = Decimal(0).quantize(Decimal(1).scaleb(-decimales))
+                continue
+            valor = numero(crudo)
             if valor is None or valor < 0:
                 problemas.append(Problema("error", f"{nombre.capitalize()} de {canal} inválido ({crudo!r}). "
                                                    f"Se toma 0.", bloque="input2"))
@@ -268,8 +291,7 @@ def leer_input2(texto: str) -> tuple[dict[str, TotalCanal], list[Problema]]:
 # ---------------------------------------------------------------------------
 
 def leer_base(origen) -> tuple[dict[tuple[str, str], Decimal], list[Problema]]:
-    filas = _filas_de_excel(origen)
-    n, cols = _encabezado(filas, "base", {"sku"}, "Base del mes anterior")
+    filas, n, cols = _encabezado(_hojas_de_excel(origen), "base", {"sku"}, "Base del mes anterior")
     meta = set(cols.values())
     canales = [(i, str(v).strip()) for i, v in enumerate(filas[n]) if v is not None and i not in meta]
     problemas: list[Problema] = []
