@@ -1,7 +1,8 @@
 # Motor del móvil — notas
 
-Estado, decisiones y gotchas del motor. Lo lee el equipo y Claude Code antes de
-tocar `domain/`, `importer/` o `movil/`.
+Estado, decisiones y gotchas del motor, la API y la pantalla. Lo lee el equipo y
+Claude Code antes de tocar `domain/`, `importer/`, `movil/`, `routes/movil.py` o
+`frontend/src/presentation/pages/Movil`.
 
 ## Cómo está armado
 
@@ -12,9 +13,19 @@ domain/flujo.py        flujo máximo y de costo mínimo (sin dependencias)
 domain/reparto.py      largest remainder: repartir un total por pesos relativos
 domain/arbol.py        árbol con valor y estado, fijado, ON/OFF, agregado
 movil/recorrido.py     encadena todo y exporta el Excel; también es la línea de comandos
+movil/sesion.py        la sesión del mes: entradas, ON/OFF, celdas fijadas, historial
+movil/repositorio.py   dónde vive la sesión (hoy en memoria, un lock global)
+auth/proveedor.py      quién es el usuario (hoy "planner-local"; Entra ID después)
+routes/movil.py        API /api/movil sobre la sesión
+app.py                 crear_app(): elige repositorio y autenticación
+
+frontend/src/stores/useMovil          store sobre /api/movil
+frontend/src/presentation/pages/Movil pantalla central (ruta /)
 ```
 
 El dominio no importa FastAPI, ni la base, ni openpyxl. Se testea sin levantar nada.
+La sesión recalcula el recorrido entero con cada cambio y cada cambio es una
+transacción: si el recálculo falla, vuelve al estado anterior.
 
 ## Correrlo
 
@@ -39,6 +50,21 @@ un móvil que cierra, apagar ese SKU y usar el input 2 sin él:
     --input2 ../data/sample/input2_sin_sku_nuevo.tsv \
     --base ../data/sample/base_mes_anterior.xlsx \
     --apagar 90020900 --salida movil.xlsx
+```
+
+### La aplicación (API + pantalla)
+
+```
+cd backend && .venv/bin/python app.py                  # API en :3000
+cd frontend && npm ci && npx vite --port 5175          # pantalla en :5175, /api va a :3000
+```
+
+En la pantalla, "Cargar datos de muestra" carga las tres entradas. La sesión vive en
+memoria: reiniciar el backend la pierde. Desde Claude Code: `template-api` y
+`template-web` en `.claude/launch.json` del workspace.
+
+```
+cd frontend && npx vitest --watch=false                # tests del front
 ```
 
 Los datos de prueba se regeneran con `data/sample/generar_muestra.py`: semilla,
@@ -101,6 +127,18 @@ celda. El cruce no cambia al apagar un distribuidor.
   más columnas que el encabezado se rechaza, no se lee a medias.
 - **Códigos de SKU**: solo dígitos se normalizan (`00123` = `123`). Canales: se
   cruzan sin importar tildes, mayúsculas ni espacios.
+- **Los montos viajan como texto** (`"1234.500"`) con los decimales de su unidad.
+  El front solo cambia separadores (`formatear`), nunca los convierte a número:
+  un número JSON pasa por float en JavaScript.
+- **Nombres con `/` en la URL**: canales y entidades van al final de la ruta con
+  `:path`, porque Starlette decodifica `%2F` antes de rutear.
+- **Todo ajuste pide motivo** (fijar, desfijar, ON/OFF). Las cargas de entradas van
+  al historial sin motivo.
+- **Celdas fijadas de un SKU apagado** quedan en espera y vuelven al prenderlo; no
+  rompen la sesión.
+- **MSW en desarrollo**: el front arranca con el worker de msw; lo que no tiene
+  mock (todo `/api/movil`) pasa al backend. Si el navegador tiene un worker viejo
+  registrado, se traga pedidos: desregistrarlo y recargar.
 - **Librerías `nbra-*`**: no existen en los registros públicos y no hay que
   pedirlas ahí (dependency confusion). `make deps-local` usa `local_shims/`.
 
@@ -109,5 +147,8 @@ celda. El cruce no cambia al apagar un distribuidor.
 - Reglas (catálogo de tipos): tope o mínimo en %, valor fijo, dónde se vende un
   SKU. Hoy solo existen el total por canal (input 2) y las celdas fijadas.
 - Margen del input 2 (A2).
-- API y pantalla central (input 2, reglas, inconsistencias).
-- Persistencia en Postgres.
+- Pantalla de reglas (cuando exista el catálogo).
+- Aprobación del móvil por una persona (hoy se exporta sin aprobar).
+- Persistencia en Postgres (otra implementación de `repositorio.py`).
+- Entra ID (otro proveedor en `auth/proveedor.py`).
+- Buscador de SKUs en la matriz, si la cantidad real lo pide.

@@ -148,6 +148,7 @@ No se cargan solos: leé el que la tarea pida antes de actuar.
 | `docs/preguntas.md` | Preguntas enviadas a IT y a negocio |
 | `docs/contexto-negocio.md` | Cómo se arma hoy el móvil, contado desde el planner |
 | `docs/template-reference.md` | Estructura del scaffold que entrega Nestlé |
+| `backend/src/domain/NOTES.md` | Cómo está armado el código, cómo correrlo, supuestos en uso y gotchas |
 
 Si se contradicen, **gana `docs/entendimiento-negocio.md`**: es lo último que
 validó el cliente. Si algo del código contradice una regla de arriba, frená y
