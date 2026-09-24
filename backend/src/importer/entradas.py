@@ -1,0 +1,298 @@
+"""
+Importadores de las tres entradas del móvil. Reportan los problemas de calidad, no
+los replican.
+
+- Input 1: el Excel de Contraloría con el objetivo por SKU (SKU y kilos son
+  esenciales; NNS opcional).
+- Input 2: la tabla de totales por canal que pega el planner (texto separado por
+  tabulaciones, punto y coma o comas).
+- Base: el reparto del mes anterior, SKU × canal en kilos. Celda vacía = no aplica;
+  0 = aplica con cero.
+
+Todo se detecta por nombre de encabezado, nunca por posición, y se cruza por
+código de SKU, nunca por nombre. Los nombres aceptados están en formato.json.
+
+Cada problema es un `Problema` con severidad "error" (el dato está mal y no se usa)
+o "aviso" (raro pero válido). Si el archivo no se puede leer (falta una columna
+esencial), se lanza ErrorDeEntrada.
+"""
+
+from __future__ import annotations
+
+import csv
+import io
+import json
+import re
+import unicodedata
+from dataclasses import dataclass
+from decimal import ROUND_HALF_EVEN, Decimal
+from pathlib import Path
+
+from openpyxl import load_workbook
+
+from src.domain.arbol import Problema
+
+FORMATO = json.loads(Path(__file__).with_name("formato.json").read_text(encoding="utf-8"))
+KILOS = 3  # decimales
+PLATA = 2
+
+
+class ErrorDeEntrada(ValueError):
+    """El archivo o la tabla no se puede leer: falta algo esencial."""
+
+
+@dataclass
+class ObjetivoSku:
+    kilos: Decimal
+    nns: Decimal | None
+    nns_iibb: Decimal | None
+    descripcion: str
+    categoria: str | None
+    pais: str | None
+
+
+@dataclass
+class TotalCanal:
+    kilos: Decimal
+    plata: Decimal | None
+
+
+# ---------------------------------------------------------------------------
+# Utilidades
+# ---------------------------------------------------------------------------
+
+def normalizar(texto) -> str:
+    """Minúsculas, sin tildes, espacios simples: para comparar encabezados."""
+    texto = unicodedata.normalize("NFKD", str(texto))
+    texto = "".join(c for c in texto if not unicodedata.combining(c))
+    return re.sub(r"\s+", " ", texto).strip().lower()
+
+
+_MILES_AR = re.compile(r"-?\d{1,3}(\.\d{3})+(,\d+)?")
+_COMA_DECIMAL = re.compile(r"-?\d+(,\d+)?")
+_PUNTO_DECIMAL = re.compile(r"-?\d+(\.\d+)?")
+
+
+def numero(texto: str) -> Decimal | None:
+    """
+    Número escrito a mano o pegado desde Excel -> Decimal, o None si no es número.
+
+    Si tiene forma de separador de miles con punto (13.000, 1.234.567,89) se lee en
+    formato argentino. Si no, el punto es decimal (1234.5). El caso ambiguo "1.234"
+    se lee como mil doscientos treinta y cuatro: la tabla viene de un Excel en español.
+    """
+    t = str(texto).strip()
+    if _MILES_AR.fullmatch(t):
+        t = t.replace(".", "").replace(",", ".")
+    elif _COMA_DECIMAL.fullmatch(t):
+        t = t.replace(",", ".")
+    elif not _PUNTO_DECIMAL.fullmatch(t):
+        return None
+    return Decimal(t)
+
+
+def _celda(valor) -> tuple[Decimal | None, str | None]:
+    """
+    Celda de Excel -> (Decimal | None, problema | None). None = celda vacía.
+
+    Excel guarda los números como float: `repr` da el decimal más corto que lo
+    representa, que es lo que se ve en la celda. Es el único lugar donde entra un float.
+    """
+    if valor is None or (isinstance(valor, str) and not valor.strip()):
+        return None, None
+    if isinstance(valor, bool):
+        return None, f"valor no numérico ({valor!r})"
+    if isinstance(valor, int):
+        return Decimal(valor), None
+    if isinstance(valor, float):
+        return Decimal(repr(valor)), None
+    n = numero(valor)
+    return (n, None) if n is not None else (None, f"celda con error o texto ({valor!r})")
+
+
+def _codigo(valor) -> str | None:
+    if valor is None:
+        return None
+    if isinstance(valor, float) and valor.is_integer():
+        valor = int(valor)
+    texto = str(valor).strip()
+    return texto or None
+
+
+def _columnas(encabezado, entrada: str) -> dict[str, int]:
+    """Encabezado -> {campo: índice} con los alias de esa entrada en formato.json."""
+    alias = {normalizar(a): campo for campo, lista in FORMATO[entrada].items() for a in lista}
+    encontradas: dict[str, int] = {}
+    for i, celda in enumerate(encabezado):
+        if celda is not None:
+            campo = alias.get(normalizar(celda))
+            if campo and campo not in encontradas:
+                encontradas[campo] = i
+    return encontradas
+
+
+def _al_paso(valor: Decimal, decimales: int, que: str, sku, problemas: list[Problema]) -> Decimal:
+    paso = Decimal(1).scaleb(-decimales)
+    redondeado = valor.quantize(paso, rounding=ROUND_HALF_EVEN)
+    if redondeado != valor:
+        problemas.append(Problema("aviso", f"{que} con más de {decimales} decimales: {valor} se redondea a "
+                                           f"{redondeado}.", sku=sku))
+    return redondeado
+
+
+def _filas_de_excel(origen) -> list[list]:
+    try:
+        libro = load_workbook(origen, read_only=True, data_only=True)
+    except Exception as e:  # openpyxl lanza de todo según qué esté roto
+        raise ErrorDeEntrada(f"No se pudo abrir el archivo como Excel (.xlsx): {e}") from e
+    try:
+        return [list(f) for f in libro.worksheets[0].iter_rows(values_only=True)]
+    finally:
+        libro.close()
+
+
+def _encabezado(filas: list[list], entrada: str, obligatorios: set[str], que: str) -> tuple[int, dict[str, int]]:
+    for n, fila in enumerate(filas[:30]):
+        cols = _columnas(fila, entrada)
+        if obligatorios <= cols.keys():
+            return n, cols
+    nombres = ", ".join(sorted(obligatorios))
+    raise ErrorDeEntrada(f"{que}: no se encontró un encabezado con las columnas {nombres} "
+                         f"(nombres aceptados en formato.json).")
+
+
+# ---------------------------------------------------------------------------
+# Input 1: objetivo por SKU
+# ---------------------------------------------------------------------------
+
+def leer_input1(origen) -> tuple[dict[str, ObjetivoSku], list[Problema]]:
+    filas = _filas_de_excel(origen)
+    n, cols = _encabezado(filas, "input1", {"sku", "kilos"}, "Input 1")
+    problemas: list[Problema] = []
+    if "nns" not in cols:
+        problemas.append(Problema("aviso", "El input 1 no tiene columna de NNS: se reparten solo los kilos.",
+                                  bloque="input1"))
+
+    def campo(fila, nombre):
+        i = cols.get(nombre)
+        return fila[i] if i is not None and i < len(fila) else None
+
+    objetivos: dict[str, ObjetivoSku] = {}
+    for fila in filas[n + 1:]:
+        codigo = _codigo(campo(fila, "sku"))
+        if codigo is None:
+            continue
+        if codigo in objetivos:
+            problemas.append(Problema("error", "SKU repetido en el input 1: se usa la primera fila.",
+                                      sku=codigo, bloque="input1"))
+            continue
+        montos = {}
+        for nombre, decimales, etiqueta in (("kilos", KILOS, "Kilos"), ("nns", PLATA, "NNS"),
+                                            ("nns_iibb", PLATA, "NNS c/IIBB")):
+            if nombre not in cols:
+                montos[nombre] = None
+                continue
+            valor, error = _celda(campo(fila, nombre))
+            if error:
+                problemas.append(Problema("error", f"{etiqueta}: {error}. Se toma 0.", sku=codigo, bloque="input1"))
+                valor = Decimal(0)
+            elif valor is None:
+                valor = Decimal(0)
+            if valor < 0:
+                problemas.append(Problema("error", f"{etiqueta} negativo ({valor}). Se toma 0.", sku=codigo,
+                                          bloque="input1"))
+                valor = Decimal(0)
+            montos[nombre] = _al_paso(valor, decimales, etiqueta, codigo, problemas)
+
+        pais = campo(fila, "pais")
+        if pais and normalizar(pais) != normalizar(FORMATO["pais_local"]):
+            problemas.append(Problema("aviso", f"Producto de otro país ({pais}) en el archivo de "
+                                               f"{FORMATO['pais_local']}.", sku=codigo, bloque="input1"))
+        if montos["kilos"] == 0 and not montos["nns"]:
+            problemas.append(Problema("aviso", "SKU con objetivo en cero (obsoleto o estacional): no se reparte.",
+                                      sku=codigo, bloque="input1"))
+        objetivos[codigo] = ObjetivoSku(
+            kilos=montos["kilos"],
+            nns=montos["nns"],
+            nns_iibb=montos["nns_iibb"],
+            descripcion=str(campo(fila, "descripcion") or ""),
+            categoria=campo(fila, "categoria"),
+            pais=pais,
+        )
+    return objetivos, problemas
+
+
+# ---------------------------------------------------------------------------
+# Input 2: totales por canal
+# ---------------------------------------------------------------------------
+
+def leer_input2(texto: str) -> tuple[dict[str, TotalCanal], list[Problema]]:
+    lineas = [linea for linea in texto.strip().splitlines() if linea.strip()]
+    if not lineas:
+        raise ErrorDeEntrada("Input 2: la tabla está vacía.")
+    separador = "\t" if "\t" in lineas[0] else ";" if ";" in lineas[0] else ","
+    filas = list(csv.reader(io.StringIO("\n".join(lineas)), delimiter=separador))
+    n, cols = _encabezado(filas, "input2", {"canal", "kilos"}, "Input 2")
+    problemas: list[Problema] = []
+    if "plata" not in cols:
+        problemas.append(Problema("aviso", "El input 2 no tiene columna de plata: se reparten solo los kilos.",
+                                  bloque="input2"))
+
+    canales: dict[str, TotalCanal] = {}
+    for fila in filas[n + 1:]:
+        canal = fila[cols["canal"]].strip() if cols["canal"] < len(fila) else ""
+        if not canal:
+            continue
+        if canal in canales:
+            problemas.append(Problema("error", f"Canal {canal} repetido en el input 2: se usa la primera fila.",
+                                      bloque="input2"))
+            continue
+        montos = {}
+        for nombre, decimales in (("kilos", KILOS), ("plata", PLATA)):
+            if nombre not in cols:
+                montos[nombre] = None
+                continue
+            crudo = fila[cols[nombre]] if cols[nombre] < len(fila) else ""
+            valor = numero(crudo) if crudo.strip() else Decimal(0)
+            if valor is None or valor < 0:
+                problemas.append(Problema("error", f"{nombre.capitalize()} de {canal} inválido ({crudo!r}). "
+                                                   f"Se toma 0.", bloque="input2"))
+                valor = Decimal(0)
+            montos[nombre] = _al_paso(valor, decimales, f"{nombre.capitalize()} de {canal}", None, problemas)
+        canales[canal] = TotalCanal(kilos=montos["kilos"], plata=montos["plata"])
+    return canales, problemas
+
+
+# ---------------------------------------------------------------------------
+# Base: reparto del mes anterior
+# ---------------------------------------------------------------------------
+
+def leer_base(origen) -> tuple[dict[tuple[str, str], Decimal], list[Problema]]:
+    filas = _filas_de_excel(origen)
+    n, cols = _encabezado(filas, "base", {"sku"}, "Base del mes anterior")
+    meta = set(cols.values())
+    canales = [(i, str(v).strip()) for i, v in enumerate(filas[n]) if v is not None and i not in meta]
+    problemas: list[Problema] = []
+    base: dict[tuple[str, str], Decimal] = {}
+    vistos: set[str] = set()
+    for fila in filas[n + 1:]:
+        codigo = _codigo(fila[cols["sku"]]) if cols["sku"] < len(fila) else None
+        if codigo is None:
+            continue
+        if codigo in vistos:
+            problemas.append(Problema("error", "SKU repetido en la base: se usa la primera fila.", sku=codigo,
+                                      bloque="base"))
+            continue
+        vistos.add(codigo)
+        for i, canal in canales:
+            valor, error = _celda(fila[i] if i < len(fila) else None)
+            if error:
+                problemas.append(Problema("error", f"{canal}: {error}. Se trata como no aplica.", sku=codigo,
+                                          bloque="base"))
+            elif valor is not None and valor < 0:
+                problemas.append(Problema("error", f"Reparto negativo en {canal} ({valor}): es un error del "
+                                                   f"archivo, no se usa.", sku=codigo, bloque="base"))
+            elif valor is not None:
+                base[(codigo, canal)] = valor
+    return base, problemas
+
