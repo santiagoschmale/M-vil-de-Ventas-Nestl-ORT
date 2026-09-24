@@ -10,3 +10,13 @@ packages/db/generated/
 
 # Vite
 apps/web/dist/
+
+# Datos reales de Nestlé: NUNCA al repo
+data/real/
+*.xlsb
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
