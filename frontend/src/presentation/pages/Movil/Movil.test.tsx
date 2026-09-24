@@ -7,7 +7,7 @@ import { server } from '../../../mocks/server';
 import { MovilPage } from './Movil';
 import { mensajeDeError } from '../../../stores/useMovil/useMovil';
 import { Estado } from '../../../stores/useMovil/useMovil.type';
-import { cruceFactory, estadoFactory } from '../../../mocks/movil/fabricas';
+import { cruceFactory, estadoFactory, inconsistenciaFactory, reglaFactory } from '../../../mocks/movil/fabricas';
 
 // Un monto con más dígitos de los que un float representa exacto (está en cruceFactory).
 const GRANDE = '12345678901234567.891';
@@ -85,6 +85,26 @@ describe('MovilPage', { timeout: 15000 }, () => {
 
     expect(await within(dialogo).findByText(detalle)).toBeInTheDocument();
     expect(screen.getByRole('dialog')).toBeInTheDocument();
+  });
+
+  it('una sección que se abrió sola por un problema no se cierra sola cuando se arregla', async () => {
+    const reglas = [reglaFactory.build({ id: 'R1' }), reglaFactory.build({ id: 'R2', limite: 'minimo' })];
+    const conflicto = estado({ reglas, inconsistencias: { kilos: [inconsistenciaFactory.build()], plata: [] } });
+    server.use(
+      http.get('*/api/movil', () => HttpResponse.json(conflicto)),
+      http.delete('*/api/movil/reglas/*', () => HttpResponse.json(estado({ reglas: reglas.slice(0, 1) }))),
+    );
+    const user = userEvent.setup({ delay: null });
+    render(<MovilPage />);
+    const seccion = await screen.findByRole('button', { name: /^Reglas/ });
+    expect(seccion).toHaveAttribute('aria-expanded', 'true');  // se abrió sola: hay reglas que chocan
+
+    await user.click(screen.getByRole('button', { name: 'Eliminar R2' }));
+    const dialogo = screen.getByRole('dialog');
+    await user.type(within(dialogo).getByRole('textbox', { name: /Motivo/ }), 'era un error');
+    await user.click(within(dialogo).getByRole('button', { name: 'Eliminar' }));
+    await waitFor(() => expect(screen.queryByText('Choca')).not.toBeInTheDocument());
+    expect(screen.getByRole('button', { name: /^Reglas/ })).toHaveAttribute('aria-expanded', 'true');
   });
 
   it('exportar se habilita solo cuando kilos y pesos cierran', async () => {

@@ -129,19 +129,25 @@ const ChipCierre = ({ unidad, cierra }: { unidad: Unidad; cierra: boolean }) => 
   />
 );
 
-const Seccion = ({ titulo, resumen, abierta, children }:
-  { titulo: string; resumen?: React.ReactNode; abierta?: boolean; children: React.ReactNode }) => (
-  // key: si cambia si debería estar abierta (p. ej. se cargaron las entradas), vuelve a su posición inicial.
-  <Accordion key={String(abierta)} defaultExpanded={abierta} disableGutters variant="outlined" sx={{ '&:before': { display: 'none' } }}>
-    <AccordionSummary expandIcon={<ExpandMoreRoundedIcon />}>
-      <Box sx={{ display: 'flex', alignItems: 'baseline', flexWrap: 'wrap', columnGap: 2 }}>
-        <Typography fontWeight={700}>{titulo}</Typography>
-        {resumen}
-      </Box>
-    </AccordionSummary>
-    <AccordionDetails>{children}</AccordionDetails>
-  </Accordion>
-);
+const Seccion = ({ titulo, resumen, abierta = false, children }:
+  { titulo: string; resumen?: React.ReactNode; abierta?: boolean; children: React.ReactNode }) => {
+  // Se abre sola cuando algo pide atención (faltan entradas, una regla choca) y nunca se
+  // cierra sola: si el planner la está usando y lo arregla, sigue abierta.
+  const [expandida, setExpandida] = useState(abierta);
+  useEffect(() => { if (abierta) setExpandida(true); }, [abierta]);
+  return (
+    <Accordion expanded={expandida} onChange={(_, v) => setExpandida(v)} disableGutters variant="outlined"
+      sx={{ '&:before': { display: 'none' } }}>
+      <AccordionSummary expandIcon={<ExpandMoreRoundedIcon />}>
+        <Box sx={{ display: 'flex', alignItems: 'baseline', flexWrap: 'wrap', columnGap: 2 }}>
+          <Typography fontWeight={700}>{titulo}</Typography>
+          {resumen}
+        </Box>
+      </AccordionSummary>
+      <AccordionDetails>{children}</AccordionDetails>
+    </Accordion>
+  );
+};
 
 export const MovilPage = () => {
   const { estado, cruce, unidad, refrescar, elegirUnidad, ocupado, errorDeCarga } = useMovil();
