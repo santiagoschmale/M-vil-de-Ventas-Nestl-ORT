@@ -1,0 +1,54 @@
+{
+  "name": "nusa-bcase-copilot-webapp-react",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "test": "vitest --watch=false --coverage",
+    "test:watch": "vitest --watch",
+    "build": "tsc && vite build",
+    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@emotion/react": "^11.11.1",
+    "@emotion/styled": "^11.11.0",
+    "@mui/icons-material": "^5.14.15",
+    "@mui/material": "^5.14.15",
+    "@mui/x-data-grid": "^6.17.0",
+    "nbra-http-client": "^1.1.2",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.17.0",
+    "react-select-event": "^5.5.1",
+    "zustand": "^4.4.4"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^14.3.1",
+    "@testing-library/user-event": "^14.5.1",
+    "@types/react": "^18.2.15",
+    "@types/react-dom": "^18.2.7",
+    "@types/react-test-renderer": "^18.0.5",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "@vitejs/plugin-react": "^4.0.3",
+    "@vitest/coverage-v8": "^3.1.1",
+    "@vitest/ui": "^3.1.1",
+    "eslint": "^8.45.0",
+    "eslint-plugin-react-hooks": "^4.6.0",
+    "eslint-plugin-react-refresh": "^0.4.3",
+    "global-jsdom": "^9.1.0",
+    "msw": "^2.0.1",
+    "react-test-renderer": "^18.2.0",
+    "typescript": "^5.0.2",
+    "vite": "^6.2.5",
+    "vitest": "^3.1.1",
+    "vitest-dom": "^0.1.1"
+  },
+  "overrides": {
+    "axios": "^1.15.1",
+    "form-data": "^4.0.4"
+  }
+}

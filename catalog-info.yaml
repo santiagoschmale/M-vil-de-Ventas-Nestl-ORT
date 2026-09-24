@@ -1,0 +1,16 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: ${{values.name | dump}}
+  {%- if values.description %}
+  description: ${{values.description | dump}}
+  {%- endif %}
+  namespace: ${{ values.namespace }}
+  annotations:
+    backstage.io/techdocs-ref: dir:.
+    sonarqube.org/project-key: arq-dig-${{ values.name }}
+spec:
+  type: ${{ values.type }}
+  lifecycle: experimental
+  owner: ${{values.owner | dump}}
+  system: ${{ values.system }}
