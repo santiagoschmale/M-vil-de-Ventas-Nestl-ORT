@@ -202,3 +202,37 @@ def test_codigos_con_ceros_a_la_izquierda_cruzan_con_los_numericos():
     objetivo, _ = leer_input1(_excel([["SKU", "Kilos"], ["00123", 10]]))
     base, _ = leer_base(_excel([["SKU", "X"], [123, 5]]))
     assert set(objetivo) == {s for s, _ in base}
+
+
+# ---------------------------------------------------------------------------
+# Apertura debajo del canal (hoja "Apertura anterior" de la base)
+# ---------------------------------------------------------------------------
+
+def test_apertura_de_muestra():
+    from openpyxl import load_workbook
+
+    from src.importer.entradas import leer_apertura
+
+    apertura, problemas = leer_apertura(MUESTRA / "base_mes_anterior.xlsx")
+    filas = list(load_workbook(MUESTRA / "base_mes_anterior.xlsx")["Apertura anterior"].iter_rows(values_only=True))
+    assert sum(len(e) for e in apertura.values()) == len(filas) - 1  # una entrada por fila, cuenta independiente
+    assert problemas == []
+    assert {c for _, c in apertura} == {"Distribuidores", "Directa (BA)", "Córdoba", "Rosario"}
+
+
+def test_apertura_negativa_repetida_o_con_texto_se_reporta():
+    from src.importer.entradas import leer_apertura
+
+    libro = _excel([
+        ["SKU", "Canal", "Entidad", "Kilos"],
+        ["1", "Distribuidores", "A", 10],
+        ["1", "Distribuidores", "A", 20],
+        ["1", "Distribuidores", "B", -5],
+        ["1", "Distribuidores", "C", "#N/A"],
+    ])
+    apertura, problemas = leer_apertura(libro)
+    assert apertura == {("1", "Distribuidores"): {"A": D("10")}}
+    errores = _mensajes(problemas, "error")
+    assert any("repetid" in m for m in errores)
+    assert any("negativ" in m for m in errores)
+    assert any("#N/A" in m for m in errores)

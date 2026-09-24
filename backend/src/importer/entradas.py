@@ -8,6 +8,8 @@ los replican.
   tabulaciones, punto y coma o comas).
 - Base: el reparto del mes anterior, SKU × canal en kilos. Celda vacía = no aplica;
   0 = aplica con cero.
+- Apertura: cómo se abrió cada celda debajo del canal el mes anterior (SKU, canal,
+  entidad, kilos), en formato largo. Una entidad que no figura no aplica ahí.
 
 Todo se detecta por nombre de encabezado, nunca por posición, y se cruza por
 código de SKU, nunca por nombre. Los nombres aceptados están en formato.json.
@@ -318,3 +320,45 @@ def leer_base(origen) -> tuple[dict[tuple[str, str], Decimal], list[Problema]]:
                 base[(codigo, canal)] = valor
     return base, problemas
 
+
+
+# ---------------------------------------------------------------------------
+# Apertura debajo del canal
+# ---------------------------------------------------------------------------
+
+def leer_apertura(origen) -> tuple[dict[tuple[str, str], dict[str, Decimal]], list[Problema]]:
+    """
+    {(sku, canal): {entidad: peso}} con el reparto del mes anterior debajo de cada
+    canal (distribuidores, vendedores). Supuesto A10: los vendedores cuelgan de la
+    venta directa y de cada territorio.
+    """
+    filas, n, cols = _encabezado(_hojas_de_excel(origen), "apertura", {"sku", "canal", "entidad", "kilos"},
+                                 "Apertura del mes anterior")
+    problemas: list[Problema] = []
+    apertura: dict[tuple[str, str], dict[str, Decimal]] = {}
+
+    def campo(fila, nombre):
+        i = cols[nombre]
+        return fila[i] if i < len(fila) else None
+
+    for fila in filas[n + 1:]:
+        codigo = _codigo(campo(fila, "sku"))
+        canal = str(campo(fila, "canal") or "").strip()
+        entidad = str(campo(fila, "entidad") or "").strip()
+        if codigo is None or not canal or not entidad:
+            continue
+        celda = apertura.setdefault((codigo, canal), {})
+        if entidad in celda:
+            problemas.append(Problema("error", f"{entidad} repetida en {canal}: se usa la primera fila.",
+                                      sku=codigo, bloque="apertura"))
+            continue
+        valor, error = _celda(campo(fila, "kilos"))
+        if error:
+            problemas.append(Problema("error", f"{entidad} en {canal}: {error}. Se trata como no aplica.",
+                                      sku=codigo, bloque="apertura"))
+        elif valor is not None and valor < 0:
+            problemas.append(Problema("error", f"Reparto negativo de {entidad} en {canal} ({valor}): es un error "
+                                               f"del archivo, no se usa.", sku=codigo, bloque="apertura"))
+        elif valor is not None:
+            celda[entidad] = valor
+    return {k: v for k, v in apertura.items() if v}, problemas

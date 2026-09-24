@@ -9,6 +9,9 @@ Salida (en data/sample/):
   (números con formato argentino: 13.000 y 1.234,56).
 - base_mes_anterior.xlsx: cómo quedó repartido el mes anterior, SKU × canal en kilos.
   Celda vacía = no aplica; 0 = aplica con cero.
+  Segunda hoja "Apertura anterior": cómo se abrió cada celda debajo del canal
+  (SKU, canal, entidad, kilos): distribuidores en Distribuidores, vendedores en
+  Directa, Córdoba y Rosario (supuesto A10: cada territorio con sus vendedores).
 - input2_distribuidores_imposible.tsv: el ejemplo del cliente. Distribuidores pide
   más de lo que pueden darle los SKUs que se venden ahí.
 
@@ -39,6 +42,16 @@ SOLUCIONES = ["Distribuidores", "Directa (BA)", "Córdoba", "Rosario", "KAM Sol"
 CANALES = INGREDIENTES + SOLUCIONES
 # Precio por kilo de cada canal (la plata del input 2 es por canal).
 PRECIO = {c: D(rnd.randint(4000, 30000)) for c in CANALES}
+
+DISTRIBUIDORES = ["Distribuidora Andina", "Distribuidora del Litoral", "Comercial Pampa", "Red Cuyo",
+                  "Norte Servicios"]
+# Supuesto A10: los vendedores cuelgan de la venta directa y de cada territorio.
+VENDEDORES = {
+    "Directa (BA)": ["Lucía Ferreyra", "Tomás Quiroga", "Valentina Sosa", "Martín Acosta", "Camila Benítez"],
+    "Córdoba": ["Joaquín Ledesma", "Sofía Correa", "Nicolás Paz"],
+    "Rosario": ["Agustina Medina", "Federico Luna"],
+}
+APERTURA = {"Distribuidores": DISTRIBUIDORES, **VENDEDORES}
 
 PRODUCTOS_ING = ["Café soluble", "Leche en polvo", "Cacao amargo", "Crema vegetal", "Puré instantáneo",
                  "Chocolate en polvo", "Caldo concentrado"]
@@ -173,6 +186,19 @@ for s in skus:
         v = base.get((s["codigo"], c))
         fila.append(None if v is None else float(v))  # vacío = no aplica
     hoja.append(fila)
+
+# Apertura debajo del canal, en formato largo. Una entidad que no figura en una celda
+# no aplica ahí; una con 0 aplica con cero.
+apertura = wb.create_sheet("Apertura anterior")
+apertura.append(["Código SKU", "Canal", "Entidad", "Kilos"])
+for (codigo, canal), v in sorted(base.items()):
+    if canal not in APERTURA or v == 0:
+        continue
+    for entidad in APERTURA[canal]:
+        r = rnd.random()
+        if r < 0.2:
+            continue  # no aplica
+        apertura.append([int(codigo), canal, entidad, 0.0 if r < 0.25 else float(rnd.randint(10, 900))])
 wb.properties.created = wb.properties.modified = FECHA
 wb.save(AQUI / "base_mes_anterior.xlsx")
 
