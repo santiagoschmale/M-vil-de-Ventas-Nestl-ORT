@@ -145,3 +145,7 @@ __pycache__/
 *.pyc
 .venv/
 .pytest_cache/
+
+# Backend local
+backend/.venv/
+backend/.requirements.publicas.txt
