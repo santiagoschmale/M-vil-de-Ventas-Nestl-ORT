@@ -23,6 +23,7 @@ from datetime import datetime
 from decimal import Decimal
 
 from src.domain.cruce import Celda, ErrorDeCruce
+from src.domain.reparto import a_texto
 from src.importer.entradas import (
     KILOS,
     PLATA,
@@ -179,12 +180,12 @@ class Sesion:
         objetivo = r.objetivos[sku].kilos if unidad == "kilos" else r.objetivos[sku].nns
         total_canal = r.canales[canal].kilos if unidad == "kilos" else r.canales[canal].plata
         if objetivo is not None and valor > objetivo:
-            raise ErrorDeAjuste(f"El valor supera el objetivo del SKU {sku} ({objetivo}).")
+            raise ErrorDeAjuste(f"El valor supera el objetivo del SKU {sku} ({_con_unidad(objetivo, unidad)}).")
         if total_canal is not None and valor > total_canal:
-            raise ErrorDeAjuste(f"El valor supera el total del canal {canal} ({total_canal}).")
+            raise ErrorDeAjuste(f"El valor supera el total del canal {canal} ({_con_unidad(total_canal, unidad)}).")
 
         def cambio():
-            ajuste = Ajuste("fijar", f"{unidad} {sku} × {canal} = {valor.quantize(paso)}", autor, cuando, motivo)
+            ajuste = Ajuste("fijar", f"{sku} × {canal} = {_con_unidad(valor.quantize(paso), unidad)}", autor, cuando, motivo)
             self._fijas[unidad][(sku, canal)] = Fijada(valor.quantize(paso), ajuste)
             return ajuste
         self._aplicar(cambio)
@@ -196,7 +197,7 @@ class Sesion:
             raise ErrorDeAjuste(f"La celda {sku} × {canal} no está fijada en {unidad}.")
         def cambio():
             del self._fijas[unidad][(sku, canal)]
-            return Ajuste("desfijar", f"{unidad} {sku} × {canal}", autor, cuando, motivo)
+            return Ajuste("desfijar", f"{sku} × {canal} en {'kilos' if unidad == 'kilos' else 'pesos'}", autor, cuando, motivo)
         self._aplicar(cambio)
 
     # --- interno ------------------------------------------------------------
@@ -255,6 +256,10 @@ class Sesion:
             )
         except ErrorDeCruce as e:
             raise ErrorDeAjuste(str(e)) from e
+
+
+def _con_unidad(valor: Decimal, unidad: str) -> str:
+    return f"{a_texto(valor)} kg" if unidad == "kilos" else f"$ {a_texto(valor)}"
 
 
 def _motivo(motivo: str | None) -> str:

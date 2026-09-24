@@ -249,3 +249,13 @@ def test_la_apertura_sale_en_el_excel():
     assert set(por_celda) == set(r.aperturas)
     for k, total in por_celda.items():
         assert total == sum((h.valores["kilos"].monto for h in r.aperturas[k].hijos), D(0)), k
+
+
+def test_por_que_no_abre_habla_en_terminos_del_planner():
+    from src.movil.recorrido import por_que_no_abre
+
+    m = por_que_no_abre("Rosario", "plata", "Todos los pesos son cero: no hay base para repartir.")
+    assert m == ("Rosario no se puede abrir en pesos: el mes anterior ninguno de sus distribuidores o "
+                 "vendedores vendió este SKU. Los pesos quedan en el canal, sin abrir.")
+    assert "apagados" in por_que_no_abre("Directa (BA)", "kilos", "No hay entidades entre las cuales repartir.")
+    assert "pesos son cero" not in m and "plata" not in m

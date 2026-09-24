@@ -170,6 +170,8 @@ def test_totales_de_los_dos_inputs_que_no_coinciden():
     (inc,) = r.inconsistencias
     assert inc.tipo == "totales_distintos"
     assert inc.diferencia == D("10.000")
+    # En el mensaje, como se lee en Argentina: "10.000" serían diez mil.
+    assert "suma 100,000" in inc.mensaje and "difieren en 10,000." in inc.mensaje
 
 
 def test_sku_sin_ningun_canal_en_la_base():

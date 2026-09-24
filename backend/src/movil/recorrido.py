@@ -133,11 +133,22 @@ def _abrir(kilos, plata, apertura, apagadas, problemas, por_nombre) -> dict[Celd
         recalcular(raiz, inactivas)
         for unidad in ("kilos", "nns"):
             if raiz.aviso[unidad]:
-                problemas.append(Problema("error", f"La apertura de {canal} no se pudo repartir en "
-                                                   f"{'kilos' if unidad == 'kilos' else 'plata'}: "
-                                                   f"{raiz.aviso[unidad]}", sku=sku, bloque="apertura"))
+                problemas.append(Problema("error", por_que_no_abre(canal, unidad, raiz.aviso[unidad]),
+                                          sku=sku, bloque="apertura"))
         aperturas[k] = raiz
     return aperturas
+
+
+def por_que_no_abre(canal: str, unidad: str, aviso: str) -> str:
+    """El aviso del reparto dicho en términos del planner: qué pasó y qué queda."""
+    medida = "kilos" if unidad == "kilos" else "pesos"
+    if "pesos son cero" in aviso:
+        motivo = "el mes anterior ninguno de sus distribuidores o vendedores vendió este SKU"
+    elif "No hay entidades" in aviso:
+        motivo = "todos sus distribuidores o vendedores están apagados"
+    else:
+        motivo = aviso.rstrip(".")
+    return f"{canal} no se puede abrir en {medida}: {motivo}. Los {medida} quedan en el canal, sin abrir."
 
 
 def desde_archivos(input1, input2_texto: str, base_origen, **opciones) -> Recorrido:

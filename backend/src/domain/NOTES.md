@@ -130,6 +130,12 @@ celda. El cruce no cambia al apagar un distribuidor.
 - **Los montos viajan como texto** (`"1234.500"`) con los decimales de su unidad.
   El front solo cambia separadores (`formatear`), nunca los convierte a número:
   un número JSON pasa por float en JavaScript.
+- **Mensajes al planner con montos en formato argentino** (`a_texto`: 10,000 kg,
+  no 10.000) y diciendo qué hacer. Nada de códigos internos (A4) ni del reparto
+  ("pesos son cero") en lo que se muestra.
+- **"Plata" en la API, "Pesos" en pantalla**: el cliente dice plata; en pantalla se
+  usa la unidad, que se lee igual en cualquier lado. Se cambia en `UNIDADES` de
+  `formato.ts`.
 - **Nombres con `/` en la URL**: canales y entidades van al final de la ruta con
   `:path`, porque Starlette decodifica `%2F` antes de rutear.
 - **Todo ajuste pide motivo** (fijar, desfijar, ON/OFF). Las cargas de entradas van

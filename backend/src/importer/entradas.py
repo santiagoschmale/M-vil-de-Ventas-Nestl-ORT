@@ -33,6 +33,7 @@ from pathlib import Path
 from openpyxl import load_workbook
 
 from src.domain.arbol import Problema
+from src.domain.reparto import a_texto
 
 FORMATO = json.loads(Path(__file__).with_name("formato.json").read_text(encoding="utf-8"))
 KILOS = 3  # decimales
@@ -143,8 +144,8 @@ def _al_paso(valor: Decimal, decimales: int, que: str, sku, problemas: list[Prob
     paso = Decimal(1).scaleb(-decimales)
     redondeado = valor.quantize(paso, rounding=ROUND_HALF_EVEN)
     if redondeado != valor:
-        problemas.append(Problema("aviso", f"{que} con más de {decimales} decimales: {valor} se redondea a "
-                                           f"{redondeado}.", sku=sku))
+        problemas.append(Problema("aviso", f"{que} con más de {decimales} decimales: {a_texto(valor)} se redondea a "
+                                           f"{a_texto(redondeado)}.", sku=sku))
     return redondeado
 
 
@@ -208,7 +209,7 @@ def leer_input1(origen) -> tuple[dict[str, ObjetivoSku], list[Problema]]:
             elif valor is None:
                 valor = Decimal(0)
             if valor < 0:
-                problemas.append(Problema("error", f"{etiqueta} negativo ({valor}). Se toma 0.", sku=codigo,
+                problemas.append(Problema("error", f"{etiqueta} negativo ({a_texto(valor)}). Se toma 0.", sku=codigo,
                                           bloque="input1"))
                 valor = Decimal(0)
             montos[nombre] = _al_paso(valor, decimales, etiqueta, codigo, problemas)
@@ -221,8 +222,8 @@ def leer_input1(origen) -> tuple[dict[str, ObjetivoSku], list[Problema]]:
             problemas.append(Problema("aviso", "SKU con objetivo en cero (obsoleto o estacional): no se reparte.",
                                       sku=codigo, bloque="input1"))
         elif montos["kilos"] == 0:
-            problemas.append(Problema("error", f"SKU con NNS ({montos['nns']}) pero kilos en cero: los kilos son "
-                                               f"esenciales, no se reparte ni en kilos ni en plata.",
+            problemas.append(Problema("error", f"SKU con NNS ({a_texto(montos['nns'])}) pero kilos en cero: los kilos son "
+                                               f"esenciales, no se reparte ni en kilos ni en pesos.",
                                       sku=codigo, bloque="input1"))
         objetivos[codigo] = ObjetivoSku(
             kilos=montos["kilos"],
@@ -314,7 +315,7 @@ def leer_base(origen) -> tuple[dict[tuple[str, str], Decimal], list[Problema]]:
                 problemas.append(Problema("error", f"{canal}: {error}. Se trata como no aplica.", sku=codigo,
                                           bloque="base"))
             elif valor is not None and valor < 0:
-                problemas.append(Problema("error", f"Reparto negativo en {canal} ({valor}): es un error del "
+                problemas.append(Problema("error", f"Reparto negativo en {canal} ({a_texto(valor)}): es un error del "
                                                    f"archivo, no se usa.", sku=codigo, bloque="base"))
             elif valor is not None:
                 base[(codigo, canal)] = valor
@@ -357,7 +358,7 @@ def leer_apertura(origen) -> tuple[dict[tuple[str, str], dict[str, Decimal]], li
             problemas.append(Problema("error", f"{entidad} en {canal}: {error}. Se trata como no aplica.",
                                       sku=codigo, bloque="apertura"))
         elif valor is not None and valor < 0:
-            problemas.append(Problema("error", f"Reparto negativo de {entidad} en {canal} ({valor}): es un error "
+            problemas.append(Problema("error", f"Reparto negativo de {entidad} en {canal} ({a_texto(valor)}): es un error "
                                                f"del archivo, no se usa.", sku=codigo, bloque="apertura"))
         elif valor is not None:
             celda[entidad] = valor

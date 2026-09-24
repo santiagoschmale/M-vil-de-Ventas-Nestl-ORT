@@ -18,7 +18,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from src.domain.cruce import Inconsistencia, ResultadoCruce
-from src.movil.recorrido import exportar
+from src.movil.recorrido import exportar, por_que_no_abre
 from src.movil.sesion import UNIDADES as DECIMALES, Ajuste, ErrorDeAjuste, Sesion
 
 router = APIRouter(prefix="/api/movil", tags=["Móvil"])
@@ -226,7 +226,8 @@ def obtener_apertura(sku: str, canal: str, s: Sesion = Depends(sesion)):
         "kilos": _texto(raiz.valores["kilos"].monto, "kilos"),
         "plata": _texto(raiz.valores["nns"].monto, "plata"),
         "cuadra": {"kilos": raiz.cuadra["kilos"], "plata": raiz.cuadra["nns"]},
-        "aviso": raiz.aviso["kilos"] or raiz.aviso["nns"],
+        "aviso": next((por_que_no_abre(canal, u, raiz.aviso[k])
+                       for u, k in (("kilos", "kilos"), ("plata", "nns")) if raiz.aviso[k]), None),
         "entidades": [
             {"nombre": h.entidad, "activo": h.activo, "peso": str(h.peso),
              "kilos": _texto(h.valores["kilos"].monto, "kilos"), "plata": _texto(h.valores["nns"].monto, "plata")}

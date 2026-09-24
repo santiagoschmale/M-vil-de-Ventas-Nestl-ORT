@@ -374,3 +374,14 @@ def test_totales_de_mas_de_28_digitos_no_se_redondean():
     r = repartir(total, {"a": D(1), "b": D(2)}, decimales=3)
 
     assert cuadra(total, r)
+
+
+def test_a_texto_escribe_montos_como_se_leen_en_argentina():
+    from src.domain.reparto import a_texto
+
+    assert a_texto(D("10.000")) == "10,000"  # diez kilos, no diez mil
+    assert a_texto(D("454971.590")) == "454.971,590"
+    assert a_texto(D("-1234.50")) == "-1.234,50"
+    assert a_texto(D("1000")) == "1.000"
+    assert a_texto(D("0.00")) == "0,00"
+    assert a_texto(D("12345678901234567.891")) == "12.345.678.901.234.567,891"

@@ -39,6 +39,7 @@ from math import floor
 from typing import Mapping
 
 from .flujo import INFINITO, FlujoMaximo, flujo_de_costo_minimo
+from .reparto import a_texto
 
 Celda = tuple[str, str]  # (sku, canal)
 
@@ -116,8 +117,9 @@ def cruzar(
         dif = _a_decimal(abs(total_filas - total_columnas), decimales)
         inconsistencias.append(Inconsistencia(
             "totales_distintos",
-            f"El objetivo por SKU (input 1) suma {_a_decimal(total_filas, decimales)} y los totales por canal "
-            f"(input 2) suman {_a_decimal(total_columnas, decimales)}: difieren en {dif}.",
+            f"El objetivo por SKU (input 1) suma {a_texto(_a_decimal(total_filas, decimales))} y los totales por canal "
+            f"(input 2) suman {a_texto(_a_decimal(total_columnas, decimales))}: difieren en {a_texto(dif)}. "
+            f"Corregí uno de los dos para que coincidan.",
             diferencia=dif,
         ))
 
@@ -127,11 +129,11 @@ def cruzar(
         c[k] -= v
     total_filas -= sum(fijadas.values())
     inconsistencias += [
-        Inconsistencia("fijado_excede", f"Lo fijado en el SKU {s} supera su objetivo en {_a_decimal(-v, decimales)}.",
+        Inconsistencia("fijado_excede", f"Lo fijado en el SKU {s} supera su objetivo en {a_texto(_a_decimal(-v, decimales))}.",
                        skus=(s,), diferencia=_a_decimal(-v, decimales))
         for s, v in sorted(r.items()) if v < 0
     ] + [
-        Inconsistencia("fijado_excede", f"Lo fijado en el canal {k} supera su total en {_a_decimal(-v, decimales)}.",
+        Inconsistencia("fijado_excede", f"Lo fijado en el canal {k} supera su total en {a_texto(_a_decimal(-v, decimales))}.",
                        canales=(k,), diferencia=_a_decimal(-v, decimales))
         for k, v in sorted(c.items()) if v < 0
     ]
@@ -151,11 +153,13 @@ def cruzar(
     def sin_celdas_libres(que: str, nombre: str, falta: int, fijado: bool) -> str:
         if fijado:
             return (f"Lo fijado en el {que} {nombre} no alcanza su total y no le quedan celdas libres: "
-                    f"faltan {_a_decimal(falta, decimales)}.")
+                    f"faltan {a_texto(_a_decimal(falta, decimales))}.")
         if que == "SKU":
-            return (f"El SKU {nombre} tiene objetivo pero no tiene reparto previo en ningún canal "
-                    f"(caso A4: SKU sin reparto previo, regla pendiente).")
-        return f"El canal {nombre} tiene total pero ningún SKU se vendió ahí el mes anterior."
+            # Caso A4 (SKU sin reparto previo): la regla está pendiente con el cliente.
+            return (f"El SKU {nombre} tiene objetivo pero el mes anterior no se vendió en ningún canal: "
+                    f"no hay base para repartirlo. Apagalo para seguir y descontá su parte del input 2.")
+        return (f"El canal {nombre} tiene total pero el mes anterior no vendió ningún SKU: "
+                f"no hay base para repartirlo. Revisá su total en el input 2.")
 
     inconsistencias += [
         Inconsistencia("sku_sin_canal", sin_celdas_libres("SKU", s, r[s], s in filas_fijadas), skus=(s,),
@@ -268,8 +272,8 @@ def _deficits(red: FlujoMaximo, r, c, soporte, decimales: int) -> list[Inconsist
         dif = _a_decimal(necesitan - pueden, decimales)
         inconsistencias.append(Inconsistencia(
             "canales_sin_volumen",
-            f"{', '.join(ks)} {'necesita' if len(ks) == 1 else 'necesitan'} {_a_decimal(necesitan, decimales)}, "
-            f"pero los SKUs que se venden ahí suman {_a_decimal(pueden, decimales)} en total: faltan {dif}.",
+            f"{', '.join(ks)} {'necesita' if len(ks) == 1 else 'necesitan'} {a_texto(_a_decimal(necesitan, decimales))}, "
+            f"pero los SKUs que se venden ahí suman {a_texto(_a_decimal(pueden, decimales))} en total: faltan {a_texto(dif)}.",
             skus=skus,
             canales=tuple(ks),
             diferencia=dif,
