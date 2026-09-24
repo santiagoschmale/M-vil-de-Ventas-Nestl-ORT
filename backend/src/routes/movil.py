@@ -74,6 +74,15 @@ class MotivoIn(BaseModel):
     motivo: str
 
 
+class ReglaIn(BaseModel):
+    canal: str
+    categorias: list[str]
+    limite: str = Field(description="tope, minimo o fijo")
+    kilos: str | None = Field(description="% del total del canal en kilos, como texto; null = no aplica")
+    nns: str | None = Field(description="% del total del canal en NNS, como texto; null = no aplica")
+    motivo: str
+
+
 def _texto(v: Decimal | None, unidad: str) -> str | None:
     return None if v is None else str(v.quantize(Decimal(1).scaleb(-DECIMALES[unidad])))
 
@@ -84,7 +93,17 @@ def _suma(valores) -> Decimal:
 
 def _inconsistencia(i: Inconsistencia) -> dict:
     return {"tipo": i.tipo, "mensaje": i.mensaje, "skus": list(i.skus), "canales": list(i.canales),
-            "diferencia": None if i.diferencia is None else str(i.diferencia)}
+            "diferencia": None if i.diferencia is None else str(i.diferencia), "reglas": list(i.reglas)}
+
+
+def _porcentaje(v: Decimal | None) -> str | None:
+    return None if v is None else str(v)
+
+
+def _regla(id_: str, cargada) -> dict:
+    r = cargada.regla
+    return {"id": id_, "canal": r.canal, "categorias": sorted(r.categorias), "limite": r.limite,
+            "kilos": _porcentaje(r.kilos), "nns": _porcentaje(r.nns), **_ajuste(cargada.ajuste)}
 
 
 def _ajuste(a: Ajuste) -> dict:
@@ -126,6 +145,12 @@ def _estado(s: Sesion) -> dict:
         },
         "fijas": {u: [{"sku": k[0], "canal": k[1], "valor": _texto(f.valor, u), **_ajuste(f.ajuste)}
                       for k, f in sorted(s.fijas(u).items())] for u in DECIMALES},
+        "reglas": [_regla(i, r) for i, r in sorted(s.reglas.items(), key=lambda x: int(x[0][1:]))],
+        # Para el formulario de reglas: canales del input 2 y categorías del input 1.
+        "opciones": {
+            "canales": list(e.canales or {}),
+            "categorias": sorted({o.categoria for o in (e.objetivos or {}).values() if o.categoria}),
+        },
         "historial": [_ajuste(a) for a in s.historial],
     }
 
@@ -276,4 +301,28 @@ def fijar_celda(unidad: str, sku: str, canal: str, cuerpo: FijarIn, s: Sesion = 
 def desfijar_celda(unidad: str, sku: str, canal: str, cuerpo: MotivoIn, s: Sesion = Depends(sesion),
                    quien: str = Depends(autor)):
     _aplicar(s.desfijar, unidad, sku, canal, autor=quien, cuando=_ahora(), motivo=cuerpo.motivo)
+    return _estado(s)
+
+
+# ---------------------------------------------------------------------------
+# Reglas (todas con motivo)
+# ---------------------------------------------------------------------------
+
+@router.post("/reglas", summary="Agregar una regla: canal, categorías, límite y % de kilos y de NNS")
+def agregar_regla(cuerpo: ReglaIn, s: Sesion = Depends(sesion), quien: str = Depends(autor)):
+    _aplicar(s.agregar_regla, cuerpo.canal, cuerpo.categorias, cuerpo.limite, cuerpo.kilos, cuerpo.nns,
+             autor=quien, cuando=_ahora(), motivo=cuerpo.motivo)
+    return _estado(s)
+
+
+@router.put("/reglas/{id_}", summary="Editar una regla")
+def editar_regla(id_: str, cuerpo: ReglaIn, s: Sesion = Depends(sesion), quien: str = Depends(autor)):
+    _aplicar(s.editar_regla, id_, cuerpo.canal, cuerpo.categorias, cuerpo.limite, cuerpo.kilos, cuerpo.nns,
+             autor=quien, cuando=_ahora(), motivo=cuerpo.motivo)
+    return _estado(s)
+
+
+@router.delete("/reglas/{id_}", summary="Eliminar una regla")
+def eliminar_regla(id_: str, cuerpo: MotivoIn, s: Sesion = Depends(sesion), quien: str = Depends(autor)):
+    _aplicar(s.eliminar_regla, id_, autor=quien, cuando=_ahora(), motivo=cuerpo.motivo)
     return _estado(s)
