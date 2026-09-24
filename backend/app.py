@@ -3,7 +3,9 @@ from fastapi import FastAPI
 from logging import getLogger
 from os import environ
 
-from src.routes import health
+from src.auth.proveedor import ProveedorLocal
+from src.movil.repositorio import RepositorioEnMemoria
+from src.routes import health, movil
 from nbra_envs_python import set_local_variables
 from src.config.logger import logger
 from src.middleware.error_handler import catch_exceptions
@@ -18,15 +20,26 @@ async def lifespan(app: FastAPI):
     await set_local_variables()
     yield
 
-if environ.get("IS_LOCAL", "true").lower() == "false":
-    app = FastAPI(lifespan=lifespan)
-else:
-    app = FastAPI()
+def crear_app() -> FastAPI:
+    """
+    Arma la app. Acá se eligen las implementaciones: sesión en memoria y
+    autenticación local; cambiar a Postgres o a Entra ID es cambiar estas líneas.
+    Los tests arman su propia app con una sesión vacía.
+    """
+    if environ.get("IS_LOCAL", "true").lower() == "false":
+        nueva = FastAPI(lifespan=lifespan)
+    else:
+        nueva = FastAPI()
+    nueva.middleware('http')(catch_exceptions)
+    nueva.state.repositorio = RepositorioEnMemoria()
+    nueva.state.autenticacion = ProveedorLocal()
+    nueva.include_router(health.router)
+    nueva.include_router(movil.router)
+    return nueva
 
+
+app = crear_app()
 getLogger("uvicorn.error").name =  '${{ values.name }}'
-app.middleware('http')(catch_exceptions)
-
-app.include_router(health.router)
 
 if __name__ == "__main__":
     uvicorn.run(
