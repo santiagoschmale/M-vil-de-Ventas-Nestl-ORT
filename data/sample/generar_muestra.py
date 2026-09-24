@@ -84,6 +84,15 @@ PRODUCTOS_ING = ["Café soluble", "Leche en polvo", "Cacao amargo", "Crema veget
                  "Chocolate en polvo", "Caldo concentrado"]
 PRODUCTOS_SOL = ["Café en grano", "Mix capuccino", "Vaso térmico", "Tapa para vaso", "Azúcar en stick",
                  "Paletina", "Taza de servicio"]
+# La categoría del input 1 (sobre la que se arman las reglas), por producto.
+CATEGORIA = {
+    "Café soluble": "Café", "Café en grano": "Café", "Mix capuccino": "Café", "Café en cápsula": "Café",
+    "Leche en polvo": "Lácteos", "Crema vegetal": "Lácteos",
+    "Cacao amargo": "Chocolatería", "Chocolate en polvo": "Chocolatería",
+    "Puré instantáneo": "Culinarios", "Caldo concentrado": "Culinarios",
+    "Vaso térmico": "Descartables", "Tapa para vaso": "Descartables", "Paletina": "Descartables",
+    "Azúcar en stick": "Endulzantes", "Taza de servicio": "Vajilla",
+}
 
 
 def sku(n: int) -> str:
@@ -96,11 +105,13 @@ def sku(n: int) -> str:
 
 skus: list[dict] = []
 for i in range(1, 21):
-    skus.append({"codigo": sku(i), "desc": f"{rnd.choice(PRODUCTOS_ING)} {rnd.choice(['1kg', '2x1kg', '5kg'])}",
-                 "cat": "Ingredientes", "canales": INGREDIENTES})
+    producto = rnd.choice(PRODUCTOS_ING)
+    skus.append({"codigo": sku(i), "desc": f"{producto} {rnd.choice(['1kg', '2x1kg', '5kg'])}",
+                 "cat": CATEGORIA[producto], "canales": INGREDIENTES})
 for i in range(101, 126):
-    skus.append({"codigo": sku(i), "desc": f"{rnd.choice(PRODUCTOS_SOL)} x{rnd.choice([50, 100, 500])}",
-                 "cat": "Soluciones", "canales": SOLUCIONES})
+    producto = rnd.choice(PRODUCTOS_SOL)
+    skus.append({"codigo": sku(i), "desc": f"{producto} x{rnd.choice([50, 100, 500])}",
+                 "cat": CATEGORIA[producto], "canales": SOLUCIONES})
 # Dos SKUs que se venden en los dos segmentos: el cruce parte su objetivo solo.
 for s in skus[18:20]:
     s["canales"] = INGREDIENTES + ["Distribuidores", "KAM Sol"]
@@ -148,9 +159,9 @@ for s in skus:
     hoja.append([s["cat"], s["desc"], int(s["codigo"]), float(nns), float(kg),
                  float((nns * D("1.035")).quantize(CENTAVO)), "AR"])
 nuevo = sku(900)  # SKU nuevo: tiene objetivo pero no estaba el mes anterior (A4)
-hoja.append(["Soluciones", "Café en cápsula x50", int(nuevo), 125000.0, 10.0, 129375.0, "AR"])
-hoja.append(["Ingredientes", "Leche en polvo 1kg", int(sku(950)), 0.0, 0.0, 0.0, "UY"])  # otro país, en cero
-hoja.append(["Ingredientes", "Café soluble 1kg (repetido)", int(skus[0]["codigo"]), 1.0, 1.0, 1.0, "AR"])  # código repetido
+hoja.append(["Café", "Café en cápsula x50", int(nuevo), 125000.0, 10.0, 129375.0, "AR"])
+hoja.append(["Lácteos", "Leche en polvo 1kg", int(sku(950)), 0.0, 0.0, 0.0, "UY"])  # otro país, en cero
+hoja.append(["Café", "Café soluble 1kg (repetido)", int(skus[0]["codigo"]), 1.0, 1.0, 1.0, "AR"])  # código repetido
 guardar(wb, "input1_objetivo.xlsx")
 
 # ---------------------------------------------------------------------------
