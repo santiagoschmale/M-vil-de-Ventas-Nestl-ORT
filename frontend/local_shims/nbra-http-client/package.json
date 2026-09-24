@@ -1,0 +1,17 @@
+{
+  "name": "nbra-http-client",
+  "version": "0.0.0-local",
+  "description": "Reemplazo local de nbra-http-client (ver local_shims/README.md)",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "dependencies": {
+    "axios": "^1.15.1"
+  },
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "default": "./index.js"
+    }
+  }
+}
