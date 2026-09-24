@@ -26,13 +26,15 @@ from pathlib import Path
 from openpyxl import Workbook
 from openpyxl.styles import Font
 
-from src.domain.arbol import Problema
+from src.domain.arbol import Nodo, Problema, recalcular
 from src.domain.cruce import Celda, ResultadoCruce, cruzar
 from src.importer.entradas import (
     KILOS,
     PLATA,
     ObjetivoSku,
+    ErrorDeEntrada,
     TotalCanal,
+    leer_apertura,
     leer_base,
     leer_input1,
     leer_input2,
@@ -48,6 +50,9 @@ class Recorrido:
     plata: ResultadoCruce | None  # None si algún input no trae plata
     problemas: list[Problema] = field(default_factory=list)
     apagados: frozenset[str] = frozenset()
+    # Debajo del canal: {(sku, canal): raíz con el valor del cruce y sus entidades}.
+    aperturas: dict[Celda, Nodo] = field(default_factory=dict)
+    entidades_apagadas: frozenset[str] = frozenset()
 
 
 def armar(
@@ -58,11 +63,18 @@ def armar(
     fijas_kilos: dict[Celda, Decimal] | None = None,
     fijas_plata: dict[Celda, Decimal] | None = None,
     problemas: list[Problema] | None = None,
+    apertura: dict[Celda, dict[str, Decimal]] | None = None,
+    entidades_apagadas: set[str] | frozenset[str] = frozenset(),
 ) -> Recorrido:
     """
     `apagados`: SKUs que el planner saca del mes (ON/OFF). No se reparten; si su
     objetivo estaba contado en el input 2, el cruce va a informar que los totales no
     coinciden, y es el planner quien ajusta el input 2.
+
+    `apertura`: cómo se abre cada celda debajo del canal. Cada celda del cruce con
+    apertura se reparte entre sus entidades con largest remainder, en kilos y en
+    plata por separado. `entidades_apagadas` (distribuidores, vendedores) salen del
+    reparto en todas las celdas y su parte va a los demás de la misma celda (A1).
     """
     problemas = list(problemas or [])
     apagados = frozenset(apagados)
@@ -95,15 +107,49 @@ def armar(
             decimales=PLATA,
             fijas=fijas_plata,
         )
+    entidades_apagadas = frozenset(entidades_apagadas)
+    aperturas = _abrir(kilos, plata, apertura or {}, entidades_apagadas, problemas, por_nombre)
     return Recorrido(objetivos=objetivos, canales=canales, kilos=kilos, plata=plata, problemas=problemas,
-                     apagados=apagados)
+                     apagados=apagados, aperturas=aperturas, entidades_apagadas=entidades_apagadas)
+
+
+def _abrir(kilos, plata, apertura, apagadas, problemas, por_nombre) -> dict[Celda, Nodo]:
+    """Una raíz por celda del cruce con apertura: el valor del cruce se reparte entre sus entidades."""
+    if kilos.celdas is None:
+        return {}
+    aperturas = {}
+    inactivas = {e: True for e in apagadas}
+    for (sku, canal_base), pesos in sorted(apertura.items()):
+        canal = por_nombre.get(normalizar(canal_base), canal_base)
+        k = (sku, canal)
+        valor_kilos = kilos.celdas.get(k, Decimal(0))
+        valor_plata = Decimal(0) if plata is None or plata.celdas is None else plata.celdas.get(k, Decimal(0))
+        if valor_kilos == 0 and valor_plata == 0:
+            continue
+        raiz = Nodo(entidad=f"{sku}|{canal}", nombre=canal, peso=Decimal(1),
+                    hijos=[Nodo(entidad=e, nombre=e, peso=w) for e, w in sorted(pesos.items())])
+        raiz.valores["kilos"].monto = valor_kilos
+        raiz.valores["nns"].monto = valor_plata
+        recalcular(raiz, inactivas)
+        for unidad in ("kilos", "nns"):
+            if raiz.aviso[unidad]:
+                problemas.append(Problema("error", f"La apertura de {canal} no se pudo repartir en "
+                                                   f"{'kilos' if unidad == 'kilos' else 'plata'}: "
+                                                   f"{raiz.aviso[unidad]}", sku=sku, bloque="apertura"))
+        aperturas[k] = raiz
+    return aperturas
 
 
 def desde_archivos(input1, input2_texto: str, base_origen, **opciones) -> Recorrido:
     objetivos, p1 = leer_input1(input1)
     canales, p2 = leer_input2(input2_texto)
     base, p3 = leer_base(base_origen)
-    return armar(objetivos, canales, base, problemas=p1 + p2 + p3, **opciones)
+    try:
+        apertura, p4 = leer_apertura(base_origen)
+    except ErrorDeEntrada:
+        apertura, p4 = {}, [Problema("aviso", "La base no tiene apertura debajo del canal: los canales cierran "
+                                              "en el canal.", bloque="apertura")]
+    return armar(objetivos, canales, base, problemas=p1 + p2 + p3 + p4, apertura=apertura, **opciones)
 
 
 # ---------------------------------------------------------------------------
@@ -141,6 +187,17 @@ def exportar(recorrido: Recorrido, destino) -> None:
         for fila in hoja.iter_rows(min_row=2, min_col=3):
             for celda in fila:
                 celda.number_format = formato
+
+    hoja = libro.create_sheet("Apertura")
+    hoja.append(["Código SKU", "Canal", "Entidad", "Kilos", "Plata", "Estado"])
+    for c in hoja[1]:
+        c.font = Font(bold=True)
+    for (sku, canal), raiz in sorted(recorrido.aperturas.items()):
+        for h in raiz.hijos:
+            hoja.append([sku, canal, h.entidad, h.valores["kilos"].monto, h.valores["nns"].monto,
+                         "activo" if h.activo else "apagado"])
+    for fila in hoja.iter_rows(min_row=2, min_col=4, max_col=5):
+        fila[0].number_format, fila[1].number_format = "#,##0.000", "#,##0.00"
 
     hoja = libro.create_sheet("Problemas")
     hoja.append(["Origen", "Severidad", "SKU", "Canal", "Detalle"])

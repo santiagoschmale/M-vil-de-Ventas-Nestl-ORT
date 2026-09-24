@@ -165,3 +165,87 @@ def test_los_nombres_de_canal_de_la_base_cruzan_sin_importar_tildes_ni_mayuscula
     r = armar(objetivos, canales, {("1", "cordoba "): D(1)})
     assert r.kilos.celdas == {("1", "Córdoba"): D("10.000")}
     assert not any("cordoba" in p.mensaje for p in r.problemas)
+
+
+# ---------------------------------------------------------------------------
+# Apertura debajo del canal
+# ---------------------------------------------------------------------------
+
+def _con_apertura(apagados_entidades=frozenset()):
+    from src.importer.entradas import leer_apertura
+
+    objetivos, canales, base = _entradas()
+    apertura, _ = leer_apertura(MUESTRA / "base_mes_anterior.xlsx")
+    r = armar(objetivos, _sin_el_nuevo(canales), base, apagados={NUEVO}, apertura=apertura,
+              entidades_apagadas=apagados_entidades)
+    return r, apertura
+
+
+def test_cada_celda_abierta_suma_exacto_o_queda_reportada():
+    """
+    Cada celda con apertura: o sus entidades suman exacto el valor del cruce (en kilos
+    y en plata, con los decimales de cada unidad), o no cierra y está reportada con
+    su motivo. Nunca una apertura que no suma sin que nadie lo diga.
+
+    En la muestra hay celdas cuyas entidades tenían todas 0 el mes anterior (entidad
+    sin histórico, A4): no hay base para repartir y tiene que quedar reportado.
+    """
+    r, apertura = _con_apertura()
+    cierran = reportadas = 0
+    for (sku, canal), raiz in r.aperturas.items():
+        for unidad, cruce, decimales in (("kilos", r.kilos, 3), ("nns", r.plata, 2)):
+            total = cruce.celdas.get((sku, canal), D(0))
+            partes = [h.valores[unidad].monto for h in raiz.hijos]
+            assert raiz.valores[unidad].monto == total
+            assert all(p.as_tuple().exponent == -decimales for p in partes), (sku, canal, unidad, partes)
+            if raiz.cuadra[unidad]:
+                assert sum(partes, D(0)) == total, (sku, canal, unidad)
+                cierran += 1
+            else:
+                assert raiz.aviso[unidad]
+                assert any(p.sku == sku and canal in p.mensaje for p in r.problemas), (sku, canal)
+                reportadas += 1
+    assert cierran > 40 and reportadas > 0
+    esperadas = {k for k in apertura if r.kilos.celdas.get(k, D(0)) > 0 or r.plata.celdas.get(k, D(0)) > 0}
+    assert set(r.aperturas) == esperadas
+
+
+def test_los_canales_sin_apertura_cierran_en_el_canal():
+    r, _ = _con_apertura()
+    assert not any(c in ("Catering", "Vending", "Mayoristas", "KAM Ingredientes", "KAM Sol") for _, c in r.aperturas)
+
+
+def test_apagar_un_distribuidor_reparte_su_parte_entre_los_demas_en_cada_celda():
+    antes, _ = _con_apertura()
+    despues, _ = _con_apertura(apagados_entidades={"Red Cuyo"})
+    tocadas = 0
+    for k, raiz in despues.aperturas.items():
+        nombres = {h.entidad: h for h in raiz.hijos}
+        if "Red Cuyo" not in nombres:
+            continue
+        assert nombres["Red Cuyo"].valores["kilos"].monto == 0
+        assert sum((h.valores["kilos"].monto for h in raiz.hijos), D(0)) == raiz.valores["kilos"].monto
+        if antes.aperturas[k].hijos and any(
+            h.entidad == "Red Cuyo" and h.valores["kilos"].monto > 0 for h in antes.aperturas[k].hijos
+        ):
+            tocadas += 1
+    assert tocadas > 0
+    # El cruce no cambia: apagar un distribuidor es debajo del canal.
+    assert despues.kilos.celdas == antes.kilos.celdas
+
+
+def test_la_apertura_sale_en_el_excel():
+    r, _ = _con_apertura()
+    destino = BytesIO()
+    exportar(r, destino)
+    destino.seek(0)
+    filas = list(load_workbook(destino)["Apertura"].iter_rows(values_only=True))
+    col = {n: i for i, n in enumerate(filas[0])}
+    por_celda = {}
+    for f in filas[1:]:
+        clave = (str(f[col["Código SKU"]]), f[col["Canal"]])
+        por_celda[clave] = por_celda.get(clave, D(0)) + D(str(f[col["Kilos"]]))
+    # El Excel tiene exactamente lo que dio el reparto debajo de cada canal.
+    assert set(por_celda) == set(r.aperturas)
+    for k, total in por_celda.items():
+        assert total == sum((h.valores["kilos"].monto for h in r.aperturas[k].hijos), D(0)), k
