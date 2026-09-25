@@ -177,14 +177,7 @@ def flujo_de_costo_minimo(
     for d, cantidad in demandas.items():
         arista("d:" + d, sumidero, cantidad, Decimal(0))
 
-    if intermedios:
-        potencial = _potenciales(grafo, fuente)
-    else:
-        # El grafo es un DAG fuente -> ofertas -> demandas -> sumidero.
-        potencial = {n: Decimal(0) for n in grafo}
-        for (o, d), costo in arcos.items():
-            potencial["d:" + d] = min(potencial["d:" + d], costo)
-        potencial[sumidero] = min((potencial["d:" + d] for d in demandas), default=Decimal(0))
+    potencial = _potenciales(grafo, fuente)
     if potencial is None:
         return None
 
