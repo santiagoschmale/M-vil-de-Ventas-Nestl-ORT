@@ -4,7 +4,7 @@ import PushPinRoundedIcon from '@mui/icons-material/PushPinRounded';
 import { useMovil } from '../../../stores/useMovil';
 import { Celda, Cruce } from '../../../stores/useMovil/useMovil.type';
 import { formatear, UNIDADES } from './formato';
-import { APAGADO, AVENA, CIERRA, NO_CIERRA, TINTA, numeros } from './estilo';
+import { APAGADO, AVENA, CIERRA, ENFOCADA, NO_CIERRA, TINTA, numeros } from './estilo';
 import { CeldaDialog } from './CeldaDialog';
 import { MotivoDialog } from './MotivoDialog';
 
@@ -13,7 +13,7 @@ type Sku = Cruce['skus'][number];
 const fija = { position: 'sticky' as const, left: 0, zIndex: 2, background: '#fff' };
 
 export const Matriz = ({ cruce }: { cruce: Cruce }) => {
-  const { cambiarSku, ocupado } = useMovil();
+  const { cambiarSku, ocupado, foco } = useMovil();
   const [abierta, setAbierta] = useState<{ sku: Sku; canal: string; celda: Celda }>();
   const [prender, setPrender] = useState<Sku>();
 
@@ -48,7 +48,10 @@ export const Matriz = ({ cruce }: { cruce: Cruce }) => {
           </TableHead>
           <TableBody>
             {cruce.skus.map(s => (
-              <TableRow key={s.codigo} hover sx={{ '& td': { color: s.activo ? undefined : APAGADO } }}>
+              <TableRow key={s.codigo} id={`sku-${s.codigo}`} hover
+                aria-current={foco?.tipo === 'sku' && foco.id === s.codigo ? true : undefined}
+                sx={[{ '& td': { color: s.activo ? undefined : APAGADO } },
+                     foco?.tipo === 'sku' && foco.id === s.codigo && ENFOCADA]}>
                 <TableCell sx={fija}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                     <Switch

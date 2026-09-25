@@ -107,6 +107,40 @@ describe('MovilPage', { timeout: 15000 }, () => {
     expect(screen.getByRole('button', { name: /^Reglas/ })).toHaveAttribute('aria-expanded', 'true');
   });
 
+  it('desde "Para revisar" se va a la regla que choca: abre Reglas y marca la fila', async () => {
+    const reglas = [reglaFactory.build({ id: 'R1' }), reglaFactory.build({ id: 'R2', limite: 'minimo' })];
+    server.use(http.get('*/api/movil', () => HttpResponse.json(
+      estado({ reglas, inconsistencias: { kilos: [inconsistenciaFactory.build({ reglas: ['R1', 'R2'] })], plata: [] } }))));
+    const user = userEvent.setup({ delay: null });
+    render(<MovilPage />);
+    await user.click(await screen.findByRole('button', { name: 'Ver R2' }));
+    expect(screen.getByRole('button', { name: /^Reglas/ })).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('row', { name: /^R2 / })).toHaveAttribute('aria-current', 'true');
+    expect(screen.getByRole('row', { name: /^R1 / })).not.toHaveAttribute('aria-current');
+  });
+
+  it('desde "Para revisar" se va a la fila del SKU en la matriz', async () => {
+    server.use(http.get('*/api/movil', () => HttpResponse.json(estado({
+      problemas: [{ severidad: 'aviso', mensaje: 'SKU con objetivo en cero.', sku: '200', bloque: 'input1' }],
+    }))));
+    const user = userEvent.setup({ delay: null });
+    render(<MovilPage />);
+    await user.click(await screen.findByRole('button', { name: /^Para revisar/ }));  // no bloquea: está cerrada
+    await user.click(screen.getByRole('button', { name: 'Ver SKU 200' }));
+    expect(screen.getByRole('row', { name: /^Apagar 200/ })).toHaveAttribute('aria-current', 'true');
+  });
+
+  it('un problema de un SKU que no está en la matriz no ofrece ir a verlo', async () => {
+    server.use(http.get('*/api/movil', () => HttpResponse.json(estado({
+      problemas: [{ severidad: 'aviso', mensaje: 'Producto de otro país.', sku: '999', bloque: 'input1' }],
+    }))));
+    const user = userEvent.setup({ delay: null });
+    render(<MovilPage />);
+    await user.click(await screen.findByRole('button', { name: /^Para revisar/ }));
+    expect(screen.getByText(/Producto de otro país/)).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Ver SKU 999' })).not.toBeInTheDocument();
+  });
+
   it('exportar se habilita solo cuando kilos y pesos cierran', async () => {
     server.use(http.get('*/api/movil', () => HttpResponse.json(estado({ cierra: { kilos: true, plata: false } }))));
     render(<MovilPage />);

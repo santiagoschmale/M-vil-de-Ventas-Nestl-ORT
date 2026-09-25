@@ -10,6 +10,7 @@ import { useMovil } from '../../../stores/useMovil';
 import { Estado, Unidad } from '../../../stores/useMovil/useMovil.type';
 import { formatear, UNIDADES } from './formato';
 import { AVENA, CIERRA, NO_CIERRA } from './estilo';
+import { Foco } from '../../../stores/useMovil/useMovil.type';
 import { Matriz } from './Matriz';
 import { Reglas } from './Reglas';
 
@@ -105,7 +106,28 @@ const Entradas = ({ estado }: { estado: Estado }) => {
 
 const conSku = (p: Estado['problemas'][number]) => (p.sku ? `SKU ${p.sku} · ${p.mensaje}` : p.mensaje);
 
-const Pendientes = ({ estado, unidad }: { estado: Estado; unidad: Unidad }) => {
+/** "Ver R1", "Ver SKU 900…": de un problema al lugar donde se arregla. */
+const Ir = ({ destinos }: { destinos: [Foco['tipo'], string][] }) => {
+  const { enfocar } = useMovil();
+  if (!destinos.length) return null;
+  return (
+    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+      {destinos.map(([tipo, id]) => (
+        <Button key={`${tipo}-${id}`} size="small" color="inherit" onClick={() => enfocar(tipo, id)}
+          sx={{ whiteSpace: 'nowrap' }}>
+          Ver {tipo === 'sku' ? `SKU ${id}` : id}
+        </Button>
+      ))}
+    </Box>
+  );
+};
+
+const Pendientes = ({ estado, unidad, enMatriz }: { estado: Estado; unidad: Unidad; enMatriz: Set<string> }) => {
+  // Solo a los SKUs que tienen fila en la matriz; si son muchos, el mensaje ya los nombra.
+  const skus = (xs: (string | null)[]) => {
+    const hay = xs.filter((x): x is string => !!x && enMatriz.has(x));
+    return hay.length <= 3 ? hay.map((x): [Foco['tipo'], string] => ['sku', x]) : [];
+  };
   const inconsistencias = estado.inconsistencias[unidad];
   const errores = estado.problemas.filter(p => p.severidad === 'error');
   const avisos = estado.problemas.filter(p => p.severidad !== 'error');
@@ -114,10 +136,19 @@ const Pendientes = ({ estado, unidad }: { estado: Estado; unidad: Unidad }) => {
   }
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-      {inconsistencias.map((i, n) => <Alert key={`i${n}`} severity="error">{i.mensaje}</Alert>)}
-      {errores.map((p, n) => <Alert key={`e${n}`} severity="error">{conSku(p)}</Alert>)}
+      {inconsistencias.map((i, n) => (
+        <Alert key={`i${n}`} severity="error"
+          action={<Ir destinos={[...i.reglas.map((r): [Foco['tipo'], string] => ['regla', r]), ...skus(i.skus)]} />}>
+          {i.mensaje}
+        </Alert>
+      ))}
+      {errores.map((p, n) => (
+        <Alert key={`e${n}`} severity="error" action={<Ir destinos={skus([p.sku])} />}>{conSku(p)}</Alert>
+      ))}
       {estado.avisos[unidad].map((a, n) => <Alert key={`a${n}`} severity="info">{a}</Alert>)}
-      {avisos.map((p, n) => <Alert key={`p${n}`} severity="warning">{conSku(p)}</Alert>)}
+      {avisos.map((p, n) => (
+        <Alert key={`p${n}`} severity="warning" action={<Ir destinos={skus([p.sku])} />}>{conSku(p)}</Alert>
+      ))}
     </Box>
   );
 };
@@ -129,12 +160,12 @@ const ChipCierre = ({ unidad, cierra }: { unidad: Unidad; cierra: boolean }) => 
   />
 );
 
-const Seccion = ({ titulo, resumen, abierta = false, children }:
-  { titulo: string; resumen?: React.ReactNode; abierta?: boolean; children: React.ReactNode }) => {
-  // Se abre sola cuando algo pide atención (faltan entradas, una regla choca) y nunca se
-  // cierra sola: si el planner la está usando y lo arregla, sigue abierta.
+const Seccion = ({ titulo, resumen, abierta = false, pedido, children }:
+  { titulo: string; resumen?: React.ReactNode; abierta?: boolean; pedido?: number; children: React.ReactNode }) => {
+  // Se abre sola cuando algo pide atención (faltan entradas, una regla choca, el planner
+  // fue a ver algo de acá: `pedido` cambia) y nunca se cierra sola.
   const [expandida, setExpandida] = useState(abierta);
-  useEffect(() => { if (abierta) setExpandida(true); }, [abierta]);
+  useEffect(() => { if (abierta) setExpandida(true); }, [abierta, pedido]);
   return (
     <Accordion expanded={expandida} onChange={(_, v) => setExpandida(v)} disableGutters variant="outlined"
       sx={{ '&:before': { display: 'none' } }}>
@@ -150,8 +181,16 @@ const Seccion = ({ titulo, resumen, abierta = false, children }:
 };
 
 export const MovilPage = () => {
-  const { estado, cruce, unidad, refrescar, elegirUnidad, ocupado, errorDeCarga } = useMovil();
+  const { estado, cruce, unidad, refrescar, elegirUnidad, ocupado, errorDeCarga, foco } = useMovil();
   useEffect(() => { refrescar(); }, []);
+  // Llevar a la fila que se fue a ver, cuando la sección terminó de abrirse.
+  useEffect(() => {
+    if (!foco) return;
+    const suave = !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    const t = setTimeout(() => document.getElementById(`${foco.tipo}-${foco.id}`)
+      ?.scrollIntoView?.({ block: 'center', behavior: suave ? 'smooth' : 'auto' }), 350);
+    return () => clearTimeout(t);
+  }, [foco]);
 
   if (!estado) {
     return (
@@ -180,10 +219,13 @@ export const MovilPage = () => {
     : 'Ninguna';
 
   return (
-    <Box sx={{ position: 'relative' }}>
-      {ocupado && <LinearProgress sx={{ position: 'absolute', top: 0, left: 0, right: 0 }} aria-label="Recalculando" />}
-      <Box sx={{ p: 3, display: 'flex', flexDirection: 'column', gap: 2 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1.5 }}>
+    <Box sx={{ px: 3, pb: 3, display: 'flex', flexDirection: 'column', gap: 2 }}>
+        {/* Fijo arriba: si cierra, en qué unidad se mira y la salida, siempre a la vista. */}
+        <Box component="header" sx={{
+          position: 'sticky', top: 0, zIndex: 5, bgcolor: '#fff', mx: -3, px: 3, py: 1.5,
+          borderBottom: `1px solid ${AVENA}`, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1.5,
+        }}>
+          {ocupado && <LinearProgress sx={{ position: 'absolute', left: 0, right: 0, bottom: 0 }} aria-label="Recalculando" />}
           <Box sx={{ mr: 'auto' }}>
             <Typography variant="h5" fontWeight={700}>Móvil</Typography>
             <Dato>Reparto del objetivo del mes por SKU y canal.</Dato>
@@ -217,18 +259,20 @@ export const MovilPage = () => {
           <Entradas estado={estado} />
         </Seccion>
 
-        <Seccion titulo="Reglas" abierta={chocan > 0} resumen={<Dato>{resumenReglas}</Dato>}>
+        <Seccion titulo="Reglas" abierta={chocan > 0 || foco?.tipo === 'regla'}
+          pedido={foco?.tipo === 'regla' ? foco.vez : undefined} resumen={<Dato>{resumenReglas}</Dato>}>
           <Reglas estado={estado} />
         </Seccion>
 
         {estado.faltan.length === 0 && (
           <Seccion titulo="Para revisar" abierta={bloquean > 0} resumen={<Dato>{resumen}</Dato>}>
-            <Pendientes estado={estado} unidad={unidad} />
+            <Pendientes estado={estado} unidad={unidad} enMatriz={new Set(cruce?.skus.map(x => x.codigo))} />
           </Seccion>
         )}
 
         {cruce && (
-          <Seccion titulo={`SKU × canal en ${UNIDADES[unidad].nombre.toLowerCase()}`} abierta>
+          <Seccion titulo={`SKU × canal en ${UNIDADES[unidad].nombre.toLowerCase()}`} abierta
+            pedido={foco?.tipo === 'sku' ? foco.vez : undefined}>
             <Matriz cruce={cruce} />
           </Seccion>
         )}
@@ -249,7 +293,6 @@ export const MovilPage = () => {
               </List>
             )}
         </Seccion>
-      </Box>
     </Box>
   );
 };

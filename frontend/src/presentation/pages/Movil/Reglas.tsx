@@ -10,7 +10,7 @@ import EditRoundedIcon from '@mui/icons-material/EditRounded';
 import { useMovil } from '../../../stores/useMovil';
 import { DatosRegla, Estado, Limite, Regla } from '../../../stores/useMovil/useMovil.type';
 import { formatear, UNIDADES } from './formato';
-import { NO_CIERRA, numeros } from './estilo';
+import { ENFOCADA, NO_CIERRA, numeros } from './estilo';
 import { MotivoDialog } from './MotivoDialog';
 
 const LIMITES: { valor: Limite; nombre: string; ayuda: string }[] = [
@@ -123,7 +123,7 @@ const ReglaDialog = ({ regla, estado, onCerrar }: Formulario & { estado: Estado;
 };
 
 export const Reglas = ({ estado }: { estado: Estado }) => {
-  const { eliminarRegla } = useMovil();
+  const { eliminarRegla, foco } = useMovil();
   const [formulario, setFormulario] = useState<Formulario>();
   const [eliminar, setEliminar] = useState<Regla>();
   const chocan = enConflicto(estado);
@@ -151,7 +151,9 @@ export const Reglas = ({ estado }: { estado: Estado }) => {
           </TableHead>
           <TableBody>
             {estado.reglas.map(r => (
-              <TableRow key={r.id}>
+              <TableRow key={r.id} id={`regla-${r.id}`}
+                aria-current={foco?.tipo === 'regla' && foco.id === r.id ? true : undefined}
+                sx={foco?.tipo === 'regla' && foco.id === r.id ? ENFOCADA : undefined}>
                 <TableCell sx={{ fontWeight: 700 }}>{r.id}</TableCell>
                 <TableCell>{r.canal}</TableCell>
                 <TableCell>{r.categorias.join(' + ')}</TableCell>

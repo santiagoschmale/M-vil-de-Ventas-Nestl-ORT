@@ -75,6 +75,8 @@ export const useMovil = create<TUseMovil>((set, get) => {
   const encendido = (activo: boolean) => (activo ? 'prendido' : 'apagado');
 
   return {
+    foco: undefined,
+    enfocar: (tipo, id) => set(s => ({ foco: { tipo, id, vez: (s.foco?.vez ?? 0) + 1 } })),
     estado: undefined,
     cruce: undefined,
     unidad: 'kilos',

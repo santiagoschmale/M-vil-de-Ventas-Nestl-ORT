@@ -90,7 +90,12 @@ export type Apertura = {
 /** null si salió bien; si no, el mensaje de error para mostrar. */
 type Resultado = Promise<string | null>;
 
+/** A qué fila fue a mirar el planner desde "Para revisar". `vez` cambia en cada clic. */
+export type Foco = { tipo: 'regla' | 'sku'; id: string; vez: number };
+
 export type TUseMovil = {
+  foco?: Foco;
+  enfocar: (tipo: Foco['tipo'], id: string) => void;
   estado?: Estado;
   cruce?: Cruce;
   unidad: Unidad;
