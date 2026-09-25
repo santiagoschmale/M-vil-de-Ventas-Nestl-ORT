@@ -222,29 +222,7 @@ def cruzar(
     if red.maximo("fuente", "sumidero") < total_filas:
         return ResultadoCruce(celdas=None, inconsistencias=_deficits(red, r, c, soporte, decimales))
 
-    # Celdas que en cualquier solución quedan en cero: se sacan del ajuste y se avisan.
-    comp = red.componentes()
-    forzadas = sorted(k for k in soporte if red.flujo("s:" + k[0], "c:" + k[1]) == 0
-                      and comp["s:" + k[0]] != comp["c:" + k[1]])
-    avisos = [
-        f"El SKU {s} tiene base en el canal {k}, pero en cualquier reparto que cierre los totales "
-        f"esa celda queda en 0."
-        for s, k in forzadas
-    ]
-    if grupos:
-        return _con_reglas(grupos, r, c, totales_canal, soporte, fijadas, decimales, resultado)
-    for k in forzadas:
-        del soporte[k]
-
-    real, iteraciones = _ajuste_biproporcional(r, c, soporte)
-    unidades = None if real is None else _redondeo_controlado(real, r, c)
-    if unidades is None:
-        # No debería pasar: el problema es factible y sin celdas de borde. Si pasa, se
-        # usa la solución entera del flujo (cierra exacto, pero lejos de la base) y se avisa.
-        unidades = {k: red.flujo("s:" + k[0], "c:" + k[1]) for k in soporte}
-        avisos.append(_NO_CONVERGIO)
-    unidades.update(fijadas)
-    return resultado(unidades, avisos=avisos, iteraciones=iteraciones)
+    return _repartir(grupos, r, c, totales_canal, soporte, fijadas, decimales, resultado)
 
 
 _NO_CONVERGIO = "El ajuste no convergió: se usó un reparto que cierra exacto pero no sigue la base. Revisar."
@@ -446,7 +424,11 @@ def _conflictos(grupos, r, c, totales, soporte, fijadas, decimales) -> list[Inco
     return inconsistencias
 
 
-def _con_reglas(grupos, r, c, totales, soporte, fijadas, decimales, resultado) -> ResultadoCruce:
+def _repartir(grupos, r, c, totales, soporte, fijadas, decimales, resultado) -> ResultadoCruce:
+    """
+    Con el problema ya factible sin reglas: aplica las reglas (si hay), saca las
+    celdas que quedan en cero en cualquier solución, ajusta y redondea.
+    """
     # Orden canónico: el resultado y los conflictos no dependen del orden de las reglas.
     grupos = sorted(grupos, key=lambda g: (g.regla, g.canal, sorted(g.skus), g.limite, g.porcentaje))
     avisos = []
@@ -471,17 +453,16 @@ def _con_reglas(grupos, r, c, totales, soporte, fijadas, decimales, resultado) -
                       and comp["s:" + k[0]] != comp[destino[k]])
     for k in forzadas:
         del libres[k]
-    avisos += [
-        f"El SKU {x} tiene base en el canal {k}, pero con las reglas y los totales del mes esa celda queda en 0."
-        for x, k in forzadas
-    ]
+    por_que = "con las reglas y los totales del mes" if grupos else "en cualquier reparto que cierre los totales"
+    avisos += [f"El SKU {x} tiene base en el canal {k}, pero {por_que} esa celda queda en 0." for x, k in forzadas]
 
     restricciones = [
         ([k for k in libres if k[1] == n.canal and k[0] in n.skus], n.lo if n.lo > 0 else None, n.hi)
         for n in nodos
     ]
-    real, iteraciones = _ajuste_biproporcional(r, c, libres, restricciones,
-                                               tolerancia=Decimal("1e-6"), aceptable=Decimal("Infinity"))
+    # Con reglas la convergencia es lenta y alcanza con estar cerca (ver _ajuste_biproporcional).
+    cerca = {"tolerancia": Decimal("1e-6"), "aceptable": Decimal("Infinity")} if grupos else {}
+    real, iteraciones = _ajuste_biproporcional(r, c, libres, restricciones, **cerca)
     unidades = None if real is None else _redondeo_controlado(real, r, c, nodos)
     if unidades is None:
         # ponytail: con reglas muy justas (celdas casi en cero sin estar forzadas) el
@@ -489,7 +470,7 @@ def _con_reglas(grupos, r, c, totales, soporte, fijadas, decimales, resultado) -
         # El reparto cierra y cumple las reglas igual, pero no sigue la base. Si pasa con
         # datos reales: proyección por Newton sobre el dual, o flujo de costo convexo.
         unidades = {k: red.flujo("s:" + k[0], destino[k]) for k in soporte}
-        avisos.append(_REGLAS_JUSTAS)
+        avisos.append(_REGLAS_JUSTAS if grupos else _NO_CONVERGIO)
     unidades.update(fijadas)
     return resultado(unidades, avisos=avisos, iteraciones=iteraciones)
 
