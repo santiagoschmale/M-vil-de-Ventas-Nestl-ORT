@@ -48,7 +48,6 @@ class ErrorDeEntrada(ValueError):
 class ObjetivoSku:
     kilos: Decimal
     nns: Decimal | None
-    nns_iibb: Decimal | None
     descripcion: str
     categoria: str | None
     pais: str | None
@@ -197,8 +196,7 @@ def leer_input1(origen) -> tuple[dict[str, ObjetivoSku], list[Problema]]:
                                       sku=codigo, bloque="input1"))
             continue
         montos = {}
-        for nombre, decimales, etiqueta in (("kilos", KILOS, "Kilos"), ("nns", PLATA, "NNS"),
-                                            ("nns_iibb", PLATA, "NNS c/IIBB")):
+        for nombre, decimales, etiqueta in (("kilos", KILOS, "Kilos"), ("nns", PLATA, "NNS")):
             if nombre not in cols:
                 montos[nombre] = None
                 continue
@@ -228,7 +226,6 @@ def leer_input1(origen) -> tuple[dict[str, ObjetivoSku], list[Problema]]:
         objetivos[codigo] = ObjetivoSku(
             kilos=montos["kilos"],
             nns=montos["nns"],
-            nns_iibb=montos["nns_iibb"],
             descripcion=str(campo(fila, "descripcion") or ""),
             categoria=campo(fila, "categoria"),
             pais=pais,

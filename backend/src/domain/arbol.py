@@ -1,12 +1,13 @@
 """
-El árbol del móvil: la cascada completa sobre la que opera `repartir`.
+El árbol debajo del canal: cómo se abre una celda SKU × canal entre
+distribuidores y vendedores, con `repartir` en cada nivel.
 
 FORMA
 -----
-Un árbol por SKU. La raíz es el SKU y trae el objetivo del mes (no se edita: llega
-cerrado de Contraloría). Cada nodo es una entidad (canal, territorio,
-distribuidor, vendedor...) con un peso relativo a sus hermanos. La profundidad la
-define cada rama: no hay niveles fijos, no hay nombres de canal en el código.
+La raíz trae el valor de la celda del cruce (no se toca). Cada nodo es una entidad
+(territorio, distribuidor, vendedor...) con un peso relativo a sus hermanos. La
+profundidad la define cada rama: no hay niveles fijos, no hay nombres de canal en
+el código.
 
 "No aplica" es no tener el nodo. "Aplica con cero" es tener el nodo con peso 0:
 entra al reparto y recibe 0.
@@ -21,14 +22,13 @@ CUÁNDO NO CUADRA
 ----------------
 Nunca se ajusta por atrás en silencio. Si lo fijado no cierra contra el padre, o
 si un problema de datos impide repartir, el nivel queda marcado `cuadra = False`
-con un aviso, y el planner decide. Lo único que se rechaza es la edición
-imposible en sí misma (negativa o mayor que el padre).
+con un aviso, y el planner decide. Validar una edición (negativa, mayor que el
+padre) es de quien fija el valor.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
 from decimal import Decimal
 
 from .reparto import ErrorDeReparto, cuadra, repartir
@@ -37,23 +37,10 @@ from .reparto import ErrorDeReparto, cuadra, repartir
 UNIDADES = {"kilos": 3, "nns": 2}
 
 
-class ErrorDeEdicion(ValueError):
-    """La edición pedida es imposible y no se aplicó."""
-
-
-@dataclass
-class Traza:
-    """Quién tocó un valor o una entidad, cuándo y qué hizo."""
-    autor: str
-    cuando: datetime
-    accion: str  # "editado" | "desfijado" | "deshabilitado"
-
-
 @dataclass
 class Valor:
     monto: Decimal = Decimal(0)
     fijado: Decimal | None = None  # lo que puso el planner; None = calculado
-    traza: Traza | None = None
 
     @property
     def estado(self) -> str:
@@ -77,22 +64,6 @@ class Nodo:
 
 
 @dataclass
-class Sku:
-    codigo: str
-    descripcion: str
-    segmento: str | None
-    raiz: Nodo
-    nns_iibb: Decimal | None = None  # se muestra; no se reparte (no está definido si se reparte)
-
-
-@dataclass
-class Entidad:
-    id: str
-    nombre: str
-    tipo: str
-
-
-@dataclass
 class Problema:
     """Un problema de calidad del archivo de entrada."""
     severidad: str  # "error" | "aviso"
@@ -101,22 +72,9 @@ class Problema:
     bloque: str | None = None
 
 
-@dataclass
-class Movil:
-    skus: dict[str, Sku]
-    entidades: dict[str, Entidad] = field(default_factory=dict)
-    inactivas: dict[str, Traza] = field(default_factory=dict)
-    problemas: list[Problema] = field(default_factory=list)
-
-
 # ---------------------------------------------------------------------------
 # Recálculo
 # ---------------------------------------------------------------------------
-
-def recalcular_todo(movil: Movil) -> None:
-    for sku in movil.skus.values():
-        recalcular(sku.raiz, movil.inactivas)
-
 
 def recalcular(raiz: Nodo, inactivas) -> None:
     """Recalcula el árbol entero de arriba hacia abajo. La raíz no se toca."""
@@ -172,120 +130,3 @@ def _repartir_hijos(nodo: Nodo, unidad: str, decimales: int) -> None:
     else:
         nodo.cuadra[unidad] = cuadra(total, {h.entidad: h.valores[unidad].monto for h in activos})
     nodo.aviso[unidad] = aviso
-
-
-# ---------------------------------------------------------------------------
-# Operaciones del planner
-# ---------------------------------------------------------------------------
-
-def buscar(raiz: Nodo, entidad: str) -> tuple[Nodo | None, Nodo | None]:
-    """Devuelve (nodo, padre). (None, None) si la entidad no está en el árbol."""
-    pendientes = [(raiz, None)]
-    while pendientes:
-        nodo, padre = pendientes.pop()
-        if nodo.entidad == entidad:
-            return nodo, padre
-        pendientes.extend((h, nodo) for h in nodo.hijos)
-    return None, None
-
-
-def editar(movil, codigo_sku, entidad, unidad, monto, autor, cuando) -> None:
-    """Fija un valor a mano y recalcula el SKU. Rechaza lo imposible."""
-    sku, nodo, padre = _ubicar(movil, codigo_sku, entidad, unidad)
-    if not isinstance(monto, Decimal) or not monto.is_finite():
-        raise ErrorDeEdicion(f"El valor tiene que ser un número decimal, llegó {monto!r}.")
-    if monto < 0:
-        raise ErrorDeEdicion("El valor no puede ser negativo.")
-    paso = Decimal(f"1E-{UNIDADES[unidad]}")
-    if monto % paso != 0:  # 1.0000 vale; 1.0001 kilos no
-        raise ErrorDeEdicion(f"{unidad} admite como máximo {UNIDADES[unidad]} decimales.")
-    tope = padre.valores[unidad].monto
-    if monto > tope:
-        raise ErrorDeEdicion(f"El valor ({monto}) supera al de {padre.nombre} ({tope}).")
-
-    valor = nodo.valores[unidad]
-    valor.fijado = monto.quantize(paso)
-    valor.traza = Traza(autor, cuando, "editado")
-    recalcular(sku.raiz, movil.inactivas)
-
-
-def desfijar(movil, codigo_sku, entidad, unidad, autor, cuando) -> None:
-    """Vuelve un valor editado a calculado."""
-    sku, nodo, _ = _ubicar(movil, codigo_sku, entidad, unidad)
-    valor = nodo.valores[unidad]
-    if valor.fijado is None:
-        return
-    valor.fijado = None
-    valor.traza = Traza(autor, cuando, "desfijado")
-    recalcular(sku.raiz, movil.inactivas)
-
-
-def cambiar_estado_entidad(movil, entidad, activa, autor, cuando) -> None:
-    """
-    Prende o apaga una entidad en TODOS los SKUs donde aparece. Su parte se reparte
-    entre los hermanos calculados, proporcional a su peso (supuesto A1).
-    """
-    if entidad not in movil.entidades and not any(
-        buscar(s.raiz, entidad)[0] for s in movil.skus.values()
-    ):
-        raise ErrorDeEdicion(f"No existe la entidad {entidad!r}.")
-    if activa:
-        movil.inactivas.pop(entidad, None)
-    else:
-        movil.inactivas[entidad] = Traza(autor, cuando, "deshabilitado")
-    recalcular_todo(movil)
-
-
-def _ubicar(movil, codigo_sku, entidad, unidad):
-    if unidad not in UNIDADES:
-        raise ErrorDeEdicion(f"Unidad desconocida: {unidad!r}.")
-    sku = movil.skus.get(codigo_sku)
-    if sku is None:
-        raise ErrorDeEdicion(f"No existe el SKU {codigo_sku!r}.")
-    nodo, padre = buscar(sku.raiz, entidad)
-    if nodo is None:
-        raise ErrorDeEdicion(f"La entidad {entidad!r} no está en el SKU {codigo_sku}.")
-    if padre is None:
-        raise ErrorDeEdicion("El objetivo del SKU llega cerrado de Contraloría: no se edita.")
-    if not nodo.activo:
-        raise ErrorDeEdicion(f"{nodo.nombre} está deshabilitada: no se puede editar.")
-    return sku, nodo, padre
-
-
-# ---------------------------------------------------------------------------
-# Vista agregada
-# ---------------------------------------------------------------------------
-
-def agregado(movil: Movil) -> Nodo:
-    """
-    Suma de cada entidad sobre todos los SKUs, siguiendo el camino de entidades
-    desde la raíz. Es una copia nueva: editarla no cambia nada. Sobre el agregado
-    no se edita porque no hay regla para repartir un cambio entre SKUs.
-    """
-    total = Nodo(entidad="total", nombre="Total", peso=Decimal(1))
-    for sku in movil.skus.values():
-        _sumar(total, sku.raiz, raiz=True)
-    _marcar_cuadratura(total)
-    return total
-
-
-def _sumar(destino: Nodo, origen: Nodo, raiz: bool = False) -> None:
-    for unidad in UNIDADES:
-        destino.valores[unidad].monto += origen.valores[unidad].monto
-    if not raiz:
-        destino.activo = destino.activo and origen.activo
-    for hijo in origen.hijos:
-        par = next((d for d in destino.hijos if d.entidad == hijo.entidad), None)
-        if par is None:
-            par = Nodo(entidad=hijo.entidad, nombre=hijo.nombre, peso=Decimal(0))
-            destino.hijos.append(par)
-        _sumar(par, hijo)
-
-
-def _marcar_cuadratura(nodo: Nodo) -> None:
-    for unidad in UNIDADES:
-        nodo.cuadra[unidad] = not nodo.hijos or cuadra(
-            nodo.valores[unidad].monto, {h.entidad: h.valores[unidad].monto for h in nodo.hijos}
-        )
-    for hijo in nodo.hijos:
-        _marcar_cuadratura(hijo)

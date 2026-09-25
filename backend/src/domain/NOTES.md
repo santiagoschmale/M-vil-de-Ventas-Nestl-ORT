@@ -11,7 +11,7 @@ importer/entradas.py   input 1 (Excel), input 2 (tabla pegada), base y apertura 
 domain/cruce.py        cruce SKU × canal: filas = input 1, columnas = input 2
 domain/flujo.py        flujo máximo y de costo mínimo (sin dependencias)
 domain/reparto.py      largest remainder: repartir un total por pesos relativos
-domain/arbol.py        árbol con valor y estado, fijado, ON/OFF, agregado
+domain/arbol.py        debajo del canal: valor y estado, fijado, ON/OFF
 movil/recorrido.py     encadena todo y exporta el Excel; también es la línea de comandos
 movil/sesion.py        la sesión del mes: entradas, ON/OFF, celdas fijadas, historial
 movil/repositorio.py   dónde vive la sesión (hoy en memoria, un lock global)

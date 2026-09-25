@@ -1,19 +1,14 @@
 """
 Dónde vive la sesión del mes. Hoy en memoria; con Postgres se agrega otra
-implementación de la misma interfaz y ni el dominio ni las rutas se enteran.
+implementación de la misma interfaz y ni el dominio ni las rutas se enteran. La
+interfaz: `usar()`, un context manager que da la sesión con acceso exclusivo.
 """
 
 import threading
 from contextlib import contextmanager
-from typing import Iterator, Protocol
+from typing import Iterator
 
 from src.movil.sesion import Sesion
-
-
-class RepositorioDeSesion(Protocol):
-    def usar(self) -> Iterator[Sesion]:
-        """Da la sesión con acceso exclusivo mientras dura el bloque."""
-        ...
 
 
 class RepositorioEnMemoria:

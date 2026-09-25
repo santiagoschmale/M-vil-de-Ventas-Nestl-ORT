@@ -64,7 +64,6 @@ class Recorrido:
     kilos: ResultadoCruce
     plata: ResultadoCruce | None  # None si algún input no trae plata
     problemas: list[Problema] = field(default_factory=list)
-    apagados: frozenset[str] = frozenset()
     # Debajo del canal: {(sku, canal): raíz con el valor del cruce y sus entidades}.
     aperturas: dict[Celda, Nodo] = field(default_factory=dict)
     entidades_apagadas: frozenset[str] = frozenset()
@@ -132,7 +131,7 @@ def armar(
     entidades_apagadas = frozenset(entidades_apagadas)
     aperturas = _abrir(kilos, plata, apertura or {}, entidades_apagadas, problemas, por_nombre)
     return Recorrido(objetivos=objetivos, canales=canales, kilos=kilos, plata=plata, problemas=problemas,
-                     apagados=apagados, aperturas=aperturas, entidades_apagadas=entidades_apagadas)
+                     aperturas=aperturas, entidades_apagadas=entidades_apagadas)
 
 
 def _grupos(reglas, activos, por_nombre, problemas) -> tuple[list[Grupo], list[Grupo]]:
