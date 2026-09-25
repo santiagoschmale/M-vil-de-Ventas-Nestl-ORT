@@ -34,9 +34,13 @@ const vacio = () => ({ kilos: [], plata: [] });
 export const estadoFactory = Factory.define<Estado>(() => ({
   faltan: [],
   entradas: {
-    input1: { archivo: 'input1.xlsx', skus: 2, kilos: '1500.000', nns: '100.00' },
-    input2: { canales: 2, texto: 'Canal\tKilos', kilos: '1500.000', plata: '100.00' },
-    base: { archivo: 'base.xlsx', celdas: 3, aperturas: 1 },
+    input1: { archivo: 'objetivo_septiembre.xlsx', skus: 2, kilos: '1500.000', nns: '100.00' },
+    input2: {
+      archivo: 'totales_septiembre.xlsx', canales: 2, kilos: '1500.000', plata: '100.00',
+      detalle: [{ canal: 'Catering', kilos: '1000.000', plata: '60.00' },
+                { canal: 'Directa (BA)', kilos: '500.000', plata: '40.00' }],
+    },
+    base: { archivo: 'reparto_agosto.xlsx', celdas: 3, aperturas: 1 },
   },
   cierra: { kilos: true, plata: true },
   inconsistencias: vacio(),

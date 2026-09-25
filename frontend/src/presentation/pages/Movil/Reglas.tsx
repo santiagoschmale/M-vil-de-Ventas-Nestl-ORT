@@ -12,11 +12,11 @@ import { DatosRegla, Estado, Limite, Regla } from '../../../stores/useMovil/useM
 import { formatear, UNIDADES } from './formato';
 import { ENFOCADA, NO_CIERRA, numeros } from './estilo';
 import { MotivoDialog } from './MotivoDialog';
+import { Ayuda } from './Ayuda';
+import { AYUDA } from './ayudas';
 
-const LIMITES: { valor: Limite; nombre: string; ayuda: string }[] = [
-  { valor: 'tope', nombre: 'Tope', ayuda: 'Esas categorías se llevan a lo sumo ese % del canal.' },
-  { valor: 'minimo', nombre: 'Mínimo', ayuda: 'Esas categorías se llevan al menos ese % del canal.' },
-  { valor: 'fijo', nombre: 'Fijo', ayuda: 'Esas categorías se llevan exactamente ese % del canal.' },
+const LIMITES: { valor: Limite; nombre: string }[] = [
+  { valor: 'tope', nombre: 'Tope' }, { valor: 'minimo', nombre: 'Mínimo' }, { valor: 'fijo', nombre: 'Fijo' },
 ];
 const NOMBRE_LIMITE = Object.fromEntries(LIMITES.map(l => [l.valor, l.nombre]));
 
@@ -39,7 +39,7 @@ const ReglaDialog = ({ regla, estado, onCerrar }: Formulario & { estado: Estado;
   const [motivo, setMotivo] = useState('');
   const [error, setError] = useState<string | null>(null);
   const { canales, categorias: disponibles } = estado.opciones;
-  // Las categorías de la regla que ya no están en el input 1 se muestran igual, para poder sacarlas.
+  // Las categorías de la regla que ya no están en el objetivo de Contraloría se muestran igual, para poder sacarlas.
   const opciones = [...new Set([...disponibles, ...categorias])].sort();
 
   const alternar = (c: string) =>
@@ -66,7 +66,7 @@ const ReglaDialog = ({ regla, estado, onCerrar }: Formulario & { estado: Estado;
           </TextField>
         ) : (
           <TextField label="Canal" value={canal} onChange={e => setCanal(e.target.value)} sx={{ mt: 1 }}
-            helperText="Como figura en el input 2. Cuando lo cargues, se elige de la lista." />
+            helperText="Como figura en los totales por canal. Cuando los cargues, se elige de la lista." />
         )}
 
         <Box component="fieldset" sx={{ border: 0, p: 0, m: 0 }}>
@@ -80,22 +80,20 @@ const ReglaDialog = ({ regla, estado, onCerrar }: Formulario & { estado: Estado;
             </FormGroup>
           ) : (
             <Typography variant="body2" color="text.secondary">
-              Las categorías salen del input 1: cargalo para elegirlas.
+              Las categorías salen del objetivo de Contraloría: cargalo para elegirlas.
             </Typography>
           )}
         </Box>
 
         <Box>
-          <FormLabel id="limite">Límite</FormLabel>
-          <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1.5, mt: 0.5 }}>
-            <ToggleButtonGroup size="small" exclusive value={limite} aria-labelledby="limite"
-              onChange={(_, v: Limite | null) => v && setLimite(v)}>
-              {LIMITES.map(l => <ToggleButton key={l.valor} value={l.valor}>{l.nombre}</ToggleButton>)}
-            </ToggleButtonGroup>
-            <Typography variant="body2" color="text.secondary">
-              {LIMITES.find(l => l.valor === limite)?.ayuda}
-            </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+            <FormLabel id="limite">Límite</FormLabel>
+            <Ayuda ayuda={AYUDA.limite} />
           </Box>
+          <ToggleButtonGroup size="small" exclusive value={limite} aria-labelledby="limite"
+            onChange={(_, v: Limite | null) => v && setLimite(v)}>
+            {LIMITES.map(l => <ToggleButton key={l.valor} value={l.valor}>{l.nombre}</ToggleButton>)}
+          </ToggleButtonGroup>
         </Box>
 
         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
@@ -132,8 +130,7 @@ export const Reglas = ({ estado }: { estado: Estado }) => {
     <>
       {estado.reglas.length === 0 ? (
         <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-          Todavía no hay reglas. Una regla limita cuánto de un canal se lleva un grupo de categorías, por ejemplo
-          Mayoristas · Café · tope 20% de los kilos. El reparto la cumple y el resto se reparte como el mes anterior.
+          Todavía no hay reglas. Por ejemplo: Mayoristas · Café · tope 20% de los kilos.
         </Typography>
       ) : (
         <Table size="small" aria-label="Reglas del mes" sx={{ mb: 1.5 }}>

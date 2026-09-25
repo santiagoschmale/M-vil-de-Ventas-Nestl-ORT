@@ -1,22 +1,27 @@
 import React, { useEffect, useState } from 'react';
 import {
-  Accordion, AccordionDetails, AccordionSummary, Alert, Box, Button, Chip, LinearProgress, Link, List, ListItem,
-  ListItemText, Paper, TextField, ToggleButton, ToggleButtonGroup, Tooltip, Typography,
+  Accordion, AccordionDetails, AccordionSummary, Alert, Box, Button, Chip, Dialog, DialogActions, DialogContent,
+  DialogTitle, LinearProgress, Link, List, ListItem, ListItemText, Paper, Table, TableBody, TableCell, TableHead,
+  TableRow, TextField, ToggleButton, ToggleButtonGroup, Tooltip, Typography,
 } from '@mui/material';
 import ExpandMoreRoundedIcon from '@mui/icons-material/ExpandMoreRounded';
 import FileDownloadRoundedIcon from '@mui/icons-material/FileDownloadRounded';
 import UploadFileRoundedIcon from '@mui/icons-material/UploadFileRounded';
+import EditRoundedIcon from '@mui/icons-material/EditRounded';
 import { useMovil } from '../../../stores/useMovil';
 import { Estado, Unidad } from '../../../stores/useMovil/useMovil.type';
-import { formatear, UNIDADES } from './formato';
-import { AVENA, CIERRA, NO_CIERRA } from './estilo';
+import { conUnidad, formatear, UNIDADES } from './formato';
+import { AVENA, CIERRA, NO_CIERRA, numeros } from './estilo';
+import { Ayuda } from './Ayuda';
+import { AYUDA } from './ayudas';
 import { Foco } from '../../../stores/useMovil/useMovil.type';
 import { Matriz } from './Matriz';
 import { Reglas } from './Reglas';
 
 const ACCIONES: Record<string, string> = {
   agregar_regla: 'Agregó una regla', editar_regla: 'Editó una regla', eliminar_regla: 'Eliminó una regla',
-  cargar_input1: 'Cargó el input 1', cargar_input2: 'Cargó el input 2', cargar_base: 'Cargó la base',
+  cargar_input1: 'Cargó el objetivo de Contraloría', cargar_input2: 'Cargó los totales por canal',
+  cargar_base: 'Cargó el mes anterior',
   apagar_sku: 'Apagó un SKU', prender_sku: 'Prendió un SKU',
   apagar_entidad: 'Apagó un distribuidor o vendedor', prender_entidad: 'Prendió un distribuidor o vendedor',
   fijar: 'Fijó una celda', desfijar: 'Volvió una celda a calculada',
@@ -26,7 +31,7 @@ const Subir = ({ cargado, etiqueta, alElegir }: { cargado: boolean; etiqueta: st
   const { ocupado } = useMovil();
   return (
     <Button component="label" variant="outlined" size="small" startIcon={<UploadFileRoundedIcon />} disabled={ocupado}>
-      {cargado ? 'Reemplazar' : 'Subir'}
+      {cargado ? 'Reemplazar' : 'Subir Excel'}
       <input
         hidden type="file" accept=".xlsx" aria-label={etiqueta}
         onChange={e => { const f = e.target.files?.[0]; if (f) alElegir(f); e.target.value = ''; }}
@@ -39,52 +44,112 @@ const Dato = ({ children }: { children: React.ReactNode }) => (
   <Typography variant="body2" color="text.secondary" sx={{ fontVariantNumeric: 'tabular-nums' }}>{children}</Typography>
 );
 
-const Tarjeta = ({ titulo, ayuda, children }: { titulo: string; ayuda: string; children: React.ReactNode }) => (
+const Tarjeta = ({ titulo, children }: { titulo: string; children: React.ReactNode }) => (
   <Paper variant="outlined" sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-    <Box>
-      <Typography fontWeight={700}>{titulo}</Typography>
-      <Dato>{ayuda}</Dato>
-    </Box>
+    <Typography fontWeight={700}>{titulo}</Typography>
     {children}
   </Paper>
 );
 
+type Totales = NonNullable<Estado['entradas']['input2']>;
+
+/** Corregir un total sin volver a subir el Excel: una fila por canal. */
+const TotalesDialog = ({ totales, onCerrar }: { totales: Totales; onCerrar: () => void }) => {
+  const { editarTotales, ocupado } = useMovil();
+  const [filas, setFilas] = useState(totales.detalle.map(t => ({
+    canal: t.canal, kilos: formatear(t.kilos), plata: t.plata == null ? '' : formatear(t.plata),
+  })));
+  const [error, setError] = useState<string | null>(null);
+  const cambiar = (i: number, campo: 'kilos' | 'plata', valor: string) => {
+    setFilas(fs => fs.map((f, n) => (n === i ? { ...f, [campo]: valor } : f)));
+    setError(null);
+  };
+
+  const guardar = async (e: React.FormEvent) => {
+    e.preventDefault();
+    // La misma tabla que lee el backend, con los números como se escriben acá (1.234,5).
+    const texto = ['Canal\tKilos\tPlata', ...filas.map(f => `${f.canal}\t${f.kilos.trim()}\t${f.plata.trim()}`)].join('\n');
+    const falla = await editarTotales(texto);
+    if (falla) setError(falla);
+    else onCerrar();
+  };
+
+  return (
+    <Dialog open onClose={onCerrar} maxWidth="sm" fullWidth PaperProps={{ component: 'form', onSubmit: guardar }}>
+      <DialogTitle>Editar totales por canal</DialogTitle>
+      <DialogContent>
+        <Table size="small">
+          <TableHead>
+            <TableRow>
+              <TableCell>Canal</TableCell>
+              <TableCell sx={numeros}>Kilos (kg)</TableCell>
+              <TableCell sx={numeros}>{UNIDADES.plata.nombre} ($)</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {filas.map((f, i) => (
+              <TableRow key={f.canal}>
+                <TableCell>{f.canal}</TableCell>
+                <TableCell>
+                  <TextField size="small" value={f.kilos} onChange={e => cambiar(i, 'kilos', e.target.value)}
+                    inputProps={{ 'aria-label': `Kilos de ${f.canal}`, inputMode: 'decimal', style: numeros }} />
+                </TableCell>
+                <TableCell>
+                  <TextField size="small" value={f.plata} onChange={e => cambiar(i, 'plata', e.target.value)}
+                    inputProps={{ 'aria-label': `Pesos de ${f.canal}`, inputMode: 'decimal', style: numeros }} />
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+        {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
+      </DialogContent>
+      <DialogActions sx={{ px: 3, pb: 2 }}>
+        <Button onClick={onCerrar}>Cancelar</Button>
+        <Button type="submit" variant="contained" disabled={ocupado}>Guardar</Button>
+      </DialogActions>
+    </Dialog>
+  );
+};
+
 const Entradas = ({ estado }: { estado: Estado }) => {
   const { cargarInput1, cargarInput2, cargarBase, cargarMuestra, ocupado } = useMovil();
   const { input1, input2, base } = estado.entradas;
-  const [texto, setTexto] = useState(input2?.texto ?? '');
-  useEffect(() => { setTexto(input2?.texto ?? ''); }, [input2?.texto]);
+  const [editar, setEditar] = useState(false);
 
   return (
     <>
       <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 2 }}>
-        <Tarjeta titulo="Input 1 · Contraloría" ayuda="Excel con el objetivo por SKU, en kilos y pesos.">
-          <Box><Subir cargado={!!input1} etiqueta="Excel del input 1" alElegir={cargarInput1} /></Box>
+        <Tarjeta titulo="Objetivo de Contraloría">
+          <Box><Subir cargado={!!input1} etiqueta="Excel del objetivo de Contraloría" alElegir={cargarInput1} /></Box>
           {input1 && (
             <Box>
               <Dato>{input1.archivo}</Dato>
-              <Dato>{input1.skus} SKUs · {formatear(input1.kilos)} kg · $ {formatear(input1.nns)}</Dato>
+              <Dato>{input1.skus} SKUs · {conUnidad(input1.kilos, 'kilos')} · {conUnidad(input1.nns, 'plata')}</Dato>
             </Box>
           )}
         </Tarjeta>
 
-        <Tarjeta titulo="Input 2 · Totales por canal" ayuda="Copiá la tabla de Excel (canal, kilos, pesos) y pegala acá.">
-          <TextField
-            multiline minRows={4} maxRows={10} fullWidth size="small" value={texto}
-            onChange={e => setTexto(e.target.value)} placeholder={'Canal\tKilos\tPesos\nCatering\t12.500\t$ 3.400.000'}
-            inputProps={{ 'aria-label': 'Tabla del input 2', style: { fontFamily: 'ui-monospace, monospace', fontSize: 12 } }}
-          />
-          <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1.5 }}>
-            <Button size="small" variant="outlined" disabled={ocupado || !texto.trim() || texto === input2?.texto}
-              onClick={() => cargarInput2(texto)}>
-              Cargar tabla
-            </Button>
-            {input2 && <Dato>{input2.canales} canales · {formatear(input2.kilos)} kg · $ {formatear(input2.plata)}</Dato>}
+        <Tarjeta titulo="Totales por canal">
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+            <Subir cargado={!!input2} etiqueta="Excel de totales por canal" alElegir={cargarInput2} />
+            {input2 && (
+              <Button size="small" startIcon={<EditRoundedIcon />} onClick={() => setEditar(true)} disabled={ocupado}
+                aria-label="Editar totales por canal">
+                Editar
+              </Button>
+            )}
           </Box>
+          {input2 && (
+            <Box>
+              <Dato>{input2.archivo ?? 'Editados a mano'}</Dato>
+              <Dato>{input2.canales} canales · {conUnidad(input2.kilos, 'kilos')} · {conUnidad(input2.plata, 'plata')}</Dato>
+            </Box>
+          )}
         </Tarjeta>
 
-        <Tarjeta titulo="Base · Mes anterior" ayuda="Excel con el reparto SKU × canal y su apertura.">
-          <Box><Subir cargado={!!base} etiqueta="Excel de la base" alElegir={cargarBase} /></Box>
+        <Tarjeta titulo="Mes anterior">
+          <Box><Subir cargado={!!base} etiqueta="Excel del mes anterior" alElegir={cargarBase} /></Box>
           {base && (
             <Box>
               <Dato>{base.archivo}</Dato>
@@ -100,6 +165,7 @@ const Entradas = ({ estado }: { estado: Estado }) => {
           </Link>
         </Box>
       )}
+      {editar && input2 && <TotalesDialog totales={input2} onCerrar={() => setEditar(false)} />}
     </>
   );
 };
@@ -160,23 +226,32 @@ const ChipCierre = ({ unidad, cierra }: { unidad: Unidad; cierra: boolean }) => 
   />
 );
 
-const Seccion = ({ titulo, resumen, abierta = false, pedido, children }:
-  { titulo: string; resumen?: React.ReactNode; abierta?: boolean; pedido?: number; children: React.ReactNode }) => {
+const Seccion = ({ titulo, resumen, abierta = false, pedido, ayuda, children }: {
+  titulo: string; resumen?: React.ReactNode; abierta?: boolean; pedido?: number;
+  ayuda?: { titulo: string; texto: React.ReactNode }; children: React.ReactNode;
+}) => {
   // Se abre sola cuando algo pide atención (faltan entradas, una regla choca, el planner
   // fue a ver algo de acá: `pedido` cambia) y nunca se cierra sola.
   const [expandida, setExpandida] = useState(abierta);
   useEffect(() => { if (abierta) setExpandida(true); }, [abierta, pedido]);
   return (
-    <Accordion expanded={expandida} onChange={(_, v) => setExpandida(v)} disableGutters variant="outlined"
-      sx={{ '&:before': { display: 'none' } }}>
-      <AccordionSummary expandIcon={<ExpandMoreRoundedIcon />}>
-        <Box sx={{ display: 'flex', alignItems: 'baseline', flexWrap: 'wrap', columnGap: 2 }}>
-          <Typography fontWeight={700}>{titulo}</Typography>
-          {resumen}
-        </Box>
-      </AccordionSummary>
-      <AccordionDetails>{children}</AccordionDetails>
-    </Accordion>
+    // El ⓘ va al lado del título clickeable, no adentro (un botón dentro de otro no anda con teclado),
+    // y fuera del Accordion: MUI toma a su primer hijo como título y el resto como contenido.
+    <Box sx={{ position: 'relative' }}>
+      <Accordion expanded={expandida} onChange={(_, v) => setExpandida(v)} disableGutters variant="outlined"
+        sx={{ '&:before': { display: 'none' } }}>
+        {/* Lugar para el ⓘ entre el título y la flecha (un padding en el Summary correría la flecha). */}
+        <AccordionSummary expandIcon={<ExpandMoreRoundedIcon />}
+          sx={ayuda ? { '& .MuiAccordionSummary-content': { mr: 5 } } : undefined}>
+          <Box sx={{ display: 'flex', alignItems: 'baseline', flexWrap: 'wrap', columnGap: 2 }}>
+            <Typography fontWeight={700}>{titulo}</Typography>
+            {resumen}
+          </Box>
+        </AccordionSummary>
+        <AccordionDetails>{children}</AccordionDetails>
+      </Accordion>
+      {ayuda && <Box sx={{ position: 'absolute', top: 8, right: 44 }}><Ayuda ayuda={ayuda} /></Box>}
+    </Box>
   );
 };
 
@@ -226,9 +301,9 @@ export const MovilPage = () => {
           borderBottom: `1px solid ${AVENA}`, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1.5,
         }}>
           {ocupado && <LinearProgress sx={{ position: 'absolute', left: 0, right: 0, bottom: 0 }} aria-label="Recalculando" />}
-          <Box sx={{ mr: 'auto' }}>
+          <Box sx={{ mr: 'auto', display: 'flex', alignItems: 'center', gap: 0.5 }}>
             <Typography variant="h5" fontWeight={700}>Móvil</Typography>
-            <Dato>Reparto del objetivo del mes por SKU y canal.</Dato>
+            <Ayuda ayuda={AYUDA.movil} />
           </Box>
           {estado.faltan.length === 0 && (
             <>
@@ -253,31 +328,32 @@ export const MovilPage = () => {
         </Box>
 
         <Seccion
-          titulo="Entradas" abierta={estado.faltan.length > 0}
+          titulo="Entradas" abierta={estado.faltan.length > 0} ayuda={AYUDA.entradas}
           resumen={<Dato>{estado.faltan.length ? `Falta: ${estado.faltan.join(', ')}` : 'Las tres cargadas'}</Dato>}
         >
           <Entradas estado={estado} />
         </Seccion>
 
-        <Seccion titulo="Reglas" abierta={chocan > 0 || foco?.tipo === 'regla'}
+        <Seccion titulo="Reglas" abierta={chocan > 0 || foco?.tipo === 'regla'} ayuda={AYUDA.reglas}
           pedido={foco?.tipo === 'regla' ? foco.vez : undefined} resumen={<Dato>{resumenReglas}</Dato>}>
           <Reglas estado={estado} />
         </Seccion>
 
         {estado.faltan.length === 0 && (
-          <Seccion titulo="Para revisar" abierta={bloquean > 0} resumen={<Dato>{resumen}</Dato>}>
+          <Seccion titulo="Para revisar" abierta={bloquean > 0} ayuda={AYUDA.revisar} resumen={<Dato>{resumen}</Dato>}>
             <Pendientes estado={estado} unidad={unidad} enMatriz={new Set(cruce?.skus.map(x => x.codigo))} />
           </Seccion>
         )}
 
         {cruce && (
-          <Seccion titulo={`SKU × canal en ${UNIDADES[unidad].nombre.toLowerCase()}`} abierta
+          <Seccion titulo={`SKU × canal en ${UNIDADES[unidad].nombre.toLowerCase()} (${UNIDADES[unidad].simbolo})`}
+            abierta ayuda={AYUDA.matriz}
             pedido={foco?.tipo === 'sku' ? foco.vez : undefined}>
             <Matriz cruce={cruce} />
           </Seccion>
         )}
 
-        <Seccion titulo="Historial" resumen={<Dato>{estado.historial.length} {estado.historial.length === 1 ? 'cambio' : 'cambios'}</Dato>}>
+        <Seccion titulo="Historial" ayuda={AYUDA.historial} resumen={<Dato>{estado.historial.length} {estado.historial.length === 1 ? 'cambio' : 'cambios'}</Dato>}>
           {estado.historial.length === 0
             ? <Dato>Todavía no hay cambios. Cada carga y cada ajuste aparece acá con quién, cuándo y por qué.</Dato>
             : (

@@ -1,5 +1,6 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 import { Home } from './Home';
 
@@ -53,5 +54,17 @@ describe('Home Component', () => {
       flexGrow: 1,
       overflow: 'auto'
     });
+  });
+
+  it('el menú se oculta y se vuelve a mostrar, como el panel lateral de Claude', async () => {
+    const user = userEvent.setup({ delay: null });
+    render(<Home />);
+    await user.click(screen.getByRole('button', { name: 'Ocultar menú' }));
+    expect(screen.queryByTestId('mock-left-menu')).not.toBeInTheDocument();
+    const mostrar = screen.getByRole('button', { name: 'Mostrar menú' });
+    expect(mostrar).toHaveAttribute('aria-expanded', 'false');
+    await user.click(mostrar);
+    expect(screen.getByTestId('mock-left-menu')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Ocultar menú' })).toHaveAttribute('aria-expanded', 'true');
   });
 });

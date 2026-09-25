@@ -103,13 +103,13 @@ export const useMovil = create<TUseMovil>((set, get) => {
     },
 
     cargarInput1: archivo =>
-      subir('/movil/input1', archivo, e => `Input 1 cargado: ${e.entradas.input1?.skus} SKUs.`),
+      subir('/movil/input1', archivo, e => `Objetivo de Contraloría cargado: ${e.entradas.input1?.skus} SKUs.`),
     cargarBase: archivo =>
-      subir('/movil/base', archivo, e => `Base cargada: ${e.entradas.base?.celdas} celdas del mes anterior.`),
-    cargarInput2: texto =>
-      cambiar(() => api.put('/movil/input2', { texto }), {
-        exito: e => `Input 2 cargado: ${e.entradas.input2?.canales} canales.`,
-      }),
+      subir('/movil/base', archivo, e => `Mes anterior cargado: ${e.entradas.base?.celdas} celdas.`),
+    cargarInput2: archivo =>
+      subir('/movil/input2', archivo, e => `Totales por canal cargados: ${e.entradas.input2?.canales} canales.`),
+    editarTotales: texto =>
+      cambiar(() => api.put('/movil/input2', { texto }), enDialogo(e => `Totales por canal guardados.${resumenCierre(e)}`)),
     cargarMuestra: () =>
       cambiar(() => api.post('/movil/muestra', {}), { exito: () => 'Datos de muestra cargados.' }),
 

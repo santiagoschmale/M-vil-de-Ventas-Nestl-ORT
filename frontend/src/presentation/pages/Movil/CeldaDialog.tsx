@@ -8,6 +8,8 @@ import { Apertura, Celda } from '../../../stores/useMovil/useMovil.type';
 import { formatear, UNIDADES } from './formato';
 import { APAGADO, TINTA, numeros } from './estilo';
 import { MotivoDialog } from './MotivoDialog';
+import { Ayuda } from './Ayuda';
+import { AYUDA } from './ayudas';
 
 type Props = { sku: string; descripcion: string; canal: string; celda: Celda; onCerrar: () => void };
 
@@ -64,7 +66,10 @@ export const CeldaDialog = ({ sku, descripcion, canal, celda, onCerrar }: Props)
         {apertura && (
           <>
             <Divider sx={{ my: 3 }} />
-            <Typography variant="subtitle1" fontWeight={700}>Cómo se abre debajo del canal</Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+              <Typography variant="subtitle1" fontWeight={700}>Cómo se abre debajo del canal</Typography>
+              <Ayuda ayuda={AYUDA.apertura} />
+            </Box>
             {apertura.aviso && <Alert severity="warning" sx={{ my: 1 }}>{apertura.aviso}</Alert>}
             <Table size="small">
               <TableHead>

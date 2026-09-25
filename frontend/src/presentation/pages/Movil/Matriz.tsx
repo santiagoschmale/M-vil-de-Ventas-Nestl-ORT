@@ -29,7 +29,7 @@ export const Matriz = ({ cruce }: { cruce: Cruce }) => {
           <TableHead>
             <TableRow>
               <TableCell sx={{ ...fija, zIndex: 3, background: AVENA, minWidth: 260 }}>SKU</TableCell>
-              <TableCell sx={{ ...numeros, background: AVENA }}>Objetivo</TableCell>
+              <TableCell sx={{ ...numeros, background: AVENA }}>Objetivo ({UNIDADES[cruce.unidad].simbolo})</TableCell>
               {cruce.canales.map(c => {
                 const cuadra = c.pedido === c.repartido;
                 return (

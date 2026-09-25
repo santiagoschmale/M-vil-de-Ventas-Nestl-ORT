@@ -45,7 +45,13 @@ export type Estado = {
   faltan: string[];
   entradas: {
     input1: { archivo: string; skus: number; kilos: Monto; nns: Monto } | null;
-    input2: { canales: number; texto: string; kilos: Monto; plata: Monto } | null;
+    input2: {
+      archivo: string | null; // null: editados a mano en la pantalla
+      canales: number;
+      kilos: Monto;
+      plata: Monto;
+      detalle: { canal: string; kilos: Monto; plata: Monto | null }[];
+    } | null;
     base: { archivo: string; celdas: number; aperturas: number } | null;
   };
   cierra: Record<Unidad, boolean>;
@@ -104,7 +110,8 @@ export type TUseMovil = {
   refrescar: () => Promise<void>;
   elegirUnidad: (unidad: Unidad) => Promise<void>;
   cargarInput1: (archivo: File) => Resultado;
-  cargarInput2: (texto: string) => Resultado;
+  cargarInput2: (archivo: File) => Resultado;
+  editarTotales: (texto: string) => Resultado;
   cargarBase: (archivo: File) => Resultado;
   cargarMuestra: () => Resultado;
   cambiarSku: (sku: string, activo: boolean, motivo: string) => Resultado;

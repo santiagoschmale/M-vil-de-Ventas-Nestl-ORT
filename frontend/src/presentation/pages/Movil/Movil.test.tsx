@@ -5,6 +5,7 @@ import '@testing-library/jest-dom';
 import { http, HttpResponse } from 'msw';
 import { server } from '../../../mocks/server';
 import { MovilPage } from './Movil';
+import { useMovil } from '../../../stores/useMovil';
 import { mensajeDeError } from '../../../stores/useMovil/useMovil';
 import { Estado } from '../../../stores/useMovil/useMovil.type';
 import { cruceFactory, estadoFactory, inconsistenciaFactory, reglaFactory } from '../../../mocks/movil/fabricas';
@@ -27,6 +28,7 @@ beforeEach(() => {
     http.get('*/api/movil/apertura/*', () => HttpResponse.json({ detail: 'no se abre' }, { status: 404 })),
     http.put('*/api/movil/skus/*', anotar),
     http.put('*/api/movil/celdas/*', anotar),
+    http.put('*/api/movil/input2', anotar),
   );
 });
 
@@ -139,6 +141,65 @@ describe('MovilPage', { timeout: 15000 }, () => {
     await user.click(await screen.findByRole('button', { name: /^Para revisar/ }));
     expect(screen.getByText(/Producto de otro país/)).toBeVisible();
     expect(screen.queryByRole('button', { name: 'Ver SKU 999' })).not.toBeInTheDocument();
+  });
+
+  it('el ⓘ explica el concepto en un modal y no abre ni cierra la sección', async () => {
+    const user = userEvent.setup({ delay: null });
+    render(<MovilPage />);
+    const reglas = await screen.findByRole('button', { name: /^Reglas/ });
+    const antes = reglas.getAttribute('aria-expanded');
+    await user.click(screen.getByRole('button', { name: 'Qué es una regla' }));
+    expect(within(screen.getByRole('dialog')).getByText(/limita cuánto de un canal/)).toBeInTheDocument();
+    expect(reglas).toHaveAttribute('aria-expanded', antes);
+    await user.click(screen.getByRole('button', { name: 'Entendido' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  });
+
+  it('la pantalla no habla de input 1 ni input 2', async () => {
+    render(<MovilPage />);
+    await screen.findByText('Totales por canal');
+    const texto = document.body.textContent ?? '';
+    const m = texto.match(/.{0,60}input\s*[12].{0,40}/i);
+    expect(m?.[0] ?? null).toBeNull();
+  });
+
+  it('los totales por canal se suben en Excel', async () => {
+    // Acá se prueba que la pantalla le pasa el archivo a la acción. El pedido HTTP lo cubre el test de la API
+    // en el backend: en el entorno de test, jsdom + axios + msw se cuelgan con un FormData.
+    const original = useMovil.getState().cargarInput2;
+    const cargarInput2 = vi.fn(async () => null);
+    useMovil.setState({ cargarInput2 });
+    onTestFinished(() => useMovil.setState({ cargarInput2: original }));  // el store es global
+    const user = userEvent.setup({ delay: null });
+    render(<MovilPage />);
+    await user.click(await screen.findByRole('button', { name: /^Entradas/ }));  // con todo cargado, arranca cerrada
+    const archivo = new File(['x'], 'totales.xlsx');
+    await user.upload(screen.getByLabelText('Excel de totales por canal'), archivo);
+    expect(cargarInput2).toHaveBeenCalledWith(archivo);
+  });
+
+  it('editar los totales manda la tabla con los números como se escriben en Argentina', async () => {
+    const user = userEvent.setup({ delay: null });
+    render(<MovilPage />);
+    await user.click(await screen.findByRole('button', { name: /^Entradas/ }));
+    await user.click(screen.getByRole('button', { name: 'Editar totales por canal' }));
+    const dialogo = screen.getByRole('dialog');
+    const kilos = within(dialogo).getByLabelText('Kilos de Directa (BA)');
+    expect(kilos).toHaveValue('500,000');
+    await user.clear(kilos);
+    await user.type(kilos, '490,5');
+    await user.click(within(dialogo).getByRole('button', { name: 'Guardar' }));
+
+    await waitFor(() => expect(pedidos).toHaveLength(1));
+    expect(pedidos[0]).toEqual({
+      metodo: 'PUT', url: '/api/movil/input2',
+      cuerpo: { texto: 'Canal\tKilos\tPlata\nCatering\t1.000,000\t60,00\nDirecta (BA)\t490,5\t40,00' },
+    });
+  });
+
+  it('la tabla dice en qué unidad están los números', async () => {
+    render(<MovilPage />);
+    expect(await screen.findByRole('columnheader', { name: 'Objetivo (kg)' })).toBeInTheDocument();
   });
 
   it('exportar se habilita solo cuando kilos y pesos cierran', async () => {
