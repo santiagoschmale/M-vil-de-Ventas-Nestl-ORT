@@ -74,7 +74,7 @@ class _Entradas:
     archivo1: str | None = None
     canales: dict | None = None
     problemas2: list[Problema] = field(default_factory=list)
-    texto2: str | None = None
+    archivo2: str | None = None  # None si se cargó o editó como tabla en la pantalla
     base: dict | None = None
     apertura: dict = field(default_factory=dict)
     problemas_base: list[Problema] = field(default_factory=list)
@@ -95,8 +95,8 @@ class Sesion:
     # --- entradas -----------------------------------------------------------
 
     def faltan(self) -> list[str]:
-        return [n for n, v in (("input 1", self._e.objetivos), ("input 2", self._e.canales),
-                               ("base del mes anterior", self._e.base)) if v is None]
+        return [n for n, v in (("objetivo de Contraloría", self._e.objetivos), ("totales por canal", self._e.canales),
+                               ("mes anterior", self._e.base)) if v is None]
 
     @property
     def entradas(self) -> _Entradas:
@@ -110,12 +110,14 @@ class Sesion:
             return Ajuste("cargar_input1", nombre, autor, cuando)
         self._aplicar(cambio)
 
-    def cargar_input2(self, texto: str, autor: str, cuando: datetime) -> None:
-        canales, problemas = _leer(leer_input2, texto)
+    def cargar_input2(self, origen, autor: str, cuando: datetime, nombre: str | None = None) -> None:
+        """`origen`: el Excel de totales por canal, o la tabla en texto (editada en la pantalla)."""
+        canales, problemas = _leer(leer_input2, origen)
 
         def cambio():
-            self._e.canales, self._e.problemas2, self._e.texto2 = canales, problemas, texto
-            return Ajuste("cargar_input2", f"{len(canales)} canales", autor, cuando)
+            self._e.canales, self._e.problemas2, self._e.archivo2 = canales, problemas, nombre
+            detalle = f"{nombre} · {len(canales)} canales" if nombre else f"{len(canales)} canales, editados a mano"
+            return Ajuste("cargar_input2", detalle, autor, cuando)
         self._aplicar(cambio)
 
     def cargar_base(self, origen, nombre: str, autor: str, cuando: datetime) -> None:
@@ -140,7 +142,7 @@ class Sesion:
     def cambiar_sku(self, sku: str, activo: bool, autor: str, cuando: datetime, motivo: str) -> None:
         motivo = _motivo(motivo)
         if self._e.objetivos is None or sku not in self._e.objetivos:
-            raise ErrorDeAjuste(f"El SKU {sku} no está en el input 1.")
+            raise ErrorDeAjuste(f"El SKU {sku} no está en el objetivo de Contraloría.")
         def cambio():
             ajuste = Ajuste("prender_sku" if activo else "apagar_sku", sku, autor, cuando, motivo)
             if activo:
@@ -183,7 +185,7 @@ class Sesion:
         if sku not in r.objetivos or sku in self.apagados_skus:
             raise ErrorDeAjuste(f"El SKU {sku} no está en el reparto de este mes.")
         if canal not in r.canales:
-            raise ErrorDeAjuste(f"El canal {canal} no está en el input 2.")
+            raise ErrorDeAjuste(f"El canal {canal} no está en los totales por canal.")
         if (sku, canal) not in self._e.base:
             raise ErrorDeAjuste(f"El SKU {sku} no se vende en {canal} (no está en la base): no se puede fijar.")
         objetivo = r.objetivos[sku].kilos if unidad == "kilos" else r.objetivos[sku].nns

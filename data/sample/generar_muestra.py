@@ -165,7 +165,7 @@ hoja.append(["Café", "Café soluble 1kg (repetido)", int(skus[0]["codigo"]), 1.
 guardar(wb, "input1_objetivo.xlsx")
 
 # ---------------------------------------------------------------------------
-# Input 2: totales por canal (tabla pegada)
+# Input 2: totales por canal (Excel, y la misma tabla en texto para los tests del pegado)
 # ---------------------------------------------------------------------------
 
 
@@ -175,10 +175,22 @@ def ar(numero: D, decimales: int) -> str:
     return texto.replace(",", "X").replace(".", ",").replace("X", ".")
 
 
-def escribir_input2(nombre: str, kilos: dict[str, D], plata: dict[str, D]) -> None:
+def escribir_input2(nombre: str, kilos: dict[str, D], plata: dict[str, D], excel: bool = True) -> None:
+    """`nombre` sin extensión: escribe el .tsv y, salvo excel=False, el .xlsx con los mismos números."""
     lineas = ["Canal\tKilos\tPlata"]
     lineas += [f"{c}\t{ar(kilos[c], 3)}\t{ar(plata[c], 2)}" for c in CANALES]
-    (AQUI / nombre).write_text("\n".join(lineas) + "\n", encoding="utf-8")
+    (AQUI / f"{nombre}.tsv").write_text("\n".join(lineas) + "\n", encoding="utf-8")
+    if not excel:
+        return
+    libro = Workbook()
+    hoja = libro.active
+    hoja.title = "Totales por canal"
+    hoja.append(["Canal", "Kilos", "Plata"])
+    for c in CANALES:
+        hoja.append([c, float(kilos[c]), float(plata[c])])  # como en Excel: celdas numéricas
+        hoja.cell(hoja.max_row, 2).number_format = "#,##0.000"
+        hoja.cell(hoja.max_row, 3).number_format = "#,##0.00"
+    guardar(libro, f"{nombre}.xlsx")
 
 
 # El SKU nuevo suma 10 kg al input 1: se los damos a Directa para que los totales cierren.
@@ -186,9 +198,9 @@ kilos_canal_con_nuevo = dict(kilos_canal)
 kilos_canal_con_nuevo["Directa (BA)"] += D(10)
 plata_canal_con_nuevo = dict(plata_canal)
 plata_canal_con_nuevo["Directa (BA)"] += D(125000)
-escribir_input2("input2_canales.tsv", kilos_canal_con_nuevo, plata_canal_con_nuevo)
+escribir_input2("input2_canales", kilos_canal_con_nuevo, plata_canal_con_nuevo)
 # Lo que haría el planner si apaga el SKU nuevo: saca sus 10 kg (y su plata) de Directa.
-escribir_input2("input2_sin_sku_nuevo.tsv", kilos_canal, plata_canal)
+escribir_input2("input2_sin_sku_nuevo", kilos_canal, plata_canal)
 
 # El ejemplo del cliente: el planner le pide a Distribuidores 1.000 kg más de lo que
 # pueden darle todos los SKUs que se venden ahí juntos, y se lo saca a los otros canales
@@ -209,7 +221,7 @@ for c in otros[:-1]:
 imposible_kg[otros[-1]] -= extra - restado
 assert all(v >= 0 for v in imposible_kg.values())
 assert sum(imposible_kg.values()) == sum(kilos_canal_con_nuevo.values())
-escribir_input2("input2_distribuidores_imposible.tsv", imposible_kg, plata_canal_con_nuevo)
+escribir_input2("input2_distribuidores_imposible", imposible_kg, plata_canal_con_nuevo, excel=False)
 
 # ---------------------------------------------------------------------------
 # Base: la distribución del mes anterior (Excel SKU × canal)

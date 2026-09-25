@@ -236,3 +236,40 @@ def test_apertura_negativa_repetida_o_con_texto_se_reporta():
     assert any("repetid" in m for m in errores)
     assert any("negativ" in m for m in errores)
     assert any("#N/A" in m for m in errores)
+
+
+# ---------------------------------------------------------------------------
+# Totales por canal desde Excel
+# ---------------------------------------------------------------------------
+
+def _excel(filas) -> BytesIO:
+    wb = Workbook()
+    for fila in filas:
+        wb.active.append(fila)
+    datos = BytesIO()
+    wb.save(datos)
+    datos.seek(0)
+    return datos
+
+
+def test_los_totales_por_canal_en_excel_dan_lo_mismo_que_la_tabla_pegada():
+    pegada, _ = leer_input2((MUESTRA / "input2_canales.tsv").read_text(encoding="utf-8"))
+    excel, problemas = leer_input2(MUESTRA / "input2_canales.xlsx")
+    assert excel == pegada
+    assert problemas == []
+    # Mismos exponentes: 3 decimales en kilos y 2 en plata, venga de donde venga.
+    assert all(t.kilos.as_tuple().exponent == -3 and t.plata.as_tuple().exponent == -2 for t in excel.values())
+
+
+def test_en_excel_un_numero_con_tres_decimales_no_se_lee_como_miles():
+    """En texto "1.234" es mil doscientos treinta y cuatro; en una celda numérica de Excel es 1,234."""
+    canales, _ = leer_input2(_excel([["Canal", "Kilos", "Plata"], ["Catering", 1.234, 10.5]]))
+    assert canales["Catering"].kilos == D("1.234") and canales["Catering"].plata == D("10.50")
+
+
+def test_en_excel_los_problemas_se_reportan_igual():
+    canales, problemas = leer_input2(_excel([["Canal", "Kilos", "Plata"], ["Catering", None, 10], ["Vending", -1, 5]]))
+    mensajes = [p.mensaje for p in problemas]
+    assert any("Catering" in m and "vac" in m for m in mensajes)
+    assert any("Vending" in m for m in mensajes)
+    assert canales["Catering"].kilos == D("0.000")

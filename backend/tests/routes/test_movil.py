@@ -38,7 +38,7 @@ def _cerrado():
 
 def test_sin_entradas_dice_que_falta_todo():
     r = _cliente().get("/api/movil").json()
-    assert r["faltan"] == ["input 1", "input 2", "base del mes anterior"]
+    assert r["faltan"] == ["objetivo de Contraloría", "totales por canal", "mes anterior"]
     assert r["cierra"] == {"kilos": False, "plata": False}
 
 
@@ -157,3 +157,35 @@ def test_un_nombre_con_barra_llega_a_la_sesion_y_no_da_404():
         assert r.status_code == 422, (url, r.status_code)
         assert "/" in r.json()["detail"]
     assert c.get(f"/api/movil/apertura/{sku}/Soluciones%2FDirecta").json()["detail"].endswith("no se abre debajo del canal.")
+
+
+def test_ningun_mensaje_para_el_planner_habla_de_input_1_o_input_2():
+    """El planner conoce "objetivo de Contraloría", "totales por canal" y "mes anterior"."""
+    import re
+
+    c = _cliente()
+    textos = list(c.get("/api/movil").json()["faltan"])
+    c.post("/api/movil/muestra")
+    c.put(f"/api/movil/skus/{NUEVO}", json={"activo": False, "motivo": "nuevo"})
+    e = c.post("/api/movil/reglas", json={"canal": "Tucumán", "categorias": ["Té"], "limite": "tope", "kilos": "5",
+                                           "nns": None, "motivo": "x"}).json()
+    textos += [p["mensaje"] for p in e["problemas"]]
+    textos += [i["mensaje"] for u in ("kilos", "plata") for i in e["inconsistencias"][u]]
+    textos += [c.put("/api/movil/celdas/kilos/1/NoExiste", json={"monto": "1", "motivo": "x"}).json()["detail"]]
+    textos += [c.put("/api/movil/skus/no-existe", json={"activo": False, "motivo": "x"}).json()["detail"]]
+    textos += [c.put("/api/movil/input2", json={"texto": "esto no es una tabla"}).json()["detail"]]
+    textos += [c.post("/api/movil/input1", files={"archivo": ("x.xlsx", b"no")}).json()["detail"]]
+    assert len(textos) > 10
+    hablan = [t for t in textos if re.search(r"input\s*[12]", t, re.I)]
+    assert hablan == [], hablan
+
+
+def test_los_totales_por_canal_se_suben_en_excel_y_el_estado_trae_cada_canal():
+    c = _cliente()
+    with (MUESTRA / "input2_canales.xlsx").open("rb") as f:
+        r = c.post("/api/movil/input2", files={"archivo": ("totales.xlsx", f)})
+    assert r.status_code == 200, r.json()
+    totales = r.json()["entradas"]["input2"]
+    assert totales["archivo"] == "totales.xlsx" and totales["canales"] == 9
+    catering = next(t for t in totales["detalle"] if t["canal"] == "Catering")
+    assert catering == {"canal": "Catering", "kilos": "62392.800", "plata": "493090298.40"}

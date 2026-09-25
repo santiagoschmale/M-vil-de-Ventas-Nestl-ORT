@@ -57,7 +57,7 @@ def _aplicar(fn, *args, **kwargs):
 # ---------------------------------------------------------------------------
 
 class TextoIn(BaseModel):
-    texto: str = Field(description="La tabla del input 2 tal como se pega desde Excel")
+    texto: str = Field(description="Totales por canal como tabla de texto (canal, kilos, plata), p. ej. editada en la pantalla")
 
 
 class ActivoIn(BaseModel):
@@ -124,9 +124,11 @@ def _estado(s: Sesion) -> dict:
                   "kilos": _texto(_suma(o.kilos for o in activos), "kilos"),
                   "nns": _texto(_suma(o.nns or 0 for o in activos), "plata")}
     if e.canales is not None:
-        input2 = {"canales": len(e.canales), "texto": e.texto2,
+        input2 = {"archivo": e.archivo2, "canales": len(e.canales),
                   "kilos": _texto(_suma(t.kilos for t in e.canales.values()), "kilos"),
-                  "plata": _texto(_suma(t.plata or 0 for t in e.canales.values()), "plata")}
+                  "plata": _texto(_suma(t.plata or 0 for t in e.canales.values()), "plata"),
+                  "detalle": [{"canal": c, "kilos": _texto(t.kilos, "kilos"), "plata": _texto(t.plata, "plata")}
+                              for c, t in e.canales.items()]}
     if e.base is not None:
         base = {"archivo": e.archivo_base, "celdas": len(e.base), "aperturas": len(e.apertura)}
     cruces = {"kilos": r.kilos if r else None, "plata": r.plata if r else None}
@@ -171,13 +173,19 @@ def obtener_estado(s: Sesion = Depends(sesion)):
     return _estado(s)
 
 
-@router.post("/input1", summary="Cargar el input 1 (Excel de Contraloría)")
+@router.post("/input1", summary="Cargar el objetivo de Contraloría (Excel)")
 def cargar_input1(archivo: UploadFile = File(...), s: Sesion = Depends(sesion), quien: str = Depends(autor)):
     _aplicar(s.cargar_input1, _archivo(archivo), archivo.filename or "input1.xlsx", quien, _ahora())
     return _estado(s)
 
 
-@router.put("/input2", summary="Cargar el input 2 (tabla de totales por canal, pegada)")
+@router.post("/input2", summary="Cargar los totales por canal (Excel)")
+def subir_input2(archivo: UploadFile = File(...), s: Sesion = Depends(sesion), quien: str = Depends(autor)):
+    _aplicar(s.cargar_input2, _archivo(archivo), quien, _ahora(), nombre=archivo.filename or "totales.xlsx")
+    return _estado(s)
+
+
+@router.put("/input2", summary="Cargar los totales por canal como tabla de texto (editados en la pantalla)")
 def cargar_input2(cuerpo: TextoIn, s: Sesion = Depends(sesion), quien: str = Depends(autor)):
     _aplicar(s.cargar_input2, cuerpo.texto, quien, _ahora())
     return _estado(s)
@@ -193,7 +201,7 @@ def cargar_base(archivo: UploadFile = File(...), s: Sesion = Depends(sesion), qu
 def cargar_muestra(s: Sesion = Depends(sesion), quien: str = Depends(autor)):
     ahora = _ahora()
     _aplicar(s.cargar_input1, MUESTRA / "input1_objetivo.xlsx", "input1_objetivo.xlsx", quien, ahora)
-    _aplicar(s.cargar_input2, (MUESTRA / "input2_canales.tsv").read_text(encoding="utf-8"), quien, ahora)
+    _aplicar(s.cargar_input2, MUESTRA / "input2_canales.xlsx", quien, ahora, nombre="input2_canales.xlsx")
     _aplicar(s.cargar_base, MUESTRA / "base_mes_anterior.xlsx", "base_mes_anterior.xlsx", quien, ahora)
     return _estado(s)
 

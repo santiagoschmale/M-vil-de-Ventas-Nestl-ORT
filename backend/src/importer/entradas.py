@@ -176,10 +176,10 @@ def _encabezado(hojas: list[list[list]], entrada: str, obligatorios: set[str], q
 # ---------------------------------------------------------------------------
 
 def leer_input1(origen) -> tuple[dict[str, ObjetivoSku], list[Problema]]:
-    filas, n, cols = _encabezado(_hojas_de_excel(origen), "input1", {"sku", "kilos"}, "Input 1")
+    filas, n, cols = _encabezado(_hojas_de_excel(origen), "input1", {"sku", "kilos"}, "Objetivo de Contraloría")
     problemas: list[Problema] = []
     if "nns" not in cols:
-        problemas.append(Problema("aviso", "El input 1 no tiene columna de NNS: se reparten solo los kilos.",
+        problemas.append(Problema("aviso", "El objetivo de Contraloría no tiene columna de NNS: se reparten solo los kilos.",
                                   bloque="input1"))
 
     def campo(fila, nombre):
@@ -192,7 +192,7 @@ def leer_input1(origen) -> tuple[dict[str, ObjetivoSku], list[Problema]]:
         if codigo is None:
             continue
         if codigo in objetivos:
-            problemas.append(Problema("error", "SKU repetido en el input 1: se usa la primera fila.",
+            problemas.append(Problema("error", "SKU repetido en el objetivo de Contraloría: se usa la primera fila.",
                                       sku=codigo, bloque="input1"))
             continue
         montos = {}
@@ -237,29 +237,36 @@ def leer_input1(origen) -> tuple[dict[str, ObjetivoSku], list[Problema]]:
 # Input 2: totales por canal
 # ---------------------------------------------------------------------------
 
-def leer_input2(texto: str) -> tuple[dict[str, TotalCanal], list[Problema]]:
-    lineas = [linea for linea in texto.strip().splitlines() if linea.strip()]
-    if not lineas:
-        raise ErrorDeEntrada("Input 2: la tabla está vacía.")
-    separador = "\t" if "\t" in lineas[0] else ";" if ";" in lineas[0] else ","
-    filas = list(csv.reader(io.StringIO("\n".join(lineas)), delimiter=separador))
-    filas, n, cols = _encabezado([filas], "input2", {"canal", "kilos"}, "Input 2")
+def leer_input2(origen) -> tuple[dict[str, TotalCanal], list[Problema]]:
+    """
+    Totales por canal: un Excel (archivo o ruta) o la tabla en texto (str), pegada
+    o armada por la pantalla al editar. Los dos caminos validan igual.
+    """
+    if isinstance(origen, str):
+        lineas = [linea for linea in origen.strip().splitlines() if linea.strip()]
+        if not lineas:
+            raise ErrorDeEntrada("Totales por canal: la tabla está vacía.")
+        separador = "\t" if "\t" in lineas[0] else ";" if ";" in lineas[0] else ","
+        hojas = [list(csv.reader(io.StringIO("\n".join(lineas)), delimiter=separador))]
+    else:
+        hojas = _hojas_de_excel(origen)
+    filas, n, cols = _encabezado(hojas, "input2", {"canal", "kilos"}, "Totales por canal")
     ancho = len(filas[n])
     problemas: list[Problema] = []
     if "plata" not in cols:
-        problemas.append(Problema("aviso", "El input 2 no tiene columna de plata: se reparten solo los kilos.",
-                                  bloque="input2"))
+        problemas.append(Problema("aviso", "Los totales por canal no tienen columna de plata: se reparten solo "
+                                           "los kilos.", bloque="input2"))
 
     canales: dict[str, TotalCanal] = {}
     for fila in filas[n + 1:]:
-        canal = fila[cols["canal"]].strip() if cols["canal"] < len(fila) else ""
+        canal = str(fila[cols["canal"]] or "").strip() if cols["canal"] < len(fila) else ""
         if not canal:
             continue
         if canal in canales:
-            problemas.append(Problema("error", f"Canal {canal} repetido en el input 2: se usa la primera fila.",
-                                      bloque="input2"))
+            problemas.append(Problema("error", f"Canal {canal} repetido en los totales por canal: se usa la primera "
+                                               f"fila.", bloque="input2"))
             continue
-        if len(fila) > ancho:
+        if isinstance(origen, str) and len(fila) > ancho:
             # Típico de pegar separado por comas con montos 1.000,50: la coma decimal parte la celda.
             problemas.append(Problema("error", f"La fila de {canal} tiene más columnas que el encabezado: revisá "
                                                f"el separador (con coma decimal, separá con tabulaciones o punto y "
@@ -270,13 +277,14 @@ def leer_input2(texto: str) -> tuple[dict[str, TotalCanal], list[Problema]]:
             if nombre not in cols:
                 montos[nombre] = None
                 continue
-            crudo = fila[cols[nombre]] if cols[nombre] < len(fila) else ""
-            if not crudo.strip():
+            crudo = fila[cols[nombre]] if cols[nombre] < len(fila) else None
+            # Del texto llega "1.234,5"; de Excel, el número de la celda (1.234 es 1,234, no miles).
+            valor, error = _celda(crudo)
+            if valor is None and error is None:
                 problemas.append(Problema("error", f"{nombre.capitalize()} de {canal} vacío. Se toma 0.",
                                           bloque="input2"))
                 montos[nombre] = Decimal(0).quantize(Decimal(1).scaleb(-decimales))
                 continue
-            valor = numero(crudo)
             if valor is None or valor < 0:
                 problemas.append(Problema("error", f"{nombre.capitalize()} de {canal} inválido ({crudo!r}). "
                                                    f"Se toma 0.", bloque="input2"))

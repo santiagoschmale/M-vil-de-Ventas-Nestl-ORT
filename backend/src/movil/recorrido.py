@@ -102,10 +102,10 @@ def armar(
     activos = {s: o for s, o in objetivos.items() if s not in apagados and o.kilos > 0}
 
     for s in sorted({s for s, _ in base} - set(objetivos)):
-        problemas.append(Problema("aviso", f"El SKU {s} está en la base del mes anterior pero no en el input 1: "
+        problemas.append(Problema("aviso", f"El SKU {s} está en la base del mes anterior pero no en el objetivo de Contraloría: "
                                            f"no se reparte.", sku=s, bloque="base"))
     for c in sorted({c for _, c in base} - set(canales)):
-        problemas.append(Problema("aviso", f"El canal {c} está en la base del mes anterior pero no en el input 2: "
+        problemas.append(Problema("aviso", f"El canal {c} está en la base del mes anterior pero no en los totales por canal: "
                                            f"no se reparte.", bloque="base"))
 
     grupos_kilos, grupos_plata = _grupos(reglas, activos, por_nombre, problemas)
@@ -147,13 +147,13 @@ def _grupos(reglas, activos, por_nombre, problemas) -> tuple[list[Grupo], list[G
         canal = por_nombre.get(normalizar(regla.canal))
         if canal is None:
             problemas.append(Problema("aviso", f"La regla {regla.id} es del canal {regla.canal}, que no está en el "
-                                               f"input 2 de este mes: no se aplica.", bloque="reglas"))
+                                               f"los totales por canal de este mes: no se aplica.", bloque="reglas"))
             continue
         pedidas = {normalizar(c): c for c in regla.categorias}
         vacias = sorted(c for n, c in pedidas.items() if n not in categorias)
         if vacias:
             problemas.append(Problema("aviso", f"La regla {regla.id} incluye {', '.join(vacias)}, pero ningún SKU "
-                                               f"activo del input 1 es de esa categoría.", bloque="reglas"))
+                                               f"activo del objetivo de Contraloría es de esa categoría.", bloque="reglas"))
         skus = frozenset(s for s, o in activos.items() if normalizar(o.categoria or "") in pedidas)
         for porcentaje, destino in ((regla.kilos, kilos), (regla.nns, plata)):
             if porcentaje is not None:
@@ -242,7 +242,7 @@ def exportar(recorrido: Recorrido, destino) -> None:
             hoja.append(fila)
         hoja.append(["Total del reparto", None, sum((total_sku(recorrido.objetivos[s]) for s in skus), Decimal(0))]
                     + [sum((v for (_, x), v in cruce.celdas.items() if x == c), Decimal(0)) for c in canales])
-        hoja.append(["Total pedido (input 2)", None, None] + [total_canal(recorrido.canales[c]) for c in canales])
+        hoja.append(["Total pedido", None, None] + [total_canal(recorrido.canales[c]) for c in canales])
         for fila in hoja.iter_rows(min_row=2, min_col=3):
             for celda in fila:
                 celda.number_format = formato

@@ -161,8 +161,8 @@ def cruzar(
         dif = _a_decimal(abs(total_filas - total_columnas), decimales)
         inconsistencias.append(Inconsistencia(
             "totales_distintos",
-            f"El objetivo por SKU (input 1) suma {a_texto(_a_decimal(total_filas, decimales))} y los totales por canal "
-            f"(input 2) suman {a_texto(_a_decimal(total_columnas, decimales))}: difieren en {a_texto(dif)}. "
+            f"El objetivo de Contraloría suma {a_texto(_a_decimal(total_filas, decimales))} y los totales por canal "
+            f"suman {a_texto(_a_decimal(total_columnas, decimales))}: difieren en {a_texto(dif)}. "
             f"Corregí uno de los dos para que coincidan.",
             diferencia=dif,
         ))
@@ -201,9 +201,9 @@ def cruzar(
         if que == "SKU":
             # Caso A4 (SKU sin reparto previo): la regla está pendiente con el cliente.
             return (f"El SKU {nombre} tiene objetivo pero el mes anterior no se vendió en ningún canal: "
-                    f"no hay base para repartirlo. Apagalo para seguir y descontá su parte del input 2.")
+                    f"no hay base para repartirlo. Apagalo para seguir y descontá su parte de los totales por canal.")
         return (f"El canal {nombre} tiene total pero el mes anterior no vendió ningún SKU: "
-                f"no hay base para repartirlo. Revisá su total en el input 2.")
+                f"no hay base para repartirlo. Revisá su total en los totales por canal.")
 
     inconsistencias += [
         Inconsistencia("sku_sin_canal", sin_celdas_libres("SKU", s, r[s], s in filas_fijadas), skus=(s,),
@@ -250,7 +250,7 @@ _QUE_PIDE = {"tope": "a lo sumo", "minimo": "al menos", "fijo": "exactamente"}
 
 def _validar_grupo(g: Grupo, columnas: Mapping[str, int]) -> None:
     if g.canal not in columnas:
-        raise ErrorDeCruce(f"La regla {g.regla} es de un canal que no está en el input 2: {g.canal}.")
+        raise ErrorDeCruce(f"La regla {g.regla} es de un canal que no está en los totales por canal: {g.canal}.")
     if g.limite not in LIMITES:
         raise ErrorDeCruce(f"La regla {g.regla} tiene un límite desconocido: {g.limite!r}.")
     _exigir_decimal(g.porcentaje, f"porcentaje de la regla {g.regla}")
