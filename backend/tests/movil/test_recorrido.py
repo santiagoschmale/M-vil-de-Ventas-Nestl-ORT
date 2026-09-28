@@ -259,3 +259,9 @@ def test_por_que_no_abre_habla_en_terminos_del_planner():
                  "vendedores vendió este SKU. Los pesos quedan en el canal, sin abrir.")
     assert "apagados" in por_que_no_abre("Directa (BA)", "kilos", "No hay entidades entre las cuales repartir.")
     assert "pesos son cero" not in m and "plata" not in m
+
+
+def test_apagar_a_todos_los_de_un_canal_se_informa_en_cada_celda_que_no_se_abre():
+    r, _ = _con_apertura(apagados_entidades={"Joaquín Ledesma", "Nicolás Paz", "Sofía Correa"})
+    cordoba = [p for p in r.problemas if p.bloque == "apertura" and "Córdoba" in p.mensaje]
+    assert cordoba and all("apagados" in p.mensaje for p in cordoba)

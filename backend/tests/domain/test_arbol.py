@@ -238,3 +238,11 @@ def test_peso_negativo_no_se_reparte_y_apagarlo_lo_resuelve():
     recalcular(raiz, {"dist.d3"})
     assert distribuidores.cuadra["kilos"] is True
     assert distribuidores.aviso["kilos"] is None
+
+
+def test_si_se_apagan_todos_los_hijos_se_avisa_y_no_queda_en_silencio():
+    """Distribuidores sin ningún distribuidor prendido: su volumen no llega a nadie y se tiene que ver."""
+    raiz = _raiz(inactivas={"dist.d1", "dist.d2", "dist.d3"})
+    distribuidores = _nodo(raiz, "canal.distribuidores")
+    assert distribuidores.cuadra["kilos"] is False
+    assert distribuidores.aviso["kilos"] and "apagad" in distribuidores.aviso["kilos"]

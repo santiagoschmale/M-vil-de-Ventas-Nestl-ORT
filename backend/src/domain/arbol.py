@@ -109,7 +109,10 @@ def _repartir_hijos(nodo: Nodo, unidad: str, decimales: int) -> None:
     disponible = total - sum((h.valores[unidad].monto for h in fijos), Decimal(0))
     aviso = None
     reparto = {h.entidad: cero for h in libres}
-    if libres and nodo.error:
+    if nodo.hijos and not activos and total > 0:
+        # Sin ningún hijo prendido el volumen no llega a nadie: se avisa, no queda en silencio.
+        aviso = "No hay entidades prendidas entre las cuales repartir: están todas apagadas."
+    elif libres and nodo.error:
         aviso = nodo.error
     elif libres and disponible < 0:
         aviso = "Lo fijado supera el total de este nodo: no queda nada para los calculados."
