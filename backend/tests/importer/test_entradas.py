@@ -273,3 +273,13 @@ def test_en_excel_los_problemas_se_reportan_igual():
     assert any("Catering" in m and "vac" in m for m in mensajes)
     assert any("Vending" in m for m in mensajes)
     assert canales["Catering"].kilos == D("0.000")
+
+
+def test_un_sku_repetido_dice_en_que_filas_y_guarda_todas_para_elegir():
+    objetivos, problemas = leer_input1(MUESTRA / "input1_objetivo.xlsx")
+    (p,) = [p for p in problemas if p.tipo == "sku_repetido"]
+    assert p.sku == "90020001" and "filas 4 y 51" in p.mensaje
+    o = objetivos["90020001"]
+    assert o.fila == 4 and o.kilos == D("7961.420")  # mientras nadie elija, vale la primera
+    (otra,) = o.alternativas
+    assert otra.fila == 51 and otra.kilos == D("1.000") and "repetido" in otra.descripcion

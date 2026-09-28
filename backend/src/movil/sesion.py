@@ -88,6 +88,8 @@ class Sesion:
         self.entidades_apagadas: dict[str, Ajuste] = {}
         self._fijas: dict[str, dict[Celda, Fijada]] = {"kilos": {}, "plata": {}}
         self.reglas: dict[str, ReglaCargada] = {}
+        # SKU repetido en el objetivo de Contraloría -> (fila del Excel que vale, quién lo decidió).
+        self.filas_elegidas: dict[str, tuple[int, Ajuste]] = {}
         self._proxima_regla = 1  # los ids no se reusan: el historial los nombra
         self.historial: list[Ajuste] = []
         self.recorrido: Recorrido | None = None
@@ -107,6 +109,7 @@ class Sesion:
 
         def cambio():
             self._e.objetivos, self._e.problemas1, self._e.archivo1 = objetivos, problemas, nombre
+            self.filas_elegidas = {}  # otro archivo: las elecciones del anterior no aplican
             return Ajuste("cargar_input1", nombre, autor, cuando)
         self._aplicar(cambio)
 
@@ -211,6 +214,33 @@ class Sesion:
             return Ajuste("desfijar", f"{sku} × {canal} en {'kilos' if unidad == 'kilos' else 'pesos'}", autor, cuando, motivo)
         self._aplicar(cambio)
 
+    def elegir_fila(self, sku: str, fila: int, autor: str, cuando: datetime, motivo: str) -> None:
+        """Un SKU repetido en el objetivo de Contraloría: cuál de sus filas vale."""
+        motivo = _motivo(motivo)
+        o = (self._e.objetivos or {}).get(sku)
+        if o is None or not o.alternativas:
+            raise ErrorDeAjuste(f"El SKU {sku} no está repetido en el objetivo de Contraloría.")
+        filas = [x.fila for x in [o, *o.alternativas]]
+        if fila not in filas:
+            raise ErrorDeAjuste(f"El SKU {sku} está en las filas {', '.join(map(str, filas))}, no en la {fila}.")
+
+        def cambio():
+            ajuste = Ajuste("elegir_fila", f"{sku}: vale la fila {fila} del objetivo de Contraloría", autor, cuando,
+                            motivo)
+            self.filas_elegidas[sku] = (fila, ajuste)
+            return ajuste
+        self._aplicar(cambio)
+
+    def objetivos_vigentes(self) -> dict | None:
+        """El objetivo de cada SKU con las filas elegidas donde estaba repetido."""
+        if self._e.objetivos is None:
+            return None
+        vigentes = {}
+        for sku, o in self._e.objetivos.items():
+            fila = self.filas_elegidas.get(sku, (o.fila, None))[0]
+            vigentes[sku] = next(x for x in [o, *o.alternativas] if x.fila == fila)
+        return vigentes
+
     # --- reglas -------------------------------------------------------------
 
     def agregar_regla(self, canal: str, categorias, limite: str, kilos: str | None, nns: str | None,
@@ -269,13 +299,13 @@ class Sesion:
         """
         respaldo = (copy.copy(self._e), dict(self.apagados_skus), dict(self.entidades_apagadas),
                     {u: dict(f) for u, f in self._fijas.items()}, dict(self.reglas), self._proxima_regla,
-                    self.recorrido)
+                    dict(self.filas_elegidas), self.recorrido)
         try:
             ajuste = cambio()
             self.recorrido = self._recalcular()
         except Exception:
             (self._e, self.apagados_skus, self.entidades_apagadas, self._fijas, self.reglas,
-             self._proxima_regla, self.recorrido) = respaldo
+             self._proxima_regla, self.filas_elegidas, self.recorrido) = respaldo
             raise
         self.historial.append(ajuste)
 
@@ -284,10 +314,10 @@ class Sesion:
         Las celdas fijadas que aplican con las entradas y el ON/OFF actuales. Las de un
         SKU apagado o que ya no está quedan en espera: vuelven si el SKU se prende.
         """
-        e = self._e
+        e, objetivos = self._e, self.objetivos_vigentes()
         return {
             (sku, canal): f.valor for (sku, canal), f in self._fijas[unidad].items()
-            if sku in e.objetivos and sku not in self.apagados_skus and e.objetivos[sku].kilos > 0
+            if sku in objetivos and sku not in self.apagados_skus and objetivos[sku].kilos > 0
             and canal in e.canales and (sku, canal) in e.base
         }
 
@@ -295,14 +325,17 @@ class Sesion:
         if self.faltan():
             return None
         try:
+            # Un repetido ya resuelto no se vuelve a informar: la decisión quedó en el historial.
+            problemas1 = [p for p in self._e.problemas1
+                          if not (p.tipo == "sku_repetido" and p.sku in self.filas_elegidas)]
             return armar(
-                self._e.objetivos,
+                self.objetivos_vigentes(),
                 self._e.canales,
                 self._e.base,
                 apagados=set(self.apagados_skus),
                 fijas_kilos=self._fijas_vigentes("kilos"),
                 fijas_plata=self._fijas_vigentes("plata"),
-                problemas=self._e.problemas1 + self._e.problemas2 + self._e.problemas_base,
+                problemas=problemas1 + self._e.problemas2 + self._e.problemas_base,
                 apertura=self._e.apertura,
                 entidades_apagadas=set(self.entidades_apagadas),
                 reglas=[r.regla for r in self.reglas.values()],

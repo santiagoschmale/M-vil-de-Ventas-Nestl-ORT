@@ -442,3 +442,22 @@ def test_cada_monto_sale_con_exactamente_los_decimales_de_su_unidad():
     # También las diferencias que se informan.
     r = cruzar(filas={"A": D("100")}, columnas={"X": D("90")}, base={("A", "X"): D(1)}, decimales=2)
     assert str(r.inconsistencias[0].diferencia) == "10.00"
+
+
+def test_si_la_diferencia_de_totales_es_el_sku_sin_historia_el_mensaje_lo_dice():
+    """
+    El planner descontó el SKU nuevo de los totales por canal pero no lo apagó: la
+    diferencia es exactamente su objetivo. El mensaje apunta a la causa, no a "corregí uno".
+    """
+    r = cruzar(filas={"A": D("100"), "NUEVO": D("10")}, columnas={"X": D("100")},
+               base={("A", "X"): D(1)}, decimales=3)
+    totales = next(i for i in r.inconsistencias if i.tipo == "totales_distintos")
+    assert "NUEVO" in totales.mensaje and "apag" in totales.mensaje.lower()
+    nuevo = next(i for i in r.inconsistencias if i.tipo == "sku_sin_canal")
+    assert "10,000" in nuevo.mensaje  # cuánto hay que descontar
+
+
+def test_si_la_diferencia_no_es_el_sku_sin_historia_se_pide_corregir_los_totales():
+    r = cruzar(filas={"A": D("100")}, columnas={"X": D("90")}, base={("A", "X"): D(1)}, decimales=3)
+    (totales,) = r.inconsistencias
+    assert "Corregí uno de los dos" in totales.mensaje

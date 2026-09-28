@@ -159,3 +159,30 @@ def test_un_input_1_nuevo_sin_un_sku_fijado_no_rompe_la_sesion():
     datos.seek(0)
     s.cargar_input1(datos, "otro.xlsx", P, CUANDO)
     assert s.recorrido is not None  # no cierra (otros totales), pero no explota
+
+
+def test_elegir_cual_fila_repetida_vale_se_hace_en_la_plataforma():
+    s = _sesion("input2_sin_sku_nuevo.tsv")
+    s.cambiar_sku(NUEVO, activo=False, autor=P, cuando=CUANDO, motivo="nuevo")
+    assert any(p.tipo == "sku_repetido" for p in s.recorrido.problemas)
+
+    s.elegir_fila("90020001", 51, autor=P, cuando=CUANDO, motivo="la fila 4 era de otro producto")
+    assert s.recorrido.objetivos["90020001"].kilos == D("1.000")
+    assert not any(p.tipo == "sku_repetido" for p in s.recorrido.problemas)  # resuelto: va al historial
+    assert s.historial[-1].accion == "elegir_fila" and "51" in s.historial[-1].detalle
+    # El objetivo cambió 7.960,420 kg: los totales por canal ya no coinciden, y se informa.
+    assert [i.tipo for i in s.recorrido.kilos.inconsistencias] == ["totales_distintos"]
+
+
+def test_elegir_fila_rechaza_lo_que_no_es_una_opcion():
+    s = _sesion()
+    assert _falla(s.elegir_fila, "90020001", 7, autor=P, cuando=CUANDO, motivo="x")  # no es una de sus filas
+    assert _falla(s.elegir_fila, "90020002", 5, autor=P, cuando=CUANDO, motivo="x")  # no está repetido
+    assert _falla(s.elegir_fila, "90020001", 51, autor=P, cuando=CUANDO, motivo=" ")  # sin motivo
+
+
+def test_un_objetivo_nuevo_empieza_sin_elecciones():
+    s = _sesion()
+    s.elegir_fila("90020001", 51, autor=P, cuando=CUANDO, motivo="x")
+    s.cargar_input1(MUESTRA / "input1_objetivo.xlsx", "otra vez.xlsx", P, CUANDO)
+    assert s.recorrido.objetivos["90020001"].fila == 4

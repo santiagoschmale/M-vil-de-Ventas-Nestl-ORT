@@ -74,6 +74,11 @@ class MotivoIn(BaseModel):
     motivo: str
 
 
+class FilaIn(BaseModel):
+    fila: int = Field(description="Fila del Excel del objetivo de Contraloría que vale")
+    motivo: str
+
+
 class ReglaIn(BaseModel):
     canal: str
     categorias: list[str]
@@ -118,8 +123,9 @@ def _cierra(c: ResultadoCruce | None) -> bool:
 def _estado(s: Sesion) -> dict:
     e, r = s.entradas, s.recorrido
     input1 = input2 = base = None
-    if e.objetivos is not None:
-        activos = [o for k, o in e.objetivos.items() if k not in s.apagados_skus]
+    vigentes = s.objetivos_vigentes()
+    if vigentes is not None:
+        activos = [o for k, o in vigentes.items() if k not in s.apagados_skus]
         input1 = {"archivo": e.archivo1, "skus": len(e.objetivos),
                   "kilos": _texto(_suma(o.kilos for o in activos), "kilos"),
                   "nns": _texto(_suma(o.nns or 0 for o in activos), "plata")}
@@ -139,7 +145,7 @@ def _estado(s: Sesion) -> dict:
         "inconsistencias": {u: [_inconsistencia(i) for i in (c.inconsistencias if c else [])]
                             for u, c in cruces.items()},
         "avisos": {u: list(c.avisos) if c else [] for u, c in cruces.items()},
-        "problemas": [{"severidad": p.severidad, "mensaje": p.mensaje, "sku": p.sku, "bloque": p.bloque}
+        "problemas": [{"severidad": p.severidad, "mensaje": p.mensaje, "sku": p.sku, "bloque": p.bloque, "tipo": p.tipo}
                       for p in (r.problemas if r else e.problemas1 + e.problemas2 + e.problemas_base)],
         "apagados": {
             "skus": [{"codigo": k, **_ajuste(a)} for k, a in sorted(s.apagados_skus.items())],
@@ -148,6 +154,13 @@ def _estado(s: Sesion) -> dict:
         "fijas": {u: [{"sku": k[0], "canal": k[1], "valor": _texto(f.valor, u), **_ajuste(f.ajuste)}
                       for k, f in sorted(s.fijas(u).items())] for u in DECIMALES},
         "reglas": [_regla(i, r) for i, r in sorted(s.reglas.items(), key=lambda x: int(x[0][1:]))],
+        # SKUs repetidos en el objetivo de Contraloría: cada fila, y cuál vale hoy.
+        "repetidos": [
+            {"sku": k, "elegida": vigentes[k].fila,
+             "filas": [{"fila": x.fila, "descripcion": x.descripcion, "kilos": _texto(x.kilos, "kilos"),
+                        "nns": _texto(x.nns, "plata")} for x in [o, *o.alternativas]]}
+            for k, o in (e.objetivos or {}).items() if o.alternativas
+        ],
         # Para el formulario de reglas: canales del input 2 y categorías del input 1.
         "opciones": {
             "canales": list(e.canales or {}),
@@ -290,6 +303,12 @@ def exportar_excel(s: Sesion = Depends(sesion)):
 @router.put("/skus/{sku}", summary="Prender o apagar un SKU (ON/OFF)")
 def cambiar_sku(sku: str, cuerpo: ActivoIn, s: Sesion = Depends(sesion), quien: str = Depends(autor)):
     _aplicar(s.cambiar_sku, sku, activo=cuerpo.activo, autor=quien, cuando=_ahora(), motivo=cuerpo.motivo)
+    return _estado(s)
+
+
+@router.put("/skus/{sku}/fila", summary="Elegir cuál fila vale de un SKU repetido en el objetivo de Contraloría")
+def elegir_fila(sku: str, cuerpo: FilaIn, s: Sesion = Depends(sesion), quien: str = Depends(autor)):
+    _aplicar(s.elegir_fila, sku, cuerpo.fila, autor=quien, cuando=_ahora(), motivo=cuerpo.motivo)
     return _estado(s)
 
 

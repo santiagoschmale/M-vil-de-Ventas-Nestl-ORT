@@ -159,11 +159,19 @@ def cruzar(
     total_filas, total_columnas = sum(r.values()), sum(c.values())
     if total_filas != total_columnas:
         dif = _a_decimal(abs(total_filas - total_columnas), decimales)
+        # SKUs con objetivo que el mes anterior no se vendieron en ningún canal (el caso del SKU nuevo).
+        sin_historia = [x for x, v in r.items() if v > 0 and not any(k[0] == x and w > 0 for k, w in semillas.items())]
+        if sin_historia and total_filas - total_columnas == sum(r[x] for x in sin_historia):
+            # El planner ya lo descontó de los totales por canal pero no lo apagó.
+            quien = f"el SKU {sin_historia[0]}" if len(sin_historia) == 1 else f"los SKUs {_lista(sin_historia)}"
+            causa = (f"La diferencia es el objetivo de {quien}, que no tiene historia: apagalo (el interruptor de "
+                     f"su fila en la tabla) y los totales coinciden.")
+        else:
+            causa = "Corregí uno de los dos para que coincidan."
         inconsistencias.append(Inconsistencia(
             "totales_distintos",
             f"El objetivo de Contraloría suma {a_texto(_a_decimal(total_filas, decimales))} y los totales por canal "
-            f"suman {a_texto(_a_decimal(total_columnas, decimales))}: difieren en {a_texto(dif)}. "
-            f"Corregí uno de los dos para que coincidan.",
+            f"suman {a_texto(_a_decimal(total_columnas, decimales))}: difieren en {a_texto(dif)}. {causa}",
             diferencia=dif,
         ))
 
@@ -200,8 +208,10 @@ def cruzar(
                     f"faltan {a_texto(_a_decimal(falta, decimales))}.")
         if que == "SKU":
             # Caso A4 (SKU sin reparto previo): la regla está pendiente con el cliente.
-            return (f"El SKU {nombre} tiene objetivo pero el mes anterior no se vendió en ningún canal: "
-                    f"no hay base para repartirlo. Apagalo para seguir y descontá su parte de los totales por canal.")
+            return (f"El SKU {nombre} tiene objetivo ({a_texto(_a_decimal(falta, decimales))}) pero el mes anterior no "
+                    f"se vendió en ningún canal: no hay de dónde copiar el reparto. Apagalo con el interruptor de su "
+                    f"fila en la tabla y, si lo contaste en los totales por canal, descontá ahí esos "
+                    f"{a_texto(_a_decimal(falta, decimales))}.")
         return (f"El canal {nombre} tiene total pero el mes anterior no vendió ningún SKU: "
                 f"no hay base para repartirlo. Revisá su total en los totales por canal.")
 

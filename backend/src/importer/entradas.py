@@ -26,7 +26,7 @@ import io
 import json
 import re
 import unicodedata
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from decimal import ROUND_HALF_EVEN, Decimal
 from pathlib import Path
 
@@ -51,6 +51,9 @@ class ObjetivoSku:
     descripcion: str
     categoria: str | None
     pais: str | None
+    fila: int | None = None  # fila del Excel
+    # Si el SKU está repetido: las otras filas, para que el planner elija cuál vale.
+    alternativas: list[ObjetivoSku] = field(default_factory=list)
 
 
 @dataclass
@@ -187,14 +190,15 @@ def leer_input1(origen) -> tuple[dict[str, ObjetivoSku], list[Problema]]:
         return fila[i] if i is not None and i < len(fila) else None
 
     objetivos: dict[str, ObjetivoSku] = {}
-    for fila in filas[n + 1:]:
+    todos = problemas
+    for numero_fila, fila in enumerate(filas[n + 1:], start=n + 2):
         codigo = _codigo(campo(fila, "sku"))
         if codigo is None:
             continue
-        if codigo in objetivos:
-            problemas.append(Problema("error", "SKU repetido en el objetivo de Contraloría: se usa la primera fila.",
-                                      sku=codigo, bloque="input1"))
-            continue
+        repetida = codigo in objetivos
+        # ponytail: los problemas de una fila repetida no se informan (nadie la eligió);
+        # si se la elige, sus datos entran igual. Guardarlos si hace falta avisarlos después.
+        problemas = [] if repetida else todos
         montos = {}
         for nombre, decimales, etiqueta in (("kilos", KILOS, "Kilos"), ("nns", PLATA, "NNS")):
             if nombre not in cols:
@@ -223,14 +227,29 @@ def leer_input1(origen) -> tuple[dict[str, ObjetivoSku], list[Problema]]:
             problemas.append(Problema("error", f"SKU con NNS ({a_texto(montos['nns'])}) pero kilos en cero: los kilos son "
                                                f"esenciales, no se reparte ni en kilos ni en pesos.",
                                       sku=codigo, bloque="input1"))
-        objetivos[codigo] = ObjetivoSku(
+        objetivo = ObjetivoSku(
             kilos=montos["kilos"],
             nns=montos["nns"],
             descripcion=str(campo(fila, "descripcion") or ""),
             categoria=campo(fila, "categoria"),
             pais=pais,
+            fila=numero_fila,
         )
-    return objetivos, problemas
+        if repetida:
+            objetivos[codigo].alternativas.append(objetivo)
+        else:
+            objetivos[codigo] = objetivo
+    for codigo, o in objetivos.items():
+        if o.alternativas:
+            filas_txt = _y([str(x.fila) for x in [o, *o.alternativas]])
+            todos.append(Problema("error", f"Está repetido en el objetivo de Contraloría (filas {filas_txt}): se "
+                                           f"usa la fila {o.fila} hasta que elijas cuál vale.",
+                                  sku=codigo, bloque="input1", tipo="sku_repetido"))
+    return objetivos, todos
+
+
+def _y(partes: list[str]) -> str:
+    return partes[0] if len(partes) == 1 else f"{', '.join(partes[:-1])} y {partes[-1]}"
 
 
 # ---------------------------------------------------------------------------
