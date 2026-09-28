@@ -12,6 +12,10 @@ const respuesta = (e: unknown) =>
 export const mensajeDeError = (e: unknown): string => {
   const r = respuesta(e);
   if (!r) return 'No se pudo conectar con el servidor. Revisá la conexión y probá de nuevo.';
+  // Una página HTML en vez de JSON: no contestó el backend del móvil (pasa si otro programa usa su puerto).
+  if (typeof r.data === 'string' && r.data.trimStart().startsWith('<')) {
+    return 'Contestó otra aplicación en lugar del backend del móvil. Revisá que nada más esté usando el puerto 3000.';
+  }
   const detalle = r.data?.detail;
   if (typeof detalle === 'string') return detalle;
   if ((r.status ?? 0) >= 500) {

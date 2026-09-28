@@ -246,6 +246,11 @@ describe('mensajeDeError', () => {
   it('un 500 dice que no se aplicó', () => {
     expect(mensajeDeError({ response: { status: 500, data: 'Internal server error' } })).toMatch(/no se aplicó/);
   });
+  it('si contesta otra aplicación (una página HTML), dice que revise el puerto', () => {
+    const m = mensajeDeError({ response: { status: 404, data: '<!DOCTYPE html><html>…</html>' } });
+    expect(m).toMatch(/otra aplicación/);
+    expect(m).toMatch(/3000/);
+  });
   it('una validación de formato (lista de pydantic) no muestra inglés técnico', () => {
     const m = mensajeDeError({ response: { status: 422, data: { detail: [{ msg: 'Input should be a valid string' }] } } });
     expect(m).not.toMatch(/Input should/);
