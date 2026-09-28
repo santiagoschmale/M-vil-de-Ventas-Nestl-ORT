@@ -141,6 +141,10 @@ export const useMovil = create<TUseMovil>((set, get) => {
       cambiar(() => api.delete(`/movil/reglas/${ruta(id)}`, { data: { motivo } }),
         enDialogo(e => `Regla ${id} eliminada.${resumenCierre(e)}`)),
 
+    elegirFila: (sku, fila, motivo) =>
+      cambiar(() => api.put(`/movil/skus/${ruta(sku)}/fila`, { fila, motivo }),
+        enDialogo(e => `SKU ${sku}: vale la fila ${fila}.${resumenCierre(e)}`)),
+
     apertura: async (sku, canal) => {
       try {
         return (await api.get<Apertura>(`/movil/apertura/${ruta(sku, canal)}`)).data;

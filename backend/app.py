@@ -45,5 +45,7 @@ if __name__ == "__main__":
     uvicorn.run(
         "app:app",
         host="0.0.0.0",
-        port=3000
+        port=3000,
+        # En local se reinicia solo al cambiar el código (la sesión en memoria se pierde con cada reinicio).
+        reload=environ.get("IS_LOCAL", "true").lower() == "true",
     )

@@ -49,6 +49,7 @@ export const estadoFactory = Factory.define<Estado>(() => ({
   apagados: { skus: [], entidades: [] },
   fijas: vacio(),
   reglas: [],
+  repetidos: [],
   opciones: { canales: ['Catering', 'Directa (BA)'], categorias: ['Café', 'Chocolatería', 'Lácteos'] },
   historial: [],
 }));

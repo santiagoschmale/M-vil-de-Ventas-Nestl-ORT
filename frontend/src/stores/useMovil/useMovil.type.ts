@@ -39,6 +39,14 @@ export type Problema = {
   mensaje: string;
   sku: string | null;
   bloque: string | null;
+  tipo?: string | null; // p. ej. 'sku_repetido': la pantalla ofrece resolverlo
+};
+
+/** Un SKU repetido en el objetivo de Contraloría: sus filas del Excel y cuál vale. */
+export type Repetido = {
+  sku: string;
+  elegida: number;
+  filas: { fila: number; descripcion: string; kilos: Monto; nns: Monto | null }[];
 };
 
 export type Estado = {
@@ -64,6 +72,7 @@ export type Estado = {
   };
   fijas: Record<Unidad, (Ajuste & { sku: string; canal: string; valor: Monto })[]>;
   reglas: Regla[];
+  repetidos: Repetido[];
   opciones: { canales: string[]; categorias: string[] };
   historial: Ajuste[];
 };
@@ -122,4 +131,5 @@ export type TUseMovil = {
   agregarRegla: (datos: DatosRegla, motivo: string) => Resultado;
   editarRegla: (id: string, datos: DatosRegla, motivo: string) => Resultado;
   eliminarRegla: (id: string, motivo: string) => Resultado;
+  elegirFila: (sku: string, fila: number, motivo: string) => Resultado;
 };

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   Accordion, AccordionDetails, AccordionSummary, Alert, Box, Button, Chip, Dialog, DialogActions, DialogContent,
-  DialogTitle, LinearProgress, Link, List, ListItem, ListItemText, Paper, Table, TableBody, TableCell, TableHead,
+  DialogTitle, FormControlLabel, LinearProgress, Link, List, ListItem, ListItemText, Paper, Radio, RadioGroup, Table, TableBody, TableCell, TableHead,
   TableRow, TextField, ToggleButton, ToggleButtonGroup, Tooltip, Typography,
 } from '@mui/material';
 import ExpandMoreRoundedIcon from '@mui/icons-material/ExpandMoreRounded';
@@ -14,7 +14,7 @@ import { conUnidad, formatear, UNIDADES } from './formato';
 import { AVENA, CIERRA, NO_CIERRA, numeros } from './estilo';
 import { Ayuda } from './Ayuda';
 import { AYUDA } from './ayudas';
-import { Foco } from '../../../stores/useMovil/useMovil.type';
+import { Foco, Repetido } from '../../../stores/useMovil/useMovil.type';
 import { Matriz } from './Matriz';
 import { Reglas } from './Reglas';
 
@@ -188,11 +188,65 @@ const Ir = ({ destinos }: { destinos: [Foco['tipo'], string][] }) => {
   );
 };
 
+/** Un SKU repetido en el objetivo de Contraloría: el planner elige cuál fila vale, sin tocar el Excel. */
+const FilaDialog = ({ repetido, onCerrar }: { repetido: Repetido; onCerrar: () => void }) => {
+  const { elegirFila, ocupado } = useMovil();
+  const [fila, setFila] = useState(repetido.elegida);
+  const [motivo, setMotivo] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const enviar = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const falla = await elegirFila(repetido.sku, fila, motivo.trim());
+    if (falla) setError(falla);
+    else onCerrar();
+  };
+  return (
+    <Dialog open onClose={onCerrar} maxWidth="sm" fullWidth PaperProps={{ component: 'form', onSubmit: enviar }}>
+      <DialogTitle>SKU {repetido.sku}: ¿cuál fila vale?</DialogTitle>
+      <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <Typography variant="body2" color="text.secondary">
+          El código aparece {repetido.filas.length} veces en el Excel del objetivo de Contraloría. Elegí la fila
+          correcta; las demás no se usan.
+        </Typography>
+        <RadioGroup value={String(fila)} onChange={e => setFila(Number(e.target.value))}>
+          {repetido.filas.map(f => (
+            <FormControlLabel key={f.fila} value={String(f.fila)} control={<Radio size="small" />}
+              label={`Fila ${f.fila} · ${f.descripcion} · ${conUnidad(f.kilos, 'kilos')} · ${conUnidad(f.nns, 'plata')}`} />
+          ))}
+        </RadioGroup>
+        <TextField label="Motivo" required value={motivo} onChange={e => setMotivo(e.target.value)}
+          helperText="Queda en el historial, con tu nombre y la hora." />
+        {error && <Alert severity="error">{error}</Alert>}
+      </DialogContent>
+      <DialogActions sx={{ px: 3, pb: 2 }}>
+        <Button onClick={onCerrar}>Cancelar</Button>
+        <Button type="submit" variant="contained" disabled={!motivo.trim() || ocupado}>Usar esta fila</Button>
+      </DialogActions>
+    </Dialog>
+  );
+};
+
 const Pendientes = ({ estado, unidad, enMatriz }: { estado: Estado; unidad: Unidad; enMatriz: Set<string> }) => {
   // Solo a los SKUs que tienen fila en la matriz; si son muchos, el mensaje ya los nombra.
   const skus = (xs: (string | null)[]) => {
     const hay = xs.filter((x): x is string => !!x && enMatriz.has(x));
     return hay.length <= 3 ? hay.map((x): [Foco['tipo'], string] => ['sku', x]) : [];
+  };
+  const [eligiendo, setEligiendo] = useState<Repetido>();
+  const repetido = (sku: string | null) => estado.repetidos.find(r => r.sku === sku);
+  const acciones = (p: Estado['problemas'][number]) => {
+    const r = p.tipo === 'sku_repetido' ? repetido(p.sku) : undefined;
+    return (
+      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+        {r && (
+          <Button size="small" color="inherit" sx={{ whiteSpace: 'nowrap' }} onClick={() => setEligiendo(r)}
+            aria-label={`Elegir fila de SKU ${r.sku}`}>
+            Elegir fila
+          </Button>
+        )}
+        <Ir destinos={skus([p.sku])} />
+      </Box>
+    );
   };
   const inconsistencias = estado.inconsistencias[unidad];
   const errores = estado.problemas.filter(p => p.severidad === 'error');
@@ -208,13 +262,10 @@ const Pendientes = ({ estado, unidad, enMatriz }: { estado: Estado; unidad: Unid
           {i.mensaje}
         </Alert>
       ))}
-      {errores.map((p, n) => (
-        <Alert key={`e${n}`} severity="error" action={<Ir destinos={skus([p.sku])} />}>{conSku(p)}</Alert>
-      ))}
+      {errores.map((p, n) => <Alert key={`e${n}`} severity="error" action={acciones(p)}>{conSku(p)}</Alert>)}
       {estado.avisos[unidad].map((a, n) => <Alert key={`a${n}`} severity="info">{a}</Alert>)}
-      {avisos.map((p, n) => (
-        <Alert key={`p${n}`} severity="warning" action={<Ir destinos={skus([p.sku])} />}>{conSku(p)}</Alert>
-      ))}
+      {avisos.map((p, n) => <Alert key={`p${n}`} severity="warning" action={acciones(p)}>{conSku(p)}</Alert>)}
+      {eligiendo && <FilaDialog repetido={eligiendo} onCerrar={() => setEligiendo(undefined)} />}
     </Box>
   );
 };

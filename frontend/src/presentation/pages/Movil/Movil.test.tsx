@@ -29,6 +29,7 @@ beforeEach(() => {
     http.put('*/api/movil/skus/*', anotar),
     http.put('*/api/movil/celdas/*', anotar),
     http.put('*/api/movil/input2', anotar),
+    http.put('*/api/movil/skus/*/fila', anotar),
   );
 });
 
@@ -200,6 +201,31 @@ describe('MovilPage', { timeout: 15000 }, () => {
   it('la tabla dice en qué unidad están los números', async () => {
     render(<MovilPage />);
     expect(await screen.findByRole('columnheader', { name: 'Objetivo (kg)' })).toBeInTheDocument();
+  });
+
+  it('un SKU repetido se resuelve en la plataforma eligiendo cuál fila vale', async () => {
+    server.use(http.get('*/api/movil', () => HttpResponse.json(estado({
+      problemas: [{ severidad: 'error', mensaje: 'Está repetido (filas 4 y 51).', sku: '100', bloque: 'input1',
+                    tipo: 'sku_repetido' }],
+      repetidos: [{ sku: '100', elegida: 4, filas: [
+        { fila: 4, descripcion: 'Café 1 kg', kilos: '1500.000', nns: '90.00' },
+        { fila: 51, descripcion: 'Café 1 kg (repetido)', kilos: '1.000', nns: '1.00' },
+      ] }],
+    }))));
+    const user = userEvent.setup({ delay: null });
+    render(<MovilPage />);
+    await user.click(await screen.findByRole('button', { name: /^Para revisar/ }));
+    await user.click(screen.getByRole('button', { name: 'Elegir fila de SKU 100' }));
+    const dialogo = screen.getByRole('dialog');
+    expect(within(dialogo).getByRole('radio', { name: /Fila 4/ })).toBeChecked();
+    await user.click(within(dialogo).getByRole('radio', { name: /Fila 51/ }));
+    await user.type(within(dialogo).getByRole('textbox', { name: /Motivo/ }), 'la fila 4 era de otro producto');
+    await user.click(within(dialogo).getByRole('button', { name: 'Usar esta fila' }));
+
+    await waitFor(() => expect(pedidos).toHaveLength(1));
+    expect(pedidos[0]).toEqual({
+      metodo: 'PUT', url: '/api/movil/skus/100/fila', cuerpo: { fila: 51, motivo: 'la fila 4 era de otro producto' },
+    });
   });
 
   it('exportar se habilita solo cuando kilos y pesos cierran', async () => {
