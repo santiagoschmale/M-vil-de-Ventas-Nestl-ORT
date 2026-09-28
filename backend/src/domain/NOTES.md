@@ -29,12 +29,19 @@ transacción: si el recálculo falla, vuelve al estado anterior.
 
 ## Correrlo
 
-```
-cd backend
-python3.13 -m venv .venv && PATH="$PWD/.venv/bin:$PATH" make deps-local
-PATH="$PWD/.venv/bin:$PATH" make test
+Desde la raíz del repo (`make` solo muestra la ayuda):
 
-.venv/bin/python -m src.movil.recorrido \
+```
+make instalar   # una vez: entorno de Python y dependencias del front
+make dev        # API en :3000 y pantalla en http://localhost:5175
+make test       # tests del backend y del front
+```
+
+`make api` y `make web` levantan cada parte por separado. Sin pantalla, el recorrido
+entero también corre por línea de comandos:
+
+```
+cd backend && .venv/bin/python -m src.movil.recorrido \
     --input1 ../data/sample/input1_objetivo.xlsx \
     --input2 ../data/sample/input2_canales.tsv \
     --base ../data/sample/base_mes_anterior.xlsx \
@@ -52,20 +59,11 @@ un móvil que cierra, apagar ese SKU y usar el input 2 sin él:
     --apagar 90020900 --salida movil.xlsx
 ```
 
-### La aplicación (API + pantalla)
-
-```
-cd backend && .venv/bin/python app.py                  # API en :3000
-cd frontend && npm ci && npx vite --port 5175          # pantalla en :5175, /api va a :3000
-```
+### La pantalla
 
 En la pantalla, "Cargar datos de muestra" carga las tres entradas. La sesión vive en
 memoria: reiniciar el backend la pierde. Desde Claude Code: `template-api` y
 `template-web` en `.claude/launch.json` del workspace.
-
-```
-cd frontend && npx vitest --watch=false                # tests del front
-```
 
 Los datos de prueba se regeneran con `data/sample/generar_muestra.py`: semilla,
 fechas y horas internas del zip fijas, así que regenerar da los mismos bytes.

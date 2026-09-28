@@ -44,7 +44,8 @@ npm run dev
 
 The Vite dev server runs with MSW intercepting `/api/*` calls, so no backend is required to iterate on UI.
 
-> **Móvil de ventas:** `/api/movil` no tiene mock; necesita el backend en `:3000`
+> **Móvil de ventas:** en la raíz, `make instalar` y después `make dev` (API + pantalla en
+> http://localhost:5175). `/api/movil` no tiene mock; necesita el backend en `:3000`
 > (vite lo reenvía). Sin acceso a los feeds privados, `make deps-local` en el
 > backend usa los reemplazos de `local_shims/`. Cómo levantar todo y los gotchas:
 > [`backend/src/domain/NOTES.md`](backend/src/domain/NOTES.md).
