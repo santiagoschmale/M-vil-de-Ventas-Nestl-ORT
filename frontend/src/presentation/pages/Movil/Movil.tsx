@@ -284,7 +284,8 @@ const Pendientes = ({ estado, unidad, enMatriz }: { estado: Estado; unidad: Unid
           {i.mensaje}
         </Alert>
       ))}
-      {errores.map((p, n) => <Alert key={`e${n}`} severity="error" action={acciones(p)}>{conSku(p)}</Alert>)}
+      {/* Rojo solo lo que no cierra; lo del archivo o la apertura no bloquea: amarillo, lo más grave primero. */}
+      {errores.map((p, n) => <Alert key={`e${n}`} severity="warning" action={acciones(p)}>{conSku(p)}</Alert>)}
       {estado.avisos[unidad].map((a, n) => <Alert key={`a${n}`} severity="info">{a}</Alert>)}
       {avisos.map((p, n) => <Alert key={`p${n}`} severity="warning" action={acciones(p)}>{conSku(p)}</Alert>)}
       {eligiendo && <FilaDialog repetido={eligiendo} onCerrar={() => setEligiendo(undefined)} />}
@@ -330,6 +331,7 @@ const Seccion = ({ titulo, resumen, abierta = false, pedido, ayuda, children }: 
 
 export const MovilPage = () => {
   const { estado, cruce, unidad, refrescar, elegirUnidad, ocupado, errorDeCarga, foco } = useMovil();
+  const [confirmarExportar, setConfirmarExportar] = useState(false);
   useEffect(() => { refrescar(); }, []);
   // Llevar a la fila que se fue a ver, cuando la sección terminó de abrirse.
   useEffect(() => {
@@ -353,12 +355,10 @@ export const MovilPage = () => {
   }
 
   const bloquean = estado.inconsistencias[unidad].length;
-  const errores = estado.problemas.filter(p => p.severidad === 'error').length;
-  const avisos = estado.problemas.length - errores + estado.avisos[unidad].length;
+  const paraRevisar = estado.problemas.length + estado.avisos[unidad].length;
   const resumen = [
     bloquean && `${UNIDADES[unidad].nombre} no cierra`,
-    errores && `${errores} ${errores === 1 ? 'error' : 'errores'} en los datos`,
-    avisos && `${avisos} ${avisos === 1 ? 'aviso' : 'avisos'}`,
+    paraRevisar && `${paraRevisar} para revisar`,
   ].filter(Boolean).join(' · ') || 'Nada';
   const cierraTodo = estado.cierra.kilos && estado.cierra.plata;
   const chocan = new Set([...estado.inconsistencias.kilos, ...estado.inconsistencias.plata].flatMap(i => i.reglas)).size;
@@ -393,12 +393,41 @@ export const MovilPage = () => {
           </ToggleButtonGroup>
           <Tooltip title={cierraTodo ? 'Descarga el Excel con kilos, pesos, apertura y problemas' : 'Se puede exportar cuando kilos y pesos cierran'}>
             <span>
-              <Button variant="contained" startIcon={<FileDownloadRoundedIcon />} href="/api/movil/exportar" disabled={!cierraTodo}>
-                Exportar
-              </Button>
+              {estado.problemas.length ? (
+                // Cierra, pero hay algo sin resolver: se exporta igual solo si una persona lo decide.
+                <Button variant="contained" startIcon={<FileDownloadRoundedIcon />} disabled={!cierraTodo}
+                  onClick={() => setConfirmarExportar(true)}>
+                  Exportar
+                </Button>
+              ) : (
+                <Button variant="contained" startIcon={<FileDownloadRoundedIcon />} href="/api/movil/exportar" disabled={!cierraTodo}>
+                  Exportar
+                </Button>
+              )}
             </span>
           </Tooltip>
         </Box>
+        {confirmarExportar && (
+          <Dialog open onClose={() => setConfirmarExportar(false)} maxWidth="sm" fullWidth>
+            <DialogTitle>Exportar con {estado.problemas.length} {estado.problemas.length === 1 ? 'cosa' : 'cosas'} para revisar</DialogTitle>
+            <DialogContent>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                Kilos y pesos cierran, pero esto sigue sin resolver. En el Excel queda en la hoja Problemas.
+              </Typography>
+              <List dense>
+                {estado.problemas.map((p, n) => (
+                  <ListItem key={n} disableGutters><ListItemText primary={conSku(p)} /></ListItem>
+                ))}
+              </List>
+            </DialogContent>
+            <DialogActions sx={{ px: 3, pb: 2 }}>
+              <Button onClick={() => setConfirmarExportar(false)}>Cancelar</Button>
+              <Button variant="contained" href="/api/movil/exportar" onClick={() => setConfirmarExportar(false)}>
+                Exportar igual
+              </Button>
+            </DialogActions>
+          </Dialog>
+        )}
 
         <Seccion
           titulo="Entradas" abierta={estado.faltan.length > 0} ayuda={AYUDA.entradas}

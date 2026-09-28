@@ -81,13 +81,14 @@ export const AYUDA = {
       <>
         <P>
           <b>En rojo</b>, lo que impide cerrar: un SKU sin historia, totales que no coinciden, reglas que chocan.
-          Hasta resolverlo no hay reparto.
+          Mientras haya algo en rojo no hay reparto y no se puede exportar.
         </P>
         <P>
-          <b>En amarillo</b>, avisos del archivo que no bloquean: un SKU repetido, un producto de otro país, un
-          objetivo en cero. No se corrigen solos: se informan para que decidas.
+          <b>En amarillo</b>, lo que no bloquea pero conviene mirar: kilos que no se pueden abrir entre vendedores, un
+          SKU repetido en el Excel, un producto de otro país. Se puede exportar igual: el sistema te los muestra antes
+          y quedan en la hoja Problemas del Excel.
         </P>
-        <P>El botón Ver te lleva a la regla o a la fila del SKU.</P>
+        <P>Los botones de cada aviso te llevan a donde se resuelve.</P>
       </>
     ),
   },

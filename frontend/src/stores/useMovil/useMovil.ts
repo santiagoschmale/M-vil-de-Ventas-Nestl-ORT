@@ -1,7 +1,6 @@
 import { create } from 'zustand';
 import { api } from '../../infra/http';
 import { useSnackbarProps } from '../useSnackbarProps';
-import { conUnidad } from '../../presentation/pages/Movil/formato';
 import { Apertura, Cruce, Estado, TUseMovil } from './useMovil.type';
 
 // Los errores del cliente HTTP traen la respuesta del backend: { detail: "..." }.
@@ -24,24 +23,20 @@ export const mensajeDeError = (e: unknown): string => {
   return 'El pedido tenía un formato que el servidor no reconoce y no se aplicó. Avisá al equipo.';
 };
 
-const avisar = (message: string, severity: 'success' | 'error') =>
+const avisar = (message: string, severity: 'info' | 'error') =>
   useSnackbarProps.getState().setSnackbarProps({ message, severity });
 
 const ruta = (...partes: string[]) => partes.map(encodeURIComponent).join('/');
 
-// Cada cambio rehace el reparto entero: el aviso lo dice, y dice si el móvil sigue cerrando.
-const resumenCierre = (e: Estado) => {
-  if (e.faltan.length) return '';
-  return e.cierra.kilos && e.cierra.plata
-    ? ' Reparto recalculado: kilos y pesos cierran.'
-    : ' Reparto recalculado, pero algo no cierra: está en Para revisar.';
-};
-
 type Opciones = {
-  exito?: (estado: Estado) => string;
+  // Mientras falte alguna entrada no hay reparto: el aviso dice qué se cargó.
+  cargado?: string;
   // Desde un diálogo el error se muestra ahí, junto al campo; si no, como aviso.
   errorEnDialogo?: boolean;
 };
+
+// El aviso dura unos segundos: corto e informativo. Si cierra o no ya se ve en el encabezado.
+const RECALCULADO = 'Reparto recalculado.';
 
 export const useMovil = create<TUseMovil>((set, get) => {
   const traerCruce = async (estado: Estado) => {
@@ -60,7 +55,7 @@ export const useMovil = create<TUseMovil>((set, get) => {
       const estado = (await pedido()).data;
       set({ estado, errorDeCarga: undefined });
       await traerCruce(estado);
-      if (opciones.exito) avisar(opciones.exito(estado), 'success');
+      avisar(estado.faltan.length ? opciones.cargado ?? 'Guardado.' : RECALCULADO, 'info');
       return null;
     } catch (e) {
       const mensaje = mensajeDeError(e);
@@ -71,14 +66,13 @@ export const useMovil = create<TUseMovil>((set, get) => {
     }
   };
 
-  const subir = (url: string, archivo: File, exito: Opciones['exito']) => {
+  const subir = (url: string, archivo: File, cargado: string) => {
     const datos = new FormData();
     datos.append('archivo', archivo);
-    return cambiar(() => api.upload<Estado>(url, datos), { exito });
+    return cambiar(() => api.upload<Estado>(url, datos), { cargado });
   };
 
-  const enDialogo = (exito: Opciones['exito']): Opciones => ({ exito, errorEnDialogo: true });
-  const encendido = (activo: boolean) => (activo ? 'prendido' : 'apagado');
+  const enDialogo: Opciones = { errorEnDialogo: true };
 
   return {
     foco: undefined,
@@ -109,48 +103,29 @@ export const useMovil = create<TUseMovil>((set, get) => {
       if (estado) await traerCruce(estado).catch(e => avisar(mensajeDeError(e), 'error'));
     },
 
-    cargarInput1: archivo =>
-      subir('/movil/input1', archivo, e => `Objetivo de Contraloría cargado: ${e.entradas.input1?.skus} SKUs.${resumenCierre(e)}`),
-    cargarBase: archivo =>
-      subir('/movil/base', archivo, e => `Mes anterior cargado: ${e.entradas.base?.celdas} celdas.${resumenCierre(e)}`),
-    cargarInput2: archivo =>
-      subir('/movil/input2', archivo, e => `Totales por canal cargados: ${e.entradas.input2?.canales} canales.${resumenCierre(e)}`),
-    editarTotales: texto =>
-      cambiar(() => api.put('/movil/input2', { texto }), enDialogo(e => `Totales por canal guardados.${resumenCierre(e)}`)),
-    cargarMuestra: () =>
-      cambiar(() => api.post('/movil/muestra', {}), { exito: e => `Datos de muestra cargados.${resumenCierre(e)}` }),
+    cargarInput1: archivo => subir('/movil/input1', archivo, 'Objetivo de Contraloría cargado.'),
+    cargarBase: archivo => subir('/movil/base', archivo, 'Mes anterior cargado.'),
+    cargarInput2: archivo => subir('/movil/input2', archivo, 'Totales por canal cargados.'),
+    editarTotales: texto => cambiar(() => api.put('/movil/input2', { texto }), enDialogo),
+    cargarMuestra: () => cambiar(() => api.post('/movil/muestra', {})),
 
     cambiarSku: (sku, activo, motivo) =>
-      cambiar(() => api.put(`/movil/skus/${ruta(sku)}`, { activo, motivo }),
-        enDialogo(e => `SKU ${sku} ${encendido(activo)}.${resumenCierre(e)}`)),
+      cambiar(() => api.put(`/movil/skus/${ruta(sku)}`, { activo, motivo }), enDialogo),
     cambiarEntidad: (entidad, activo, motivo) =>
-      cambiar(() => api.put(`/movil/entidades/${ruta(entidad)}`, { activo, motivo }),
-        enDialogo(e => `${entidad} ${encendido(activo)}.${resumenCierre(e)}`)),
-    fijar: (sku, canal, monto, motivo) => {
-      const { unidad } = get();
-      return cambiar(() => api.put(`/movil/celdas/${ruta(unidad, sku, canal)}`, { monto, motivo }),
-        enDialogo(e => {
-          const valor = e.fijas[unidad].find(f => f.sku === sku && f.canal === canal)?.valor;
-          return `Fijado en ${conUnidad(valor, unidad)}.${resumenCierre(e)}`;
-        }));
-    },
+      cambiar(() => api.put(`/movil/entidades/${ruta(entidad)}`, { activo, motivo }), enDialogo),
+    fijar: (sku, canal, monto, motivo) =>
+      cambiar(() => api.put(`/movil/celdas/${ruta(get().unidad, sku, canal)}`, { monto, motivo }), enDialogo),
     desfijar: (sku, canal, motivo) =>
-      cambiar(() => api.delete(`/movil/celdas/${ruta(get().unidad, sku, canal)}`, { data: { motivo } }),
-        enDialogo(e => `La celda vuelve a calculada.${resumenCierre(e)}`)),
+      cambiar(() => api.delete(`/movil/celdas/${ruta(get().unidad, sku, canal)}`, { data: { motivo } }), enDialogo),
 
-    agregarRegla: (datos, motivo) =>
-      cambiar(() => api.post('/movil/reglas', { ...datos, motivo }),
-        enDialogo(e => `Regla ${e.reglas[e.reglas.length - 1]?.id} agregada.${resumenCierre(e)}`)),
+    agregarRegla: (datos, motivo) => cambiar(() => api.post('/movil/reglas', { ...datos, motivo }), enDialogo),
     editarRegla: (id, datos, motivo) =>
-      cambiar(() => api.put(`/movil/reglas/${ruta(id)}`, { ...datos, motivo }),
-        enDialogo(e => `Regla ${id} guardada.${resumenCierre(e)}`)),
+      cambiar(() => api.put(`/movil/reglas/${ruta(id)}`, { ...datos, motivo }), enDialogo),
     eliminarRegla: (id, motivo) =>
-      cambiar(() => api.delete(`/movil/reglas/${ruta(id)}`, { data: { motivo } }),
-        enDialogo(e => `Regla ${id} eliminada.${resumenCierre(e)}`)),
+      cambiar(() => api.delete(`/movil/reglas/${ruta(id)}`, { data: { motivo } }), enDialogo),
 
     elegirFila: (sku, fila, motivo) =>
-      cambiar(() => api.put(`/movil/skus/${ruta(sku)}/fila`, { fila, motivo }),
-        enDialogo(e => `SKU ${sku}: vale la fila ${fila}.${resumenCierre(e)}`)),
+      cambiar(() => api.put(`/movil/skus/${ruta(sku)}/fila`, { fila, motivo }), enDialogo),
 
     apertura: async (sku, canal) => {
       try {

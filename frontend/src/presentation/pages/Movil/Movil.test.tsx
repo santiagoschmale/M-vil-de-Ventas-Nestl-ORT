@@ -256,15 +256,38 @@ describe('MovilPage', { timeout: 15000 }, () => {
     expect(within(dialogo).getByText('antes: 500,000')).toBeInTheDocument();
   });
 
-  it('el aviso de cada cambio dice que el reparto se recalculó y si cierra', async () => {
+  it('el aviso de cada cambio es corto e informativo: el reparto se recalculó', async () => {
     const user = userEvent.setup({ delay: null });
     render(<MovilPage />);
     await user.click(await screen.findByRole('checkbox', { name: 'Apagar 200' }));
     const dialogo = screen.getByRole('dialog');
     await user.type(within(dialogo).getByRole('textbox', { name: /Motivo/ }), 'x');
     await user.click(within(dialogo).getByRole('button', { name: 'Apagar' }));
-    await waitFor(() => expect(useSnackbarProps.getState().snackbarProps?.message).toMatch(/Reparto recalculado/));
-    expect(useSnackbarProps.getState().snackbarProps?.message).toMatch(/kilos y pesos cierran/);
+    await waitFor(() => expect(useSnackbarProps.getState().snackbarProps)
+      .toEqual({ message: 'Reparto recalculado.', severity: 'info' }));
+  });
+
+  it('rojo es solo lo que no cierra: los problemas del archivo se ven en amarillo', async () => {
+    server.use(http.get('*/api/movil', () => HttpResponse.json(estado({
+      cierra: { kilos: false, plata: true },
+      inconsistencias: { kilos: [inconsistenciaFactory.build({ mensaje: 'No cierra por esto.' })], plata: [] },
+      problemas: [{ severidad: 'error', mensaje: 'Rosario no se puede abrir.', sku: '100', bloque: 'apertura', canal: 'Catering' }],
+    }))));
+    render(<MovilPage />);
+    expect((await screen.findByText('No cierra por esto.')).closest('.MuiAlert-standardError')).not.toBeNull();
+    expect(screen.getByText(/Rosario no se puede abrir/).closest('.MuiAlert-standardWarning')).not.toBeNull();
+  });
+
+  it('exportar con cosas para revisar pide confirmar y las muestra', async () => {
+    server.use(http.get('*/api/movil', () => HttpResponse.json(estado({
+      problemas: [{ severidad: 'error', mensaje: 'Rosario no se puede abrir.', sku: '100', bloque: 'apertura', canal: 'Catering' }],
+    }))));
+    const user = userEvent.setup({ delay: null });
+    render(<MovilPage />);
+    await user.click(await screen.findByRole('button', { name: 'Exportar' }));
+    const dialogo = screen.getByRole('dialog');
+    expect(dialogo).toHaveTextContent('Rosario no se puede abrir.');
+    expect(within(dialogo).getByRole('link', { name: 'Exportar igual' })).toHaveAttribute('href', '/api/movil/exportar');
   });
 
   it('exportar se habilita solo cuando kilos y pesos cierran', async () => {
