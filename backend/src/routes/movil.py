@@ -74,6 +74,11 @@ class MotivoIn(BaseModel):
     motivo: str
 
 
+class CanalesIn(BaseModel):
+    canales: list[str] = Field(description="Canales donde se vende el SKU, como figuran en los totales por canal")
+    motivo: str
+
+
 class FilaIn(BaseModel):
     fila: int = Field(description="Fila del Excel del objetivo de Contraloría que vale")
     motivo: str
@@ -154,6 +159,8 @@ def _estado(s: Sesion) -> dict:
         "fijas": {u: [{"sku": k[0], "canal": k[1], "valor": _texto(f.valor, u), **_ajuste(f.ajuste)}
                       for k, f in sorted(s.fijas(u).items())] for u in DECIMALES},
         "reglas": [_regla(i, r) for i, r in sorted(s.reglas.items(), key=lambda x: int(x[0][1:]))],
+        # "Dónde se vende": lo que decidió el planner para cada SKU.
+        "canales_sku": [{"sku": k, "canales": sorted(c), **_ajuste(a)} for k, (c, a) in sorted(s.canales_sku.items())],
         # SKUs repetidos en el objetivo de Contraloría: cada fila, y cuál vale hoy.
         "repetidos": [
             {"sku": k, "elegida": vigentes[k].fila,
@@ -302,6 +309,18 @@ def exportar_excel(s: Sesion = Depends(sesion)):
 @router.put("/skus/{sku}", summary="Prender o apagar un SKU (ON/OFF)")
 def cambiar_sku(sku: str, cuerpo: ActivoIn, s: Sesion = Depends(sesion), quien: str = Depends(autor)):
     _aplicar(s.cambiar_sku, sku, activo=cuerpo.activo, autor=quien, cuando=_ahora(), motivo=cuerpo.motivo)
+    return _estado(s)
+
+
+@router.put("/skus/{sku}/canales", summary="Dónde se vende un SKU (resuelve el SKU nuevo sin historia)")
+def elegir_canales(sku: str, cuerpo: CanalesIn, s: Sesion = Depends(sesion), quien: str = Depends(autor)):
+    _aplicar(s.elegir_canales, sku, cuerpo.canales, autor=quien, cuando=_ahora(), motivo=cuerpo.motivo)
+    return _estado(s)
+
+
+@router.delete("/skus/{sku}/canales", summary="Volver a los canales del mes anterior")
+def quitar_canales(sku: str, cuerpo: MotivoIn, s: Sesion = Depends(sesion), quien: str = Depends(autor)):
+    _aplicar(s.quitar_canales, sku, autor=quien, cuando=_ahora(), motivo=cuerpo.motivo)
     return _estado(s)
 
 

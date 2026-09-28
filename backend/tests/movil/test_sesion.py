@@ -186,3 +186,25 @@ def test_un_objetivo_nuevo_empieza_sin_elecciones():
     s.elegir_fila("90020001", 51, autor=P, cuando=CUANDO, motivo="x")
     s.cargar_input1(MUESTRA / "input1_objetivo.xlsx", "otra vez.xlsx", P, CUANDO)
     assert s.recorrido.objetivos["90020001"].fila == 4
+
+
+def test_decir_donde_se_vende_el_sku_nuevo_lo_resuelve_sin_apagarlo():
+    s = _sesion()  # la muestra tal cual: el SKU nuevo frena el cruce
+    s.elegir_canales(NUEVO, ["Directa (BA)"], autor=P, cuando=CUANDO, motivo="lanzamiento en BA")
+    assert s.recorrido.kilos.inconsistencias == [] and s.recorrido.plata.inconsistencias == []
+    assert s.recorrido.kilos.celdas[(NUEVO, "Directa (BA)")] == D("10.000")
+    assert s.historial[-1].accion == "elegir_canales" and "Directa (BA)" in s.historial[-1].detalle
+    # Ahora se puede fijar en ese canal aunque el mes anterior no se haya vendido ahí.
+    s.fijar("kilos", NUEVO, "Directa (BA)", "10", autor=P, cuando=CUANDO, motivo="x")
+
+    s.quitar_canales(NUEVO, autor=P, cuando=CUANDO, motivo="se postergó")
+    assert s.recorrido.kilos.celdas is None  # vuelve a frenar: otra vez sin historia
+
+
+def test_donde_se_vende_rechaza_lo_que_no_es_valido():
+    s = _sesion()
+    assert _falla(s.elegir_canales, NUEVO, [], autor=P, cuando=CUANDO, motivo="x")
+    assert _falla(s.elegir_canales, NUEVO, ["Tucumán"], autor=P, cuando=CUANDO, motivo="x")
+    assert _falla(s.elegir_canales, "no-existe", ["Catering"], autor=P, cuando=CUANDO, motivo="x")
+    assert _falla(s.elegir_canales, NUEVO, ["Catering"], autor=P, cuando=CUANDO, motivo=" ")
+    assert _falla(s.quitar_canales, NUEVO, autor=P, cuando=CUANDO, motivo="x")  # no tenía

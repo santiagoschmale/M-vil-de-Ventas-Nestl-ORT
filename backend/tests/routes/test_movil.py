@@ -200,3 +200,15 @@ def test_elegir_la_fila_de_un_sku_repetido_por_http():
     r = c.put("/api/movil/skus/90020001/fila", json={"fila": 51, "motivo": "la otra era de otro producto"})
     assert r.status_code == 200 and r.json()["repetidos"][0]["elegida"] == 51
     assert c.put("/api/movil/skus/90020001/fila", json={"fila": 9, "motivo": "x"}).status_code == 422
+
+
+def test_donde_se_vende_por_http():
+    c = _cargado()
+    r = c.put(f"/api/movil/skus/{NUEVO}/canales", json={"canales": ["Directa (BA)"], "motivo": "lanzamiento en BA"})
+    assert r.status_code == 200, r.json()
+    assert r.json()["cierra"]["kilos"] is True
+    (d,) = r.json()["canales_sku"]
+    assert d["sku"] == NUEVO and d["canales"] == ["Directa (BA)"] and d["motivo"] == "lanzamiento en BA"
+    assert c.put(f"/api/movil/skus/{NUEVO}/canales", json={"canales": [], "motivo": "x"}).status_code == 422
+    r = c.request("DELETE", f"/api/movil/skus/{NUEVO}/canales", json={"motivo": "se postergó"})
+    assert r.status_code == 200 and r.json()["canales_sku"] == []

@@ -32,6 +32,7 @@ from src.importer.entradas import (
     leer_base,
     leer_input1,
     leer_input2,
+    normalizar,
     numero,
 )
 from src.domain.arbol import Problema
@@ -90,6 +91,8 @@ class Sesion:
         self.reglas: dict[str, ReglaCargada] = {}
         # SKU repetido en el objetivo de Contraloría -> (fila del Excel que vale, quién lo decidió).
         self.filas_elegidas: dict[str, tuple[int, Ajuste]] = {}
+        # "Dónde se vende": SKU -> (canales, quién lo decidió). Resuelve el SKU sin historia (A4).
+        self.canales_sku: dict[str, tuple[frozenset[str], Ajuste]] = {}
         self._proxima_regla = 1  # los ids no se reusan: el historial los nombra
         self.historial: list[Ajuste] = []
         self.recorrido: Recorrido | None = None
@@ -189,8 +192,8 @@ class Sesion:
             raise ErrorDeAjuste(f"El SKU {sku} no está en el reparto de este mes.")
         if canal not in r.canales:
             raise ErrorDeAjuste(f"El canal {canal} no está en los totales por canal.")
-        if (sku, canal) not in self._e.base:
-            raise ErrorDeAjuste(f"El SKU {sku} no se vende en {canal} (no está en la base): no se puede fijar.")
+        if not self._se_vende(sku, canal):
+            raise ErrorDeAjuste(f"El SKU {sku} no se vende en {canal}: no se puede fijar.")
         objetivo = r.objetivos[sku].kilos if unidad == "kilos" else r.objetivos[sku].nns
         total_canal = r.canales[canal].kilos if unidad == "kilos" else r.canales[canal].plata
         if objetivo is not None and valor > objetivo:
@@ -230,6 +233,42 @@ class Sesion:
             self.filas_elegidas[sku] = (fila, ajuste)
             return ajuste
         self._aplicar(cambio)
+
+    def elegir_canales(self, sku: str, canales, autor: str, cuando: datetime, motivo: str) -> None:
+        """En qué canales se vende un SKU (el nuevo sin historia, o para limitar uno que ya tenía)."""
+        motivo = _motivo(motivo)
+        if self._e.objetivos is None or sku not in self._e.objetivos:
+            raise ErrorDeAjuste(f"El SKU {sku} no está en el objetivo de Contraloría.")
+        pedidos = [c for c in (canales or []) if c and c.strip()]
+        if not pedidos:
+            raise ErrorDeAjuste("Elegí al menos un canal.")
+        por_nombre = {normalizar(c): c for c in (self._e.canales or {})}
+        faltan = [c for c in pedidos if normalizar(c) not in por_nombre]
+        if faltan:
+            raise ErrorDeAjuste(f"No están en los totales por canal: {', '.join(faltan)}.")
+        elegidos = frozenset(por_nombre[normalizar(c)] for c in pedidos)
+
+        def cambio():
+            ajuste = Ajuste("elegir_canales", f"{sku} se vende en {', '.join(sorted(elegidos))}", autor, cuando, motivo)
+            self.canales_sku[sku] = (elegidos, ajuste)
+            return ajuste
+        self._aplicar(cambio)
+
+    def quitar_canales(self, sku: str, autor: str, cuando: datetime, motivo: str) -> None:
+        motivo = _motivo(motivo)
+        if sku not in self.canales_sku:
+            raise ErrorDeAjuste(f"Para el SKU {sku} no se eligió dónde se vende.")
+
+        def cambio():
+            del self.canales_sku[sku]
+            return Ajuste("quitar_canales", f"{sku}: vuelve a los canales del mes anterior", autor, cuando, motivo)
+        self._aplicar(cambio)
+
+    def _se_vende(self, sku: str, canal: str) -> bool:
+        """Por lo que dijo el planner, si lo dijo; si no, por el mes anterior."""
+        if sku in self.canales_sku:
+            return canal in self.canales_sku[sku][0]
+        return (sku, canal) in self._e.base
 
     def objetivos_vigentes(self) -> dict | None:
         """El objetivo de cada SKU con las filas elegidas donde estaba repetido."""
@@ -299,13 +338,13 @@ class Sesion:
         """
         respaldo = (copy.copy(self._e), dict(self.apagados_skus), dict(self.entidades_apagadas),
                     {u: dict(f) for u, f in self._fijas.items()}, dict(self.reglas), self._proxima_regla,
-                    dict(self.filas_elegidas), self.recorrido)
+                    dict(self.filas_elegidas), dict(self.canales_sku), self.recorrido)
         try:
             ajuste = cambio()
             self.recorrido = self._recalcular()
         except Exception:
             (self._e, self.apagados_skus, self.entidades_apagadas, self._fijas, self.reglas,
-             self._proxima_regla, self.filas_elegidas, self.recorrido) = respaldo
+             self._proxima_regla, self.filas_elegidas, self.canales_sku, self.recorrido) = respaldo
             raise
         self.historial.append(ajuste)
 
@@ -318,7 +357,7 @@ class Sesion:
         return {
             (sku, canal): f.valor for (sku, canal), f in self._fijas[unidad].items()
             if sku in objetivos and sku not in self.apagados_skus and objetivos[sku].kilos > 0
-            and canal in e.canales and (sku, canal) in e.base
+            and canal in e.canales and self._se_vende(sku, canal)
         }
 
     def _recalcular(self) -> Recorrido | None:
@@ -339,6 +378,7 @@ class Sesion:
                 apertura=self._e.apertura,
                 entidades_apagadas=set(self.entidades_apagadas),
                 reglas=[r.regla for r in self.reglas.values()],
+                canales_sku={k: c for k, (c, _) in self.canales_sku.items()},
             )
         except ErrorDeCruce as e:
             raise ErrorDeAjuste(str(e)) from e

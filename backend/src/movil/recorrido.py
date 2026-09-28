@@ -80,6 +80,7 @@ def armar(
     apertura: dict[Celda, dict[str, Decimal]] | None = None,
     entidades_apagadas: set[str] | frozenset[str] = frozenset(),
     reglas: list[Regla] | tuple[Regla, ...] = (),
+    canales_sku: dict[str, set[str] | frozenset[str]] | None = None,
 ) -> Recorrido:
     """
     `apagados`: SKUs que el planner saca del mes (ON/OFF). No se reparten; si su
@@ -93,6 +94,9 @@ def armar(
 
     `reglas`: cada una se lleva a un grupo por unidad (kilos y NNS por separado),
     con los SKUs activos de sus categorías.
+
+    `canales_sku`: dónde se vende cada SKU según el planner ("Dónde se vende"). Ver
+    `_donde_se_vende`.
     """
     problemas = list(problemas or [])
     apagados = frozenset(apagados)
@@ -100,6 +104,8 @@ def armar(
     por_nombre = {normalizar(c): c for c in canales}
     base = {(s, por_nombre.get(normalizar(c), c)): w for (s, c), w in base.items()}
     activos = {s: o for s, o in objetivos.items() if s not in apagados and o.kilos > 0}
+    if canales_sku:
+        base, apertura = _donde_se_vende(canales_sku, activos, canales, base, apertura or {}, por_nombre, problemas)
 
     for s in sorted({s for s, _ in base} - set(objetivos)):
         problemas.append(Problema("aviso", f"El SKU {s} está en la base del mes anterior pero no en el objetivo de Contraloría: "
@@ -132,6 +138,47 @@ def armar(
     aperturas = _abrir(kilos, plata, apertura or {}, entidades_apagadas, problemas, por_nombre)
     return Recorrido(objetivos=objetivos, canales=canales, kilos=kilos, plata=plata, problemas=problemas,
                      aperturas=aperturas, entidades_apagadas=entidades_apagadas)
+
+
+def _donde_se_vende(canales_sku, activos, canales, base, apertura, por_nombre, problemas):
+    """
+    El planner dice en qué canales se vende un SKU: resuelve el SKU nuevo sin historia
+    (A4) y restringe uno que ya tenía ("solo se vende en ..."). Devuelve base y apertura
+    nuevas; no toca las de entrada.
+
+    SUPUESTO (A4, a confirmar con el cliente): en un canal nuevo para el SKU se parte de
+    objetivo del SKU × total del canal / total del mes (la tabla de independencia: un
+    peso neutral, proporcional al canal), y el ajuste de siempre hace el resto. Debajo
+    del canal, se abre como se abrió el canal entero el mes anterior (la suma de los
+    pesos de cada entidad en ese canal); si no, esos kilos no llegarían a nadie.
+    """
+    base, apertura = dict(base), dict(apertura)
+    total = sum(o.kilos for o in activos.values())
+    for sku in sorted(canales_sku):
+        if sku not in activos or not total:
+            continue
+        elegidos = set()
+        for nombre in sorted(canales_sku[sku]):
+            canal = por_nombre.get(normalizar(nombre))
+            if canal is None:
+                problemas.append(Problema("aviso", f"Dice que se vende en {nombre}, que no está en los totales por "
+                                                   f"canal de este mes: ese canal no se usa.", sku=sku, bloque="canales"))
+            else:
+                elegidos.add(canal)
+        if not elegidos:
+            continue
+        for celda in [k for k in base if k[0] == sku and k[1] not in elegidos]:
+            del base[celda]  # "solo se vende en": los demás canales pasan a no aplica
+        for canal in sorted(elegidos - {k for s, k in base if s == sku}):
+            base[(sku, canal)] = activos[sku].kilos * canales[canal].kilos / total
+            pesos: dict[str, Decimal] = {}
+            for (x, k), entidades in apertura.items():
+                if por_nombre.get(normalizar(k), k) == canal:
+                    for e, w in entidades.items():
+                        pesos[e] = pesos.get(e, Decimal(0)) + w
+            if pesos:
+                apertura[(sku, canal)] = pesos
+    return base, apertura
 
 
 def _grupos(reglas, activos, por_nombre, problemas) -> tuple[list[Grupo], list[Grupo]]:
