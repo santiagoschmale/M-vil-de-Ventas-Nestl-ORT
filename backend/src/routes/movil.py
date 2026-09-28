@@ -200,9 +200,10 @@ def cargar_base(archivo: UploadFile = File(...), s: Sesion = Depends(sesion), qu
 @router.post("/muestra", summary="Cargar las tres entradas de muestra (datos ficticios)")
 def cargar_muestra(s: Sesion = Depends(sesion), quien: str = Depends(autor)):
     ahora = _ahora()
-    _aplicar(s.cargar_input1, MUESTRA / "input1_objetivo.xlsx", "input1_objetivo.xlsx", quien, ahora)
-    _aplicar(s.cargar_input2, MUESTRA / "input2_canales.xlsx", quien, ahora, nombre="input2_canales.xlsx")
-    _aplicar(s.cargar_base, MUESTRA / "base_mes_anterior.xlsx", "base_mes_anterior.xlsx", quien, ahora)
+    # Los archivos del repo se llaman input1/input2 por historia; al planner se le muestra el nombre del negocio.
+    _aplicar(s.cargar_input1, MUESTRA / "input1_objetivo.xlsx", "Muestra · objetivo de Contraloría.xlsx", quien, ahora)
+    _aplicar(s.cargar_input2, MUESTRA / "input2_canales.xlsx", quien, ahora, nombre="Muestra · totales por canal.xlsx")
+    _aplicar(s.cargar_base, MUESTRA / "base_mes_anterior.xlsx", "Muestra · mes anterior.xlsx", quien, ahora)
     return _estado(s)
 
 
