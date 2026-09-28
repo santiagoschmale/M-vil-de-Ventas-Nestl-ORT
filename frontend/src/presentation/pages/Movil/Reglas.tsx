@@ -12,6 +12,7 @@ import { DatosRegla, Estado, Limite, Regla } from '../../../stores/useMovil/useM
 import { formatear, UNIDADES } from './formato';
 import { ENFOCADA, NO_CIERRA, numeros } from './estilo';
 import { MotivoDialog } from './MotivoDialog';
+import { CanalesDialog } from './CanalesDialog';
 import { Ayuda } from './Ayuda';
 import { AYUDA } from './ayudas';
 
@@ -121,7 +122,9 @@ const ReglaDialog = ({ regla, estado, onCerrar }: Formulario & { estado: Estado;
 };
 
 export const Reglas = ({ estado }: { estado: Estado }) => {
-  const { eliminarRegla, foco } = useMovil();
+  const { eliminarRegla, quitarCanales, foco } = useMovil();
+  const [canalesDe, setCanalesDe] = useState<string>();
+  const [quitarDe, setQuitarDe] = useState<string>();
   const [formulario, setFormulario] = useState<Formulario>();
   const [eliminar, setEliminar] = useState<Regla>();
   const chocan = enConflicto(estado);
@@ -181,6 +184,33 @@ export const Reglas = ({ estado }: { estado: Estado }) => {
       <Button size="small" variant="outlined" startIcon={<AddRoundedIcon />} onClick={() => setFormulario({})}>
         Agregar regla
       </Button>
+
+      {estado.canales_sku.length > 0 && (
+        <Box sx={{ mt: 2 }}>
+          <Typography variant="subtitle2" fontWeight={700}>Dónde se vende</Typography>
+          {estado.canales_sku.map(c => (
+            <Box key={c.sku} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Typography variant="body2">SKU {c.sku} se vende en {c.canales.join(', ')}</Typography>
+              <IconButton size="small" aria-label={`Editar dónde se vende SKU ${c.sku}`} onClick={() => setCanalesDe(c.sku)}>
+                <EditRoundedIcon fontSize="small" />
+              </IconButton>
+              <IconButton size="small" aria-label={`Quitar dónde se vende SKU ${c.sku}`} onClick={() => setQuitarDe(c.sku)}>
+                <DeleteOutlineRoundedIcon fontSize="small" />
+              </IconButton>
+            </Box>
+          ))}
+        </Box>
+      )}
+      {canalesDe && <CanalesDialog sku={canalesDe} estado={estado} onCerrar={() => setCanalesDe(undefined)} />}
+      {quitarDe && (
+        <MotivoDialog
+          titulo={`Quitar dónde se vende el SKU ${quitarDe}`}
+          descripcion="Vuelve a los canales del mes anterior. Si no tenía historia, vuelve a frenar el reparto."
+          confirmar="Quitar"
+          onConfirmar={m => quitarCanales(quitarDe, m)}
+          onCerrar={() => setQuitarDe(undefined)}
+        />
+      )}
 
       {formulario && <ReglaDialog {...formulario} estado={estado} onCerrar={() => setFormulario(undefined)} />}
       {eliminar && (

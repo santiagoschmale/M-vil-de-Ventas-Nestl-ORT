@@ -74,6 +74,7 @@ export type Estado = {
   fijas: Record<Unidad, (Ajuste & { sku: string; canal: string; valor: Monto })[]>;
   reglas: Regla[];
   repetidos: Repetido[];
+  canales_sku: (Ajuste & { sku: string; canales: string[] })[]; // "Dónde se vende"
   opciones: { canales: string[]; categorias: string[] };
   historial: Ajuste[];
 };
@@ -134,4 +135,6 @@ export type TUseMovil = {
   editarRegla: (id: string, datos: DatosRegla, motivo: string) => Resultado;
   eliminarRegla: (id: string, motivo: string) => Resultado;
   elegirFila: (sku: string, fila: number, motivo: string) => Resultado;
+  elegirCanales: (sku: string, canales: string[], motivo: string) => Resultado;
+  quitarCanales: (sku: string, motivo: string) => Resultado;
 };

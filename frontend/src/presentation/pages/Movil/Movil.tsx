@@ -17,6 +17,7 @@ import { AYUDA } from './ayudas';
 import { Foco, Repetido } from '../../../stores/useMovil/useMovil.type';
 import { Matriz } from './Matriz';
 import { Reglas } from './Reglas';
+import { CanalesDialog } from './CanalesDialog';
 
 const ACCIONES: Record<string, string> = {
   agregar_regla: 'Agregó una regla', editar_regla: 'Editó una regla', eliminar_regla: 'Eliminó una regla',
@@ -247,6 +248,7 @@ const Pendientes = ({ estado, unidad, enMatriz }: { estado: Estado; unidad: Unid
     return hay.length <= 3 ? hay.map((x): [Foco['tipo'], string] => ['sku', x]) : [];
   };
   const [eligiendo, setEligiendo] = useState<Repetido>();
+  const [canalesDe, setCanalesDe] = useState<string>();
   const repetido = (sku: string | null) => estado.repetidos.find(r => r.sku === sku);
   const { enfocar } = useMovil();
   const acciones = (p: Estado['problemas'][number]) => {
@@ -280,7 +282,17 @@ const Pendientes = ({ estado, unidad, enMatriz }: { estado: Estado; unidad: Unid
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
       {inconsistencias.map((i, n) => (
         <Alert key={`i${n}`} severity="error"
-          action={<Ir destinos={[...i.reglas.map((r): [Foco['tipo'], string] => ['regla', r]), ...skus(i.skus)]} />}>
+          action={
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+              {i.tipo === 'sku_sin_canal' && i.skus[0] && (
+                <Button size="small" color="inherit" sx={{ whiteSpace: 'nowrap' }}
+                  aria-label={`Elegir canales de SKU ${i.skus[0]}`} onClick={() => setCanalesDe(i.skus[0])}>
+                  Elegir canales
+                </Button>
+              )}
+              <Ir destinos={[...i.reglas.map((r): [Foco['tipo'], string] => ['regla', r]), ...skus(i.skus)]} />
+            </Box>
+          }>
           {i.mensaje}
         </Alert>
       ))}
@@ -289,6 +301,7 @@ const Pendientes = ({ estado, unidad, enMatriz }: { estado: Estado; unidad: Unid
       {estado.avisos[unidad].map((a, n) => <Alert key={`a${n}`} severity="info">{a}</Alert>)}
       {avisos.map((p, n) => <Alert key={`p${n}`} severity="warning" action={acciones(p)}>{conSku(p)}</Alert>)}
       {eligiendo && <FilaDialog repetido={eligiendo} onCerrar={() => setEligiendo(undefined)} />}
+      {canalesDe && <CanalesDialog sku={canalesDe} estado={estado} onCerrar={() => setCanalesDe(undefined)} />}
     </Box>
   );
 };

@@ -58,6 +58,10 @@ export const AYUDA = {
           Cada regla tiene un % para kilos y otro para pesos, independientes. Si dos reglas no se pueden cumplir a la
           vez, no hay una que gane: se marcan las dos y se explica en Para revisar.
         </P>
+        <P>
+          <b>Dónde se vende</b>: para un SKU nuevo, que el mes anterior no se vendió, elegís en qué canales va. Se
+          reparte en proporción al total de cada canal. También sirve para limitar un SKU a ciertos canales.
+        </P>
       </>
     ),
   },

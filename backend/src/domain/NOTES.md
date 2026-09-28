@@ -96,6 +96,10 @@ celda. El cruce no cambia al apagar un distribuidor.
 
 ## Supuestos (a confirmar con el cliente)
 
+- **A4 · SKU sin historia**: el planner elige dónde se vende ("Dónde se vende") y se
+  reparte en proporción al total de cada canal elegido; debajo del canal, como se abrió
+  el canal entero el mes anterior. `movil/recorrido.py::_donde_se_vende`.
+
 - **A1**: al apagar una entidad, su parte se reparte proporcional al histórico.
 - **A2**: el input 2 cierra exacto. Si admite margen (±500 kg), es un parámetro
   nuevo del cruce: las columnas pasan a ser rangos.

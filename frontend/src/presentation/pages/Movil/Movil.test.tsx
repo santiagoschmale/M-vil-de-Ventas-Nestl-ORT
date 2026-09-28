@@ -32,6 +32,8 @@ beforeEach(() => {
     http.put('*/api/movil/celdas/*', anotar),
     http.put('*/api/movil/input2', anotar),
     http.put('*/api/movil/skus/*/fila', anotar),
+    http.put('*/api/movil/skus/*/canales', anotar),
+    http.delete('*/api/movil/skus/*/canales', anotar),
   );
 });
 
@@ -288,6 +290,44 @@ describe('MovilPage', { timeout: 15000 }, () => {
     const dialogo = screen.getByRole('dialog');
     expect(dialogo).toHaveTextContent('Rosario no se puede abrir.');
     expect(within(dialogo).getByRole('link', { name: 'Exportar igual' })).toHaveAttribute('href', '/api/movil/exportar');
+  });
+
+  it('un SKU sin historia se resuelve diciendo dónde se vende', async () => {
+    server.use(http.get('*/api/movil', () => HttpResponse.json(estado({
+      cierra: { kilos: false, plata: false },
+      inconsistencias: { kilos: [inconsistenciaFactory.build({
+        tipo: 'sku_sin_canal', mensaje: 'El SKU 200 tiene objetivo pero no se vendió el mes anterior.', skus: ['200'],
+        canales: [], reglas: [] })], plata: [] },
+    }))));
+    const user = userEvent.setup({ delay: null });
+    render(<MovilPage />);
+    await user.click(await screen.findByRole('button', { name: 'Elegir canales de SKU 200' }));
+    const dialogo = screen.getByRole('dialog');
+    await user.click(within(dialogo).getByRole('checkbox', { name: 'Directa (BA)' }));
+    await user.type(within(dialogo).getByRole('textbox', { name: /Motivo/ }), 'lanzamiento en BA');
+    await user.click(within(dialogo).getByRole('button', { name: 'Guardar' }));
+
+    await waitFor(() => expect(pedidos).toHaveLength(1));
+    expect(pedidos[0]).toEqual({
+      metodo: 'PUT', url: '/api/movil/skus/200/canales', cuerpo: { canales: ['Directa (BA)'], motivo: 'lanzamiento en BA' },
+    });
+  });
+
+  it('lo elegido en dónde se vende se ve en Reglas y se puede quitar', async () => {
+    server.use(http.get('*/api/movil', () => HttpResponse.json(estado({
+      canales_sku: [{ sku: '200', canales: ['Directa (BA)'], accion: 'elegir_canales', detalle: '', autor: 'planner-local',
+                      cuando: '2026-09-28T10:00:00-03:00', motivo: 'lanzamiento' }],
+    }))));
+    const user = userEvent.setup({ delay: null });
+    render(<MovilPage />);
+    await user.click(await screen.findByRole('button', { name: /^Reglas/ }));
+    expect(screen.getByText(/SKU 200 se vende en Directa \(BA\)/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Quitar dónde se vende SKU 200' }));
+    const dialogo = screen.getByRole('dialog');
+    await user.type(within(dialogo).getByRole('textbox', { name: /Motivo/ }), 'se postergó');
+    await user.click(within(dialogo).getByRole('button', { name: 'Quitar' }));
+    await waitFor(() => expect(pedidos).toHaveLength(1));
+    expect(pedidos[0]).toMatchObject({ metodo: 'DELETE', url: '/api/movil/skus/200/canales', cuerpo: { motivo: 'se postergó' } });
   });
 
   it('exportar se habilita solo cuando kilos y pesos cierran', async () => {
