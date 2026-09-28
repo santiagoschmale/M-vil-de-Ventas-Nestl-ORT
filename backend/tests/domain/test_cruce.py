@@ -460,4 +460,4 @@ def test_si_la_diferencia_de_totales_es_el_sku_sin_historia_el_mensaje_lo_dice()
 def test_si_la_diferencia_no_es_el_sku_sin_historia_se_pide_corregir_los_totales():
     r = cruzar(filas={"A": D("100")}, columnas={"X": D("90")}, base={("A", "X"): D(1)}, decimales=3)
     (totales,) = r.inconsistencias
-    assert "Corregí uno de los dos" in totales.mensaje
+    assert "Tienen que coincidir" in totales.mensaje

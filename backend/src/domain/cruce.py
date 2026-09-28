@@ -164,10 +164,9 @@ def cruzar(
         if sin_historia and total_filas - total_columnas == sum(r[x] for x in sin_historia):
             # El planner ya lo descontó de los totales por canal pero no lo apagó.
             quien = f"el SKU {sin_historia[0]}" if len(sin_historia) == 1 else f"los SKUs {_lista(sin_historia)}"
-            causa = (f"La diferencia es el objetivo de {quien}, que no tiene historia: apagalo (el interruptor de "
-                     f"su fila en la tabla) y los totales coinciden.")
+            causa = f"Es el objetivo de {quien}, que no tiene historia: podés apagarlo."
         else:
-            causa = "Corregí uno de los dos para que coincidan."
+            causa = "Tienen que coincidir para poder repartir."
         inconsistencias.append(Inconsistencia(
             "totales_distintos",
             f"El objetivo de Contraloría suma {a_texto(_a_decimal(total_filas, decimales))} y los totales por canal "
@@ -208,12 +207,12 @@ def cruzar(
                     f"faltan {a_texto(_a_decimal(falta, decimales))}.")
         if que == "SKU":
             # Caso A4 (SKU sin reparto previo): la regla está pendiente con el cliente.
-            return (f"El SKU {nombre} tiene objetivo ({a_texto(_a_decimal(falta, decimales))}) pero el mes anterior no "
-                    f"se vendió en ningún canal: no hay de dónde copiar el reparto. Apagalo con el interruptor de su "
-                    f"fila en la tabla y, si lo contaste en los totales por canal, descontá ahí esos "
-                    f"{a_texto(_a_decimal(falta, decimales))}.")
-        return (f"El canal {nombre} tiene total pero el mes anterior no vendió ningún SKU: "
-                f"no hay base para repartirlo. Revisá su total en los totales por canal.")
+            cuanto = a_texto(_a_decimal(falta, decimales))
+            return (f"El SKU {nombre} tiene objetivo ({cuanto}) pero no se vendió el mes anterior: no hay de dónde "
+                    f"copiar el reparto. Podés apagarlo y, si lo contaste en los totales por canal, descontar esos "
+                    f"{cuanto}.")
+        return (f"El canal {nombre} tiene total pero no vendió ningún SKU el mes anterior: no hay de dónde copiar "
+                f"el reparto. Conviene revisar su total.")
 
     inconsistencias += [
         Inconsistencia("sku_sin_canal", sin_celdas_libres("SKU", s, r[s], s in filas_fijadas), skus=(s,),
@@ -237,7 +236,7 @@ def cruzar(
 
 _NO_CONVERGIO = "El ajuste no convergió: se usó un reparto que cierra exacto pero no sigue la base. Revisar."
 _REGLAS_JUSTAS = ("Las reglas quedan muy justas para estos totales: el reparto cierra y las cumple, pero se aleja "
-                  "del mes anterior más de lo necesario. Revisá las reglas que están al límite.")
+                  "del mes anterior más de lo necesario. Conviene revisar las que están al límite.")
 
 
 # ---------------------------------------------------------------------------
@@ -308,7 +307,7 @@ def _superpuestas(nodos: list[_Nodo]) -> list[Inconsistencia]:
                 inconsistencias.append(Inconsistencia(
                     "reglas_superpuestas",
                     f"Las reglas {_lista(reglas)} en {a.canal} comparten solo parte de sus SKUs ({comunes}). "
-                    f"Esa combinación todavía no se puede calcular: dejá una, o armalas para que una "
+                    f"Esa combinación todavía no se puede calcular: podés dejar una, o armarlas para que una "
                     f"contenga a la otra.",
                     skus=tuple(sorted(a.skus & b.skus)), canales=(a.canal,), reglas=reglas,
                 ))
@@ -421,14 +420,15 @@ def _conflictos(grupos, r, c, totales, soporte, fijadas, decimales) -> list[Inco
                 f"La regla {g.regla} pide que sus SKUs sumen {_QUE_PIDE[g.limite]} "
                 f"{a_texto(_a_decimal(pedido, decimales))} en {g.canal} ({a_texto(g.porcentaje)}% del canal), "
                 f"pero con los totales del mes, dónde se vende cada SKU{fijado_txt} {posible}. "
-                f"Cambiá la regla o los totales.",
+                f"Podés cambiar la regla o los totales.",
                 skus=tuple(sorted(g.skus)), canales=canales, reglas=nombres,
             ))
         else:
             inconsistencias.append(Inconsistencia(
                 "reglas_en_conflicto",
                 f"Las reglas {_lista(nombres)} no se pueden cumplir a la vez con los totales del mes"
-                f"{fijado_txt}: cada una por separado sí. No hay prioridad entre reglas: cambiá o sacá alguna.",
+                f"{fijado_txt}: cada una por separado sí. Como no hay prioridad entre reglas, podés cambiar o "
+                f"sacar alguna.",
                 canales=canales, reglas=nombres,
             ))
     return inconsistencias
