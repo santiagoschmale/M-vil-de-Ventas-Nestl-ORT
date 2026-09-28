@@ -254,11 +254,24 @@ def test_la_apertura_sale_en_el_excel():
 def test_por_que_no_abre_habla_en_terminos_del_planner():
     from src.movil.recorrido import por_que_no_abre
 
-    m = por_que_no_abre("Rosario", "plata", "Todos los pesos son cero: no hay base para repartir.")
+    cero = "Todos los pesos son cero: no hay base para repartir."
+    m = por_que_no_abre("Rosario", {"kilos": None, "nns": cero})
     assert m == ("Rosario no se puede abrir en pesos: el mes anterior ninguno de sus distribuidores o "
-                 "vendedores vendió este SKU. Los pesos quedan en el canal, sin abrir.")
-    assert "apagados" in por_que_no_abre("Directa (BA)", "kilos", "No hay entidades entre las cuales repartir.")
-    assert "pesos son cero" not in m and "plata" not in m
+                 "vendedores vendió este SKU. Quedan en el canal, sin abrir.")
+    ambas = por_que_no_abre("Rosario", {"kilos": cero, "nns": cero})
+    assert "en kilos ni en pesos" in ambas and ambas.count("vendió") == 1  # un aviso, no dos
+    apagados = por_que_no_abre("Directa (BA)", {"kilos": "No hay entidades prendidas entre las cuales repartir.",
+                                                "nns": None})
+    assert "apagados" in apagados and "pesos son cero" not in m
+
+
+def test_una_celda_que_no_se_abre_es_un_solo_aviso_y_dice_su_canal():
+    r, _ = _con_apertura()
+    avisos = [p for p in r.problemas if p.bloque == "apertura"]
+    assert avisos
+    celdas = [(p.sku, p.canal) for p in avisos]
+    assert len(celdas) == len(set(celdas))  # kilos y pesos juntos: uno por celda
+    assert all(p.canal and p.canal in p.mensaje for p in avisos)
 
 
 def test_apagar_a_todos_los_de_un_canal_se_informa_en_cada_celda_que_no_se_abre():

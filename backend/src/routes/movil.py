@@ -145,7 +145,7 @@ def _estado(s: Sesion) -> dict:
         "inconsistencias": {u: [_inconsistencia(i) for i in (c.inconsistencias if c else [])]
                             for u, c in cruces.items()},
         "avisos": {u: list(c.avisos) if c else [] for u, c in cruces.items()},
-        "problemas": [{"severidad": p.severidad, "mensaje": p.mensaje, "sku": p.sku, "bloque": p.bloque, "tipo": p.tipo}
+        "problemas": [{"severidad": p.severidad, "mensaje": p.mensaje, "sku": p.sku, "bloque": p.bloque, "tipo": p.tipo, "canal": p.canal}
                       for p in (r.problemas if r else e.problemas1 + e.problemas2 + e.problemas_base)],
         "apagados": {
             "skus": [{"codigo": k, **_ajuste(a)} for k, a in sorted(s.apagados_skus.items())],
@@ -273,8 +273,7 @@ def obtener_apertura(sku: str, canal: str, s: Sesion = Depends(sesion)):
         "kilos": _texto(raiz.valores["kilos"].monto, "kilos"),
         "plata": _texto(raiz.valores["nns"].monto, "plata"),
         "cuadra": {"kilos": raiz.cuadra["kilos"], "plata": raiz.cuadra["nns"]},
-        "aviso": next((por_que_no_abre(canal, u, raiz.aviso[k])
-                       for u, k in (("kilos", "kilos"), ("plata", "nns")) if raiz.aviso[k]), None),
+        "aviso": por_que_no_abre(canal, raiz.aviso) if raiz.aviso["kilos"] or raiz.aviso["nns"] else None,
         "entidades": [
             {"nombre": h.entidad, "activo": h.activo, "peso": str(h.peso),
              "kilos": _texto(h.valores["kilos"].monto, "kilos"), "plata": _texto(h.valores["nns"].monto, "plata")}

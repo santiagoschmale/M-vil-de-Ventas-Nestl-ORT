@@ -71,6 +71,7 @@ class Problema:
     sku: str | None = None
     bloque: str | None = None
     tipo: str | None = None  # para los que la pantalla ofrece resolver, p. ej. "sku_repetido"
+    canal: str | None = None  # si es de una celda SKU × canal (p. ej. una apertura que no se puede hacer)
 
 
 # ---------------------------------------------------------------------------

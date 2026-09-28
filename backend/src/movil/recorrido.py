@@ -179,24 +179,31 @@ def _abrir(kilos, plata, apertura, apagadas, problemas, por_nombre) -> dict[Celd
         raiz.valores["kilos"].monto = valor_kilos
         raiz.valores["nns"].monto = valor_plata
         recalcular(raiz, inactivas)
-        for unidad in ("kilos", "nns"):
-            if raiz.aviso[unidad]:
-                problemas.append(Problema("error", por_que_no_abre(canal, unidad, raiz.aviso[unidad]),
-                                          sku=sku, bloque="apertura"))
+        if raiz.aviso["kilos"] or raiz.aviso["nns"]:
+            problemas.append(Problema("error", por_que_no_abre(canal, raiz.aviso), sku=sku, bloque="apertura",
+                                      canal=canal))
         aperturas[k] = raiz
     return aperturas
 
 
-def por_que_no_abre(canal: str, unidad: str, aviso: str) -> str:
-    """El aviso del reparto dicho en términos del planner: qué pasó y qué queda."""
-    medida = "kilos" if unidad == "kilos" else "pesos"
-    if "pesos son cero" in aviso:
-        motivo = "el mes anterior ninguno de sus distribuidores o vendedores vendió este SKU"
-    elif "No hay entidades" in aviso:
-        motivo = "todos sus distribuidores o vendedores están apagados"
-    else:
-        motivo = aviso.rstrip(".")
-    return f"{canal} no se puede abrir en {medida}: {motivo}. Los {medida} quedan en el canal, sin abrir."
+def por_que_no_abre(canal: str, avisos: dict[str, str | None]) -> str:
+    """
+    Los avisos del reparto de una celda ({"kilos": ..., "nns": ...}) dichos en términos
+    del planner: qué pasó y qué queda. Si kilos y pesos fallan por lo mismo, un solo aviso.
+    """
+    def motivo(aviso: str) -> str:
+        if "pesos son cero" in aviso:
+            return "el mes anterior ninguno de sus distribuidores o vendedores vendió este SKU"
+        if "No hay entidades" in aviso:
+            return "todos sus distribuidores o vendedores están apagados"
+        return aviso.rstrip(".")
+
+    fallan = {("kilos" if u == "kilos" else "pesos"): motivo(a) for u, a in avisos.items() if a}
+    if len(set(fallan.values())) == 1:
+        medidas = " ni en ".join(fallan)
+        return f"{canal} no se puede abrir en {medidas}: {next(iter(fallan.values()))}. Quedan en el canal, sin abrir."
+    detalle = "; ".join(f"en {m}, {x}" for m, x in fallan.items())
+    return f"{canal} no se puede abrir: {detalle}. Quedan en el canal, sin abrir."
 
 
 def desde_archivos(input1, input2_texto: str, base_origen, **opciones) -> Recorrido:
