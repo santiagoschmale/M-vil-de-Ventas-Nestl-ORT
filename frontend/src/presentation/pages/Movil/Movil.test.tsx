@@ -6,6 +6,7 @@ import { http, HttpResponse } from 'msw';
 import { server } from '../../../mocks/server';
 import { MovilPage } from './Movil';
 import { useMovil } from '../../../stores/useMovil';
+import { useSnackbarProps } from '../../../stores/useSnackbarProps';
 import { mensajeDeError } from '../../../stores/useMovil/useMovil';
 import { Estado } from '../../../stores/useMovil/useMovil.type';
 import { cruceFactory, estadoFactory, inconsistenciaFactory, reglaFactory } from '../../../mocks/movil/fabricas';
@@ -18,6 +19,7 @@ const cruce = cruceFactory.build();
 const pedidos: { metodo: string; url: string; cuerpo: unknown }[] = [];
 beforeEach(() => {
   pedidos.length = 0;
+  useMovil.setState({ foco: undefined, estado: undefined, cruce: undefined, unidad: 'kilos' });  // el store es global
   const anotar = async ({ request }: { request: Request }) => {
     pedidos.push({ metodo: request.method, url: new URL(request.url).pathname, cuerpo: await request.json() });
     return HttpResponse.json(estado());
@@ -226,6 +228,43 @@ describe('MovilPage', { timeout: 15000 }, () => {
     expect(pedidos[0]).toEqual({
       metodo: 'PUT', url: '/api/movil/skus/100/fila', cuerpo: { fila: 51, motivo: 'la fila 4 era de otro producto' },
     });
+  });
+
+  it('desde el aviso de una celda que no se abre se va a esa celda', async () => {
+    server.use(http.get('*/api/movil', () => HttpResponse.json(estado({
+      problemas: [{ severidad: 'error', mensaje: 'Catering no se puede abrir en kilos ni en pesos: …', sku: '100',
+                    bloque: 'apertura', canal: 'Catering' }],
+    }))));
+    const user = userEvent.setup({ delay: null });
+    render(<MovilPage />);
+    await user.click(await screen.findByRole('button', { name: /^Para revisar/ }));
+    await user.click(screen.getByRole('button', { name: 'Ver celda 100 · Catering' }));
+    expect(await screen.findByRole('dialog')).toHaveTextContent('100 · Catering');
+  });
+
+  it('al editar los totales se ve qué cambió y contra qué objetivo se compara', async () => {
+    const user = userEvent.setup({ delay: null });
+    render(<MovilPage />);
+    await user.click(await screen.findByRole('button', { name: /^Entradas/ }));
+    await user.click(screen.getByRole('button', { name: 'Editar totales por canal' }));
+    const dialogo = screen.getByRole('dialog');
+    expect(dialogo).toHaveTextContent('1.500,000 kg');  // el objetivo de Contraloría, como referencia
+    expect(within(dialogo).queryByText(/antes:/)).not.toBeInTheDocument();
+    const kilos = within(dialogo).getByLabelText('Kilos de Directa (BA)');
+    await user.clear(kilos);
+    await user.type(kilos, '490,5');
+    expect(within(dialogo).getByText('antes: 500,000')).toBeInTheDocument();
+  });
+
+  it('el aviso de cada cambio dice que el reparto se recalculó y si cierra', async () => {
+    const user = userEvent.setup({ delay: null });
+    render(<MovilPage />);
+    await user.click(await screen.findByRole('checkbox', { name: 'Apagar 200' }));
+    const dialogo = screen.getByRole('dialog');
+    await user.type(within(dialogo).getByRole('textbox', { name: /Motivo/ }), 'x');
+    await user.click(within(dialogo).getByRole('button', { name: 'Apagar' }));
+    await waitFor(() => expect(useSnackbarProps.getState().snackbarProps?.message).toMatch(/Reparto recalculado/));
+    expect(useSnackbarProps.getState().snackbarProps?.message).toMatch(/kilos y pesos cierran/);
   });
 
   it('exportar se habilita solo cuando kilos y pesos cierran', async () => {

@@ -6,7 +6,7 @@ import { Apertura, Cruce, Estado, TUseMovil } from './useMovil.type';
 
 // Los errores del cliente HTTP traen la respuesta del backend: { detail: "..." }.
 const respuesta = (e: unknown) =>
-  (e as { response?: { status?: number; data?: { detail?: unknown } } })?.response;
+  (e as { response?: { status?: number; data?: unknown } })?.response;
 
 /** Qué pasó y qué hacer, en palabras del planner. El backend ya manda mensajes así. */
 export const mensajeDeError = (e: unknown): string => {
@@ -16,7 +16,7 @@ export const mensajeDeError = (e: unknown): string => {
   if (typeof r.data === 'string' && r.data.trimStart().startsWith('<')) {
     return 'Contestó otra aplicación en lugar del backend del móvil. Revisá que nada más esté usando el puerto 3000.';
   }
-  const detalle = r.data?.detail;
+  const detalle = (r.data as { detail?: unknown } | undefined)?.detail;
   if (typeof detalle === 'string') return detalle;
   if ((r.status ?? 0) >= 500) {
     return 'Algo falló en el servidor y el cambio no se aplicó. Probá de nuevo; si se repite, avisá al equipo.';
@@ -29,10 +29,12 @@ const avisar = (message: string, severity: 'success' | 'error') =>
 
 const ruta = (...partes: string[]) => partes.map(encodeURIComponent).join('/');
 
-// Después de tocar una regla, lo que el planner quiere saber es si el móvil sigue cerrando.
+// Cada cambio rehace el reparto entero: el aviso lo dice, y dice si el móvil sigue cerrando.
 const resumenCierre = (e: Estado) => {
   if (e.faltan.length) return '';
-  return e.cierra.kilos && e.cierra.plata ? ' Kilos y pesos cierran.' : ' Revisá "Para revisar": hay algo que no cierra.';
+  return e.cierra.kilos && e.cierra.plata
+    ? ' Reparto recalculado: kilos y pesos cierran.'
+    : ' Reparto recalculado, pero algo no cierra: está en Para revisar.';
 };
 
 type Opciones = {
@@ -81,6 +83,7 @@ export const useMovil = create<TUseMovil>((set, get) => {
   return {
     foco: undefined,
     enfocar: (tipo, id) => set(s => ({ foco: { tipo, id, vez: (s.foco?.vez ?? 0) + 1 } })),
+    soltarFoco: () => set({ foco: undefined }),
     estado: undefined,
     cruce: undefined,
     unidad: 'kilos',
@@ -107,33 +110,33 @@ export const useMovil = create<TUseMovil>((set, get) => {
     },
 
     cargarInput1: archivo =>
-      subir('/movil/input1', archivo, e => `Objetivo de Contraloría cargado: ${e.entradas.input1?.skus} SKUs.`),
+      subir('/movil/input1', archivo, e => `Objetivo de Contraloría cargado: ${e.entradas.input1?.skus} SKUs.${resumenCierre(e)}`),
     cargarBase: archivo =>
-      subir('/movil/base', archivo, e => `Mes anterior cargado: ${e.entradas.base?.celdas} celdas.`),
+      subir('/movil/base', archivo, e => `Mes anterior cargado: ${e.entradas.base?.celdas} celdas.${resumenCierre(e)}`),
     cargarInput2: archivo =>
-      subir('/movil/input2', archivo, e => `Totales por canal cargados: ${e.entradas.input2?.canales} canales.`),
+      subir('/movil/input2', archivo, e => `Totales por canal cargados: ${e.entradas.input2?.canales} canales.${resumenCierre(e)}`),
     editarTotales: texto =>
       cambiar(() => api.put('/movil/input2', { texto }), enDialogo(e => `Totales por canal guardados.${resumenCierre(e)}`)),
     cargarMuestra: () =>
-      cambiar(() => api.post('/movil/muestra', {}), { exito: () => 'Datos de muestra cargados.' }),
+      cambiar(() => api.post('/movil/muestra', {}), { exito: e => `Datos de muestra cargados.${resumenCierre(e)}` }),
 
     cambiarSku: (sku, activo, motivo) =>
       cambiar(() => api.put(`/movil/skus/${ruta(sku)}`, { activo, motivo }),
-        enDialogo(() => `SKU ${sku} ${encendido(activo)}.`)),
+        enDialogo(e => `SKU ${sku} ${encendido(activo)}.${resumenCierre(e)}`)),
     cambiarEntidad: (entidad, activo, motivo) =>
       cambiar(() => api.put(`/movil/entidades/${ruta(entidad)}`, { activo, motivo }),
-        enDialogo(() => `${entidad} ${encendido(activo)}.`)),
+        enDialogo(e => `${entidad} ${encendido(activo)}.${resumenCierre(e)}`)),
     fijar: (sku, canal, monto, motivo) => {
       const { unidad } = get();
       return cambiar(() => api.put(`/movil/celdas/${ruta(unidad, sku, canal)}`, { monto, motivo }),
         enDialogo(e => {
           const valor = e.fijas[unidad].find(f => f.sku === sku && f.canal === canal)?.valor;
-          return `Fijado en ${conUnidad(valor, unidad)}. El resto de la fila y la columna se recalculó.`;
+          return `Fijado en ${conUnidad(valor, unidad)}.${resumenCierre(e)}`;
         }));
     },
     desfijar: (sku, canal, motivo) =>
       cambiar(() => api.delete(`/movil/celdas/${ruta(get().unidad, sku, canal)}`, { data: { motivo } }),
-        enDialogo(() => 'La celda vuelve a calculada.')),
+        enDialogo(e => `La celda vuelve a calculada.${resumenCierre(e)}`)),
 
     agregarRegla: (datos, motivo) =>
       cambiar(() => api.post('/movil/reglas', { ...datos, motivo }),

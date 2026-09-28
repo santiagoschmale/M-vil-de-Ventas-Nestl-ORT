@@ -54,11 +54,17 @@ const Tarjeta = ({ titulo, children }: { titulo: string; children: React.ReactNo
 type Totales = NonNullable<Estado['entradas']['input2']>;
 
 /** Corregir un total sin volver a subir el Excel: una fila por canal. */
-const TotalesDialog = ({ totales, onCerrar }: { totales: Totales; onCerrar: () => void }) => {
+type Objetivo = Estado['entradas']['input1'];
+
+const TotalesDialog = ({ totales, objetivo, onCerrar }: { totales: Totales; objetivo: Objetivo; onCerrar: () => void }) => {
   const { editarTotales, ocupado } = useMovil();
-  const [filas, setFilas] = useState(totales.detalle.map(t => ({
+  // Lo cargado, para mostrar "antes: …" en lo que se cambie (se compara texto: el front no calcula).
+  const [originales] = useState(() => totales.detalle.map(t => ({
     canal: t.canal, kilos: formatear(t.kilos), plata: t.plata == null ? '' : formatear(t.plata),
   })));
+  const [filas, setFilas] = useState(originales);
+  const antes = (i: number, campo: 'kilos' | 'plata') =>
+    filas[i][campo].trim() !== originales[i][campo] ? `antes: ${originales[i][campo] || 'vacío'}` : undefined;
   const [error, setError] = useState<string | null>(null);
   const cambiar = (i: number, campo: 'kilos' | 'plata', valor: string) => {
     setFilas(fs => fs.map((f, n) => (n === i ? { ...f, [campo]: valor } : f)));
@@ -78,6 +84,12 @@ const TotalesDialog = ({ totales, onCerrar }: { totales: Totales; onCerrar: () =
     <Dialog open onClose={onCerrar} maxWidth="sm" fullWidth PaperProps={{ component: 'form', onSubmit: guardar }}>
       <DialogTitle>Editar totales por canal</DialogTitle>
       <DialogContent>
+        {objetivo && (
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+            Tienen que sumar lo mismo que el objetivo de Contraloría: {conUnidad(objetivo.kilos, 'kilos')} y{' '}
+            {conUnidad(objetivo.nns, 'plata')}.
+          </Typography>
+        )}
         <Table size="small">
           <TableHead>
             <TableRow>
@@ -92,10 +104,12 @@ const TotalesDialog = ({ totales, onCerrar }: { totales: Totales; onCerrar: () =
                 <TableCell>{f.canal}</TableCell>
                 <TableCell>
                   <TextField size="small" value={f.kilos} onChange={e => cambiar(i, 'kilos', e.target.value)}
+                    helperText={antes(i, 'kilos')} color={antes(i, 'kilos') ? 'warning' : undefined} focused={!!antes(i, 'kilos') || undefined}
                     inputProps={{ 'aria-label': `Kilos de ${f.canal}`, inputMode: 'decimal', style: numeros }} />
                 </TableCell>
                 <TableCell>
                   <TextField size="small" value={f.plata} onChange={e => cambiar(i, 'plata', e.target.value)}
+                    helperText={antes(i, 'plata')} color={antes(i, 'plata') ? 'warning' : undefined} focused={!!antes(i, 'plata') || undefined}
                     inputProps={{ 'aria-label': `Pesos de ${f.canal}`, inputMode: 'decimal', style: numeros }} />
                 </TableCell>
               </TableRow>
@@ -165,7 +179,7 @@ const Entradas = ({ estado }: { estado: Estado }) => {
           </Link>
         </Box>
       )}
-      {editar && input2 && <TotalesDialog totales={input2} onCerrar={() => setEditar(false)} />}
+      {editar && input2 && <TotalesDialog totales={input2} objetivo={input1} onCerrar={() => setEditar(false)} />}
     </>
   );
 };
@@ -234,10 +248,18 @@ const Pendientes = ({ estado, unidad, enMatriz }: { estado: Estado; unidad: Unid
   };
   const [eligiendo, setEligiendo] = useState<Repetido>();
   const repetido = (sku: string | null) => estado.repetidos.find(r => r.sku === sku);
+  const { enfocar } = useMovil();
   const acciones = (p: Estado['problemas'][number]) => {
     const r = p.tipo === 'sku_repetido' ? repetido(p.sku) : undefined;
+    const celda = p.bloque === 'apertura' && p.sku && p.canal && enMatriz.has(p.sku) ? `${p.sku} · ${p.canal}` : null;
     return (
       <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+        {celda && (
+          <Button size="small" color="inherit" sx={{ whiteSpace: 'nowrap' }} aria-label={`Ver celda ${celda}`}
+            onClick={() => enfocar('celda', `${p.sku}|${p.canal}`)}>
+            Ver celda
+          </Button>
+        )}
         {r && (
           <Button size="small" color="inherit" sx={{ whiteSpace: 'nowrap' }} onClick={() => setEligiendo(r)}
             aria-label={`Elegir fila de SKU ${r.sku}`}>
@@ -399,7 +421,7 @@ export const MovilPage = () => {
         {cruce && (
           <Seccion titulo={`SKU × canal en ${UNIDADES[unidad].nombre.toLowerCase()} (${UNIDADES[unidad].simbolo})`}
             abierta ayuda={AYUDA.matriz}
-            pedido={foco?.tipo === 'sku' ? foco.vez : undefined}>
+            pedido={foco?.tipo === 'sku' || foco?.tipo === 'celda' ? foco.vez : undefined}>
             <Matriz cruce={cruce} />
           </Seccion>
         )}

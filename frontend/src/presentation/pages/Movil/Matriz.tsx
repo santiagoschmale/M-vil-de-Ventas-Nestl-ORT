@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Box, Switch, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography } from '@mui/material';
 import PushPinRoundedIcon from '@mui/icons-material/PushPinRounded';
 import { useMovil } from '../../../stores/useMovil';
@@ -13,9 +13,18 @@ type Sku = Cruce['skus'][number];
 const fija = { position: 'sticky' as const, left: 0, zIndex: 2, background: '#fff' };
 
 export const Matriz = ({ cruce }: { cruce: Cruce }) => {
-  const { cambiarSku, ocupado, foco } = useMovil();
+  const { cambiarSku, ocupado, foco, soltarFoco } = useMovil();
   const [abierta, setAbierta] = useState<{ sku: Sku; canal: string; celda: Celda }>();
   const [prender, setPrender] = useState<Sku>();
+  // "Ver celda" desde Para revisar: abre esa celda con su apertura.
+  useEffect(() => {
+    if (foco?.tipo !== 'celda') return;
+    const [codigo, canal] = foco.id.split('|');
+    const sku = cruce.skus.find(x => x.codigo === codigo);
+    const celda = sku?.celdas[canal];
+    if (sku && celda) setAbierta({ sku, canal, celda });
+    soltarFoco();  // se usa una vez: si la tabla se vuelve a montar, no la reabre
+  }, [foco]);
 
   return (
     <>

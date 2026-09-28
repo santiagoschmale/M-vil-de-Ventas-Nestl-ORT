@@ -40,6 +40,7 @@ export type Problema = {
   sku: string | null;
   bloque: string | null;
   tipo?: string | null; // p. ej. 'sku_repetido': la pantalla ofrece resolverlo
+  canal?: string | null; // si es de una celda SKU × canal
 };
 
 /** Un SKU repetido en el objetivo de Contraloría: sus filas del Excel y cuál vale. */
@@ -106,11 +107,12 @@ export type Apertura = {
 type Resultado = Promise<string | null>;
 
 /** A qué fila fue a mirar el planner desde "Para revisar". `vez` cambia en cada clic. */
-export type Foco = { tipo: 'regla' | 'sku'; id: string; vez: number };
+export type Foco = { tipo: 'regla' | 'sku' | 'celda'; id: string; vez: number }; // celda: "sku|canal"
 
 export type TUseMovil = {
   foco?: Foco;
   enfocar: (tipo: Foco['tipo'], id: string) => void;
+  soltarFoco: () => void;
   estado?: Estado;
   cruce?: Cruce;
   unidad: Unidad;
