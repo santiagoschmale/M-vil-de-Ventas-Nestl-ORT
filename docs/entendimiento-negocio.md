@@ -240,6 +240,13 @@ mínimo y fijo en % del total del canal para una o más categorías.
 
 ### Puntos abiertos [a confirmar]
 
+0. **SKU nuevo (sin reparto el mes anterior)**: ¿el planner indica en qué canales se
+   vende? ¿Se reparte en proporción al total de cada uno de esos canales, en partes
+   iguales, o copiando un SKU parecido? Implementado como supuesto: el planner elige
+   los canales y se reparte en proporción al total de cada canal (A4).
+0. **Editar el mes anterior**: está confirmado que es editable. ¿Qué se edita:
+   cuánto vendió un SKU en un canal, o que ahora se vende en un canal donde antes no?
+   (A12)
 1. **Base del porcentaje**: el ejemplo "Café + Chocolatería · mínimo 30% del total
    del canal" dice del canal, y así está implementado. Falta confirmar que vale
    para todas las reglas.

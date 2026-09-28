@@ -65,7 +65,8 @@ Documento vivo. Última actualización: después de la reunión con la referente
 | A1 | **Criterio de re-normalización**: cuando se modifica un SKU o se deshabilita una entidad, ¿cómo se reparte la diferencia? ¿Proporcional o en partes iguales? | Alta, es MUST |
 | A2 | **Margen en los totales por canal**: ¿el input 2 admite margen (se mencionó ±500 kg) o cierra exacto como el input 1? | Alta |
 | A3 | Formato exacto del input 2 para pegar en la herramienta | Media |
-| A4 | SKU sin reparto previo (nuevo, no estaba el mes anterior): ¿cómo se abre? | Media |
+| A4 | SKU sin reparto previo (nuevo, no estaba el mes anterior): ¿el planner indica en qué canales se vende? ¿se reparte en proporción al total de cada canal? **Implementado así como supuesto** ("Dónde se vende"); confirmar | Alta |
+| A12 | Editar el mes anterior en la plataforma (confirmado que es editable): ¿es cambiar cuánto vendió un SKU en un canal, o marcar que ahora se vende en un canal donde antes no? | Media |
 | A5 | ¿La entidad vendedor es la persona o el par persona-sistema? | Media |
 | A6 | ¿Los roles vienen de grupos de Entra o los administramos nosotros? | Media |
 | A8 | ¿Un canal que hoy cierra a nivel canal podría abrirse por vendedor más adelante? | Baja (la arquitectura ya lo cubre) |
