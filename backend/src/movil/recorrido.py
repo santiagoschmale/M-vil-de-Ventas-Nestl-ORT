@@ -325,7 +325,7 @@ def exportar(recorrido: Recorrido, destino) -> None:
         for a in cruce.avisos:
             hoja.append([f"cruce {unidad}", "aviso", None, None, a])
     for p in recorrido.problemas:
-        hoja.append([p.bloque or "archivo", p.severidad, p.sku, None, p.mensaje])
+        hoja.append([p.bloque or "archivo", p.severidad, p.sku, p.canal, p.mensaje])
     libro.save(destino)
 
 

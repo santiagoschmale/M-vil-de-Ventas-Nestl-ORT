@@ -181,6 +181,16 @@ def _con_apertura(apagados_entidades=frozenset()):
     return r, apertura
 
 
+def test_en_el_excel_cada_problema_de_apertura_dice_su_canal():
+    r, _ = _con_apertura(frozenset({"Agustina Medina", "Federico Luna"}))  # Rosario sin nadie prendido
+    destino = BytesIO()
+    exportar(r, destino)
+    destino.seek(0)
+    filas = list(load_workbook(destino)["Problemas"].iter_rows(values_only=True))
+    apertura = [f for f in filas if f[0] == "apertura"]
+    assert apertura and all(f[3] == "Rosario" for f in apertura)
+
+
 def test_cada_celda_abierta_suma_exacto_o_queda_reportada():
     """
     Cada celda con apertura: o sus entidades suman exacto el valor del cruce (en kilos
