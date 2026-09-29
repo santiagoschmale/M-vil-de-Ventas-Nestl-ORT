@@ -32,8 +32,8 @@ from pathlib import Path
 
 from openpyxl import load_workbook
 
-from src.domain.arbol import Problema
-from src.domain.reparto import a_texto
+from src.domain.formato import a_texto
+from src.domain.problema import Problema
 
 FORMATO = json.loads(Path(__file__).with_name("formato.json").read_text(encoding="utf-8"))
 KILOS = 3  # decimales

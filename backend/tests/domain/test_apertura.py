@@ -8,7 +8,7 @@ exacta que prueba. Mismo estilo que test_reparto: `assert` plano, sin fixtures.
 
 from decimal import Decimal as D
 
-from src.domain.arbol import Nodo, recalcular
+from src.domain.apertura import Nodo, recalcular
 from src.domain.reparto import cuadra
 
 

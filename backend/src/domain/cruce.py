@@ -58,7 +58,7 @@ from math import ceil, floor
 from typing import Mapping, Sequence
 
 from .flujo import INFINITO, FlujoMaximo, flujo_de_costo_minimo
-from .reparto import a_texto
+from .formato import a_texto
 
 Celda = tuple[str, str]  # (sku, canal)
 

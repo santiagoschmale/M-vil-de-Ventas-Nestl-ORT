@@ -23,7 +23,7 @@ from datetime import datetime
 from decimal import Decimal
 
 from src.domain.cruce import Celda, ErrorDeCruce
-from src.domain.reparto import a_texto
+from src.domain.formato import a_texto
 from src.importer.entradas import (
     KILOS,
     PLATA,
@@ -35,7 +35,7 @@ from src.importer.entradas import (
     normalizar,
     numero,
 )
-from src.domain.arbol import Problema
+from src.domain.problema import Problema
 from src.domain.cruce import LIMITES
 from src.movil.recorrido import Recorrido, Regla, armar
 

@@ -26,7 +26,8 @@ from pathlib import Path
 from openpyxl import Workbook
 from openpyxl.styles import Font
 
-from src.domain.arbol import Nodo, Problema, recalcular
+from src.domain.apertura import Nodo, recalcular
+from src.domain.problema import Problema
 from src.domain.cruce import Celda, Grupo, ResultadoCruce, cruzar
 from src.importer.entradas import (
     KILOS,

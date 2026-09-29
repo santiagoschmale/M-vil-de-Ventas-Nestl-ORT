@@ -1,6 +1,9 @@
 """
-El árbol debajo del canal: cómo se abre una celda SKU × canal entre
+La apertura debajo del canal: cómo se abre una celda SKU × canal entre
 distribuidores y vendedores, con `repartir` en cada nivel.
+
+Es un árbol en el sentido de jerarquía (la celda arriba, sus vendedores abajo), no un
+árbol de decisión: no predice nada, reparte de arriba hacia abajo.
 
 FORMA
 -----
@@ -61,17 +64,6 @@ class Nodo:
     activo: bool = True
     cuadra: dict[str, bool] = field(default_factory=lambda: {u: True for u in UNIDADES})
     aviso: dict[str, str | None] = field(default_factory=lambda: {u: None for u in UNIDADES})
-
-
-@dataclass
-class Problema:
-    """Un problema de calidad del archivo de entrada."""
-    severidad: str  # "error" | "aviso"
-    mensaje: str
-    sku: str | None = None
-    bloque: str | None = None
-    tipo: str | None = None  # para los que la pantalla ofrece resolver, p. ej. "sku_repetido"
-    canal: str | None = None  # si es de una celda SKU × canal (p. ej. una apertura que no se puede hacer)
 
 
 # ---------------------------------------------------------------------------

@@ -11,7 +11,9 @@ importer/entradas.py   objetivo (Excel), totales por canal (Excel o tabla), base
 domain/cruce.py        cruce SKU × canal: filas = input 1, columnas = input 2
 domain/flujo.py        flujo máximo y de costo mínimo (sin dependencias)
 domain/reparto.py      largest remainder: repartir un total por pesos relativos
-domain/arbol.py        debajo del canal: valor y estado, fijado, ON/OFF
+domain/apertura.py     debajo del canal: valor y estado, fijado, ON/OFF
+domain/formato.py      montos como se escriben en Argentina (a_texto)
+domain/problema.py     el aviso de un problema en los datos
 movil/recorrido.py     encadena todo y exporta el Excel; también es la línea de comandos
 movil/sesion.py        la sesión del mes: entradas, ON/OFF, celdas fijadas, historial
 movil/repositorio.py   dónde vive la sesión (hoy en memoria, un lock global)
@@ -90,7 +92,7 @@ columnas, así que el precio distinto de cada canal lo absorbe solo.
 ## Debajo del canal
 
 Cada celda del cruce con apertura del mes anterior es la raíz de un árbol: el
-valor se reparte entre distribuidores o vendedores con `arbol.recalcular`. Las
+valor se reparte entre distribuidores o vendedores con `apertura.recalcular`. Las
 entidades apagadas salen en todas las celdas y su parte va a las demás de la misma
 celda. El cruce no cambia al apagar un distribuidor.
 

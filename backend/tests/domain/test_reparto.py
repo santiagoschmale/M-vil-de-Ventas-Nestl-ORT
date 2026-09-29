@@ -377,7 +377,7 @@ def test_totales_de_mas_de_28_digitos_no_se_redondean():
 
 
 def test_a_texto_escribe_montos_como_se_leen_en_argentina():
-    from src.domain.reparto import a_texto
+    from src.domain.formato import a_texto
 
     assert a_texto(D("10.000")) == "10,000"  # diez kilos, no diez mil
     assert a_texto(D("454971.590")) == "454.971,590"
