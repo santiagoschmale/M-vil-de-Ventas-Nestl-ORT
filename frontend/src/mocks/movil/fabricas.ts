@@ -53,6 +53,7 @@ export const estadoFactory = Factory.define<Estado>(() => ({
   canales_sku: [],
   opciones: { canales: ['Catering', 'Directa (BA)'], categorias: ['Café', 'Chocolatería', 'Lácteos'] },
   historial: [],
+  deshacer: null,
 }));
 
 export const cruceFactory = Factory.define<Cruce>((): Cruce => ({

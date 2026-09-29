@@ -8,6 +8,7 @@ import ExpandMoreRoundedIcon from '@mui/icons-material/ExpandMoreRounded';
 import FileDownloadRoundedIcon from '@mui/icons-material/FileDownloadRounded';
 import UploadFileRoundedIcon from '@mui/icons-material/UploadFileRounded';
 import EditRoundedIcon from '@mui/icons-material/EditRounded';
+import UndoRoundedIcon from '@mui/icons-material/UndoRounded';
 import { useMovil } from '../../../stores/useMovil';
 import { Estado, Unidad } from '../../../stores/useMovil/useMovil.type';
 import { conUnidad, formatear, UNIDADES } from './formato';
@@ -26,6 +27,7 @@ const ACCIONES: Record<string, string> = {
   apagar_sku: 'Apagó un SKU', prender_sku: 'Prendió un SKU',
   apagar_entidad: 'Apagó un distribuidor o vendedor', prender_entidad: 'Prendió un distribuidor o vendedor',
   fijar: 'Fijó una celda', desfijar: 'Volvió una celda a calculada',
+  deshacer: 'Deshizo el último cambio',
 };
 
 const Subir = ({ cargado, etiqueta, alElegir }: { cargado: boolean; etiqueta: string; alElegir: (f: File) => void }) => {
@@ -343,7 +345,7 @@ const Seccion = ({ titulo, resumen, abierta = false, pedido, ayuda, children }: 
 };
 
 export const MovilPage = () => {
-  const { estado, cruce, unidad, refrescar, elegirUnidad, ocupado, errorDeCarga, foco } = useMovil();
+  const { estado, cruce, unidad, refrescar, elegirUnidad, ocupado, errorDeCarga, foco, deshacer } = useMovil();
   const [confirmarExportar, setConfirmarExportar] = useState(false);
   useEffect(() => { refrescar(); }, []);
   // Llevar a la fila que se fue a ver, cuando la sección terminó de abrirse.
@@ -374,6 +376,8 @@ export const MovilPage = () => {
     paraRevisar && `${paraRevisar} para revisar`,
   ].filter(Boolean).join(' · ') || 'Nada';
   const cierraTodo = estado.cierra.kilos && estado.cierra.plata;
+  const queDeshace = estado.deshacer
+    && `Deshacer: ${ACCIONES[estado.deshacer.accion] ?? estado.deshacer.accion} · ${estado.deshacer.detalle}`;
   const chocan = new Set([...estado.inconsistencias.kilos, ...estado.inconsistencias.plata].flatMap(i => i.reglas)).size;
   const resumenReglas = estado.reglas.length
     ? `${estado.reglas.length} ${estado.reglas.length === 1 ? 'regla' : 'reglas'}${chocan ? ` · ${chocan} ${chocan === 1 ? 'choca' : 'chocan'}` : ''}`
@@ -397,6 +401,15 @@ export const MovilPage = () => {
               <ChipCierre unidad="plata" cierra={estado.cierra.plata} />
             </>
           )}
+          {/* Una sola vuelta atrás: después se deshabilita hasta el próximo cambio. */}
+          <Tooltip title={queDeshace ?? 'No hay un cambio para deshacer'}>
+            <span>
+              <Button size="small" color="inherit" startIcon={<UndoRoundedIcon />} disabled={!queDeshace || ocupado}
+                aria-label={queDeshace ?? 'Deshacer'} onClick={() => deshacer()}>
+                Deshacer
+              </Button>
+            </span>
+          </Tooltip>
           <ToggleButtonGroup
             size="small" exclusive value={unidad} aria-label="Unidad de la matriz"
             onChange={(_, u: Unidad | null) => u && elegirUnidad(u)}

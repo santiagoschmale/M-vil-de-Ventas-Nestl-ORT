@@ -212,3 +212,15 @@ def test_donde_se_vende_por_http():
     assert c.put(f"/api/movil/skus/{NUEVO}/canales", json={"canales": [], "motivo": "x"}).status_code == 422
     r = c.request("DELETE", f"/api/movil/skus/{NUEVO}/canales", json={"motivo": "se postergó"})
     assert r.status_code == 200 and r.json()["canales_sku"] == []
+
+
+def test_deshacer_el_ultimo_cambio_una_sola_vez():
+    c = _cargado()
+    assert c.get("/api/movil").json()["deshacer"]["accion"] == "cargar_base"
+    c.put(f"/api/movil/skus/{NUEVO}", json={"activo": False, "motivo": "SKU nuevo"})
+
+    r = c.post("/api/movil/deshacer")
+    assert r.status_code == 200
+    assert r.json()["apagados"]["skus"] == [] and r.json()["deshacer"] is None
+    assert r.json()["historial"][-1]["accion"] == "deshacer"
+    assert c.post("/api/movil/deshacer").status_code == 422

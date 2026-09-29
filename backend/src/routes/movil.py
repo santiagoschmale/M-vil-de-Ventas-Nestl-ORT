@@ -174,6 +174,8 @@ def _estado(s: Sesion) -> dict:
             "categorias": sorted({o.categoria for o in (e.objetivos or {}).values() if o.categoria}),
         },
         "historial": [_ajuste(a) for a in s.historial],
+        # Lo que se puede deshacer (una sola vez), o None.
+        "deshacer": _ajuste(s.ultimo_cambio) if s.ultimo_cambio else None,
     }
 
 
@@ -371,4 +373,10 @@ def editar_regla(id_: str, cuerpo: ReglaIn, s: Sesion = Depends(sesion), quien: 
 @router.delete("/reglas/{id_}", summary="Eliminar una regla")
 def eliminar_regla(id_: str, cuerpo: MotivoIn, s: Sesion = Depends(sesion), quien: str = Depends(autor)):
     _aplicar(s.eliminar_regla, id_, autor=quien, cuando=_ahora(), motivo=cuerpo.motivo)
+    return _estado(s)
+
+
+@router.post("/deshacer", summary="Deshacer el último cambio (una sola vez)")
+def deshacer(s: Sesion = Depends(sesion), quien: str = Depends(autor)):
+    _aplicar(s.deshacer, autor=quien, cuando=_ahora())
     return _estado(s)

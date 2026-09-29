@@ -131,6 +131,7 @@ export const useMovil = create<TUseMovil>((set, get) => {
       cambiar(() => api.put(`/movil/skus/${ruta(sku)}/canales`, { canales, motivo }), enDialogo),
     quitarCanales: (sku, motivo) =>
       cambiar(() => api.delete(`/movil/skus/${ruta(sku)}/canales`, { data: { motivo } }), enDialogo),
+    deshacer: () => cambiar(() => api.post('/movil/deshacer', {})),
 
     apertura: async (sku, canal) => {
       try {

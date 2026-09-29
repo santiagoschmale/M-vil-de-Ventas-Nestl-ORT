@@ -96,6 +96,9 @@ class Sesion:
         self._proxima_regla = 1  # los ids no se reusan: el historial los nombra
         self.historial: list[Ajuste] = []
         self.recorrido: Recorrido | None = None
+        # El último cambio y el estado de antes, para deshacerlo. Una sola vez: después queda en None.
+        self._antes_del_ultimo: tuple | None = None
+        self.ultimo_cambio: Ajuste | None = None
 
     # --- entradas -----------------------------------------------------------
 
@@ -319,7 +322,31 @@ class Sesion:
             return Ajuste("eliminar_regla", _describir(regla), autor, cuando, motivo)
         self._aplicar(cambio)
 
+    # --- deshacer -----------------------------------------------------------
+
+    def deshacer(self, autor: str, cuando: datetime) -> None:
+        """
+        Vuelve al estado de antes del último cambio. No borra el historial: suma un
+        ajuste "deshacer". Una sola vez; se habilita de nuevo con el próximo cambio.
+        """
+        if self.ultimo_cambio is None:
+            raise ErrorDeAjuste("No hay ningún cambio para deshacer.")
+        proxima = self._proxima_regla  # ponytail: los ids de regla no se reusan, el historial los nombra
+        self._restaurar(self._antes_del_ultimo)
+        self._proxima_regla = proxima
+        self.historial.append(Ajuste("deshacer", f"Deshizo: {self.ultimo_cambio.detalle}", autor, cuando))
+        self._antes_del_ultimo = self.ultimo_cambio = None
+
     # --- interno ------------------------------------------------------------
+
+    def _respaldo(self) -> tuple:
+        return (copy.copy(self._e), dict(self.apagados_skus), dict(self.entidades_apagadas),
+                {u: dict(f) for u, f in self._fijas.items()}, dict(self.reglas), self._proxima_regla,
+                dict(self.filas_elegidas), dict(self.canales_sku), self.recorrido)
+
+    def _restaurar(self, respaldo: tuple) -> None:
+        (self._e, self.apagados_skus, self.entidades_apagadas, self._fijas, self.reglas,
+         self._proxima_regla, self.filas_elegidas, self.canales_sku, self.recorrido) = respaldo
 
     def _unidad(self, unidad: str) -> int:
         if unidad not in UNIDADES:
@@ -336,17 +363,15 @@ class Sesion:
         Aplica un cambio como transacción: si recalcular falla, el estado vuelve a como
         estaba antes y no queda nada a medias. Si sale bien, va al historial.
         """
-        respaldo = (copy.copy(self._e), dict(self.apagados_skus), dict(self.entidades_apagadas),
-                    {u: dict(f) for u, f in self._fijas.items()}, dict(self.reglas), self._proxima_regla,
-                    dict(self.filas_elegidas), dict(self.canales_sku), self.recorrido)
+        respaldo = self._respaldo()
         try:
             ajuste = cambio()
             self.recorrido = self._recalcular()
         except Exception:
-            (self._e, self.apagados_skus, self.entidades_apagadas, self._fijas, self.reglas,
-             self._proxima_regla, self.filas_elegidas, self.canales_sku, self.recorrido) = respaldo
+            self._restaurar(respaldo)
             raise
         self.historial.append(ajuste)
+        self._antes_del_ultimo, self.ultimo_cambio = respaldo, ajuste
 
     def _fijas_vigentes(self, unidad: str) -> dict[Celda, Decimal]:
         """

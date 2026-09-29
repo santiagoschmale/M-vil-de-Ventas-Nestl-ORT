@@ -77,6 +77,7 @@ export type Estado = {
   canales_sku: (Ajuste & { sku: string; canales: string[] })[]; // "Dónde se vende"
   opciones: { canales: string[]; categorias: string[] };
   historial: Ajuste[];
+  deshacer: Ajuste | null; // el último cambio, si se puede deshacer (una sola vez)
 };
 
 export type Celda = { monto: Monto; fijada: boolean };
@@ -137,4 +138,5 @@ export type TUseMovil = {
   elegirFila: (sku: string, fila: number, motivo: string) => Resultado;
   elegirCanales: (sku: string, canales: string[], motivo: string) => Resultado;
   quitarCanales: (sku: string, motivo: string) => Resultado;
+  deshacer: () => Resultado;
 };

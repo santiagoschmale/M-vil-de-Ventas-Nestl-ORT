@@ -34,6 +34,7 @@ beforeEach(() => {
     http.put('*/api/movil/skus/*/fila', anotar),
     http.put('*/api/movil/skus/*/canales', anotar),
     http.delete('*/api/movil/skus/*/canales', anotar),
+    http.post('*/api/movil/deshacer', anotar),
   );
 });
 
@@ -328,6 +329,21 @@ describe('MovilPage', { timeout: 15000 }, () => {
     await user.click(within(dialogo).getByRole('button', { name: 'Quitar' }));
     await waitFor(() => expect(pedidos).toHaveLength(1));
     expect(pedidos[0]).toMatchObject({ metodo: 'DELETE', url: '/api/movil/skus/200/canales', cuerpo: { motivo: 'se postergó' } });
+  });
+
+  it('deshacer vuelve atrás el último cambio y dice cuál es', async () => {
+    const ultimo = { accion: 'apagar_sku', detalle: 'SKU 100', autor: 'planner-local', cuando: '2026-09-24T10:00:00', motivo: 'm' };
+    server.use(http.get('*/api/movil', () => HttpResponse.json(estado({ deshacer: ultimo }))));
+    const user = userEvent.setup({ delay: null });
+    render(<MovilPage />);
+    const boton = await screen.findByRole('button', { name: 'Deshacer: Apagó un SKU · SKU 100' });
+    await user.click(boton);
+    await waitFor(() => expect(pedidos).toEqual([{ metodo: 'POST', url: '/api/movil/deshacer', cuerpo: {} }]));
+  });
+
+  it('sin un cambio para deshacer, el botón está deshabilitado', async () => {
+    render(<MovilPage />);
+    expect(await screen.findByRole('button', { name: 'Deshacer' })).toBeDisabled();
   });
 
   it('exportar se habilita solo cuando kilos y pesos cierran', async () => {
