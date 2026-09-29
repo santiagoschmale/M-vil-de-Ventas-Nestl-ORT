@@ -116,7 +116,7 @@ export const CeldaDialog = ({ sku, descripcion, canal, celda, onCerrar }: Props)
         <MotivoDialog
           titulo={`${entidad.activo ? 'Apagar' : 'Prender'} ${entidad.nombre}`}
           descripcion={entidad.activo
-            ? 'Deja de recibir en todos los SKUs y canales. Lo suyo se reparte entre los demás.'
+            ? 'Deja de recibir en todos los SKUs y canales. Lo suyo pasa a los que siguen prendidos, según lo que vendió cada uno el mes anterior.'
             : 'Vuelve a recibir según su peso del mes anterior.'}
           confirmar={entidad.activo ? 'Apagar' : 'Prender'}
           onConfirmar={m => cambiarEntidad(entidad.nombre, !entidad.activo, m)}

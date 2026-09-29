@@ -124,7 +124,9 @@ export const AYUDA = {
           sus vendedores. Se reparte con los pesos del mes anterior y la suma da exacto el valor de la celda.
         </P>
         <P>
-          Apagar un distribuidor o vendedor lo saca de todos los SKUs y canales: lo suyo se reparte entre los demás.
+          Apagar un distribuidor o vendedor lo saca de todos los SKUs y canales. Lo que le tocaba se reparte entre
+          los que siguen prendidos, en proporción a lo que vendió cada uno de ese SKU en ese canal el mes anterior.
+          Los que tienen un valor fijado a mano no cambian.
         </P>
       </>
     ),

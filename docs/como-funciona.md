@@ -136,8 +136,9 @@ No sabe nada de SKUs ni canales: son números y nodos.
 ### `domain/apertura.py` y `domain/reparto.py` — debajo del canal
 
 `apertura` toma el valor de una celda (SKU × canal) y lo reparte entre las entidades
-de ese canal. Respeta las entidades apagadas (lo suyo va a las demás) y las fijadas a
-mano. Para repartir usa `reparto`, que divide un total según pesos, con el método de
+de ese canal. Una entidad apagada recibe cero y lo suyo se reparte entre las que siguen
+prendidas, en proporción a lo que vendió cada una de ese SKU en ese canal el mes anterior.
+Las fijadas a mano no cambian. Para repartir usa `reparto`, que divide un total según pesos, con el método de
 los mayores restos: la suma da exacto, sin perder ni un gramo.
 
 **Qué canales se abren lo decide el Excel del mes anterior, no el código.** Se abre
