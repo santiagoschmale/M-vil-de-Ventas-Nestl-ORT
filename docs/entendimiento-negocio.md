@@ -252,16 +252,20 @@ mínimo y fijo en % del total del canal para una o más categorías.
    ¿se reparte como el territorio entero, se le asigna a alguien, o se saca de ese
    canal? Hoy se avisa (amarillo) y los kilos quedan en el canal sin abrir. Conviene
    contar cuántas celdas quedan así con el archivo real. (A14)
-4. **Base del porcentaje**: el ejemplo "Café + Chocolatería · mínimo 30% del total
+4. **Formato del Excel de salida**: ¿qué hojas y columnas espera quien lo recibe? ¿Vuelve
+   a cargarse en algún sistema (SAP)? Hoy lo definimos nosotros. (A15)
+5. **Meses aprobados**: ¿se pueden reabrir y modificar? ¿Todos los planners ven los meses
+   anteriores, incluido lo que hizo otro? (A16, A6)
+6. **Base del porcentaje**: el ejemplo "Café + Chocolatería · mínimo 30% del total
    del canal" dice del canal, y así está implementado. Falta confirmar que vale
    para todas las reglas.
-5. **Reglas debajo del canal**: "En Córdoba ningún vendedor supera el 25%" actúa
+7. **Reglas debajo del canal**: "En Córdoba ningún vendedor supera el 25%" actúa
    en la apertura, no en el cruce. Falta confirmar que va (y la base del %).
-6. **Valor fijo en kilos** ("Córdoba siempre 2.500 kg"): a nivel canal ya es el
+8. **Valor fijo en kilos** ("Córdoba siempre 2.500 kg"): a nivel canal ya es el
    input 2. ¿Hay valores fijos en kilos para una categoría dentro de un canal, o
    solo en %?
-7. **Segmento como alcance**: hace falta saber qué categorías forman cada segmento.
-8. **Dos reglas del mismo canal que comparten solo parte de las categorías**
+9. **Segmento como alcance**: hace falta saber qué categorías forman cada segmento.
+10. **Dos reglas del mismo canal que comparten solo parte de las categorías**
    (Café + Chocolatería y Chocolatería + Mixes): hoy se informan y no se
    calculan. ¿Se da en la práctica?
 

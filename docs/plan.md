@@ -68,12 +68,14 @@ Documento vivo. Última actualización: después de la reunión con la referente
 | A4 | SKU sin reparto previo (nuevo, no estaba el mes anterior): ¿el planner indica en qué canales se vende? ¿se reparte en proporción al total de cada canal? **Implementado así como supuesto** ("Dónde se vende"); confirmar | Alta |
 | A12 | Editar el mes anterior en la plataforma (confirmado que es editable): ¿es cambiar cuánto vendió un SKU en un canal, o marcar que ahora se vende en un canal donde antes no? | Media |
 | A5 | ¿La entidad vendedor es la persona o el par persona-sistema? | Media |
-| A6 | ¿Los roles vienen de grupos de Entra o los administramos nosotros? | Media |
+| A6 | ¿Los roles vienen de grupos de Entra o los administramos nosotros? ¿Todos los planners ven los móviles de meses anteriores (incluido lo que hizo otro)? ¿Hay un rol aprobador? | Media |
 | A8 | ¿Un canal que hoy cierra a nivel canal podría abrirse por vendedor más adelante? | Baja (la arquitectura ya lo cubre) |
 | A9 | ¿TestSprite es obligatorio o sugerido? | Baja |
 | A10 | Ubicación de territorios y vendedores dentro de Soluciones (hipótesis: bajo la vía Directa) | Alta |
 | A11 | 2 SKUs aparecen en Ingredientes y en Soluciones: ¿cómo se parte su objetivo entre segmentos? | Media |
 | A13 | Siglas y nombres propios del archivo: KAS y otros dos (ver notas internas) | Baja |
+| A15 | **Formato del Excel de salida**: ¿qué hojas y columnas espera quien lo recibe? ¿Vuelve a cargarse en algún sistema (SAP)? Hoy lo definimos nosotros (Kilos, Plata, Apertura, Problemas) | Alta |
+| A16 | **¿Un mes aprobado se puede reabrir?** Si sí, hay que guardar versiones ("la aprobada del 5/3", "la corregida del 9/3"), no solo el último estado | Media |
 | A14 | SKU que cae en un territorio o en Distribuidores donde nadie lo vendió el mes anterior: ¿se reparte como el canal entero, se asigna a alguien o se saca de ese canal? Hoy se avisa y queda en el canal | Media |
 
 **Reglas**
@@ -243,7 +245,7 @@ Hay que saber si un valor fue **calculado** o **editado a mano**. El valor edita
 
 ### Trazabilidad
 
-Cada ajuste registra qué cambió, quién, cuándo y por qué. El autor sale de la interfaz de autenticación.
+Cada ajuste registra qué cambió, quién, cuándo y por qué. El autor sale de la interfaz de autenticación. Hoy el historial vive en la sesión en memoria; cómo se guarda y se consulta está en la sección 11.
 
 ### Autenticación detrás de una interfaz
 
@@ -304,6 +306,52 @@ El planner tiene **conocimiento empírico que el histórico no captura**: sabe q
 2. Conseguir los ejemplos de reglas reales y validar el catálogo de tipos (R7)
 3. Validar con el nuevo referente el margen del input 2 (A2), la estructura del árbol (A10) y las preguntas de reglas (R1 a R4)
 4. Alinear el repo del equipo con el stack confirmado (E1)
-5. Implementar el cruce SKU × canal y terminar el motor de reparto
+5. ~~Implementar el cruce SKU × canal y terminar el motor de reparto~~ (hecho en `feat/template-nestle`, ver §4)
 6. Mandar las preguntas técnicas del scaffold a IT
 7. Preguntar el criterio de re-normalización (A1)
+
+---
+
+## 11. Propuesta: historial y un móvil por mes
+
+Estado: **propuesta**, no implementada. Depende de la persistencia (§4, punto 1) y de las
+respuestas A6, A15 y A16.
+
+**Para qué sirve el historial** (la trazabilidad la pidió el cliente; el resto es lo que
+habilita):
+
+1. Explicar el móvil después: por qué una celda vale lo que vale, quién la tocó y con qué
+   motivo, aunque esa persona ya no esté.
+2. Aprobar con criterio: quien aprueba revisa lo que se tocó a mano, no miles de celdas.
+3. Arrancar el mes siguiente: las reglas se heredan (confirmado) y el historial dice qué se
+   decidió y por qué.
+4. Mejorar la herramienta: lo que se fija a mano todos los meses es candidato a regla.
+
+**Un móvil por mes, compartido.** El móvil es uno solo por mes para todos los planners (ya
+decidido: una sola versión). No hay "una sesión por persona": el historial es del móvil y
+cada entrada dice quién la hizo. "Lo que hizo Juan" es un filtro, no otra sesión.
+
+- **Móvil del mes**: sus tres archivos, reglas, ON/OFF, fijadas, historial y estado
+  (borrador → aprobado).
+- **Aprobado = solo lectura.** Si se puede reabrir (A16), cada reapertura es una versión nueva.
+- **Consultar un mes anterior**: Móviles → Febrero → ver la tabla, abrir una celda y ver su
+  historia, filtrar el historial por persona, SKU o canal. Quién puede verlo depende de A6.
+
+**Ejemplo**: en el mes 6 preguntan por algo del mes 2 que hizo Juan, que está de
+vacaciones. Cualquier planner con acceso abre el móvil de febrero (aprobado, solo lectura) y
+ve en la celda "fijada por Juan el 12/02, motivo: acuerdo con la cadena".
+
+**El Excel no es la fuente del historial.** La plataforma es la fuente de verdad. Una hoja
+Historial en el Excel exportado sería una copia útil para quien lo recibe, pero **no se
+agrega hasta saber el formato de salida (A15)**: si el Excel se vuelve a cargar en otro
+sistema, una hoja de más puede romper esa carga. El Excel de SAP o Contraloría que entra no
+se modifica nunca.
+
+**Nombres**: en el código, `Sesion` hoy es "el móvil del mes que se está armando". Cuando
+haya base y login, conviene renombrarla a *móvil del mes* (o período) para no confundirla con
+la sesión del usuario conectado.
+
+**Modelo mínimo** (cuando se haga la base): `Movil(mes, estado, versión)`, sus entradas y
+reglas, y `Ajuste(movil, acción, detalle, autor, cuándo, motivo)`, que es lo que hoy guarda
+`Sesion.historial`.
+
