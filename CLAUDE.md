@@ -24,7 +24,7 @@ como confirmada, de datos o a confirmar).
   ajuste humano → aprobación → Excel.
 - **Input 1** (Contraloría): SKU, kilos, plata. Lo esencial es SKU y kilos. El
   total por SKU **cierra exacto**.
-- **Input 2** (el planner): canal, kilos, plata. Tabla pegada cada mes,
+- **Input 2** (el planner): canal, kilos, plata. Se sube en Excel y se edita por canal en la herramienta (hoy la pega cada mes),
   precargada con la del mes anterior. La plata es por canal (cada canal tiene su
   precio): **la herramienta no valoriza**.
 - **El cruce SKU × canal es el centro del cálculo**: filas que suman el input 1,
@@ -48,7 +48,7 @@ como confirmada, de datos o a confirmar).
   de arriba. Kilos y plata por separado.
 - **Usuario**: el planner (~20 concurrentes, web desktop). El vendedor no entra al
   sistema.
-- **Integración**: entra un Excel (y el input 2 pegado), sale un Excel. SAP es
+- **Integración**: entran tres Excel (objetivo, totales por canal, mes anterior), sale un Excel. SAP es
   nice to have.
 
 ## Reglas innegociables
@@ -118,11 +118,15 @@ Lista completa con prioridades: `docs/plan.md`, sección 0 ("Abierto").
 
 - **A1** criterio de re-normalización (hoy proporcional, supuesto).
 - **A2** si el input 2 admite margen (se mencionó ±500 kg) o cierra exacto.
-- **A4** SKU sin reparto previo: cómo se abre.
+- **A4** SKU sin reparto previo: implementado como supuesto ("Dónde se vende",
+  proporcional al total de cada canal); confirmar.
 - **A10** dónde cuelgan territorios y vendedores dentro de Soluciones.
 - **A11** los 2 SKUs que están en Ingredientes y en Soluciones.
-- **R1–R7** base del %, nivel de cada regla, topes compartidos, reglas
-  incumplibles, prioridades, validar el catálogo con los ejemplos reales.
+- **A12** qué significa editar el mes anterior.
+- **A14** SKU que cae donde ningún vendedor o distribuidor lo vendió el mes anterior.
+- **R1, R2, R7** base del % para todas las reglas, reglas de vendedor (debajo del
+  canal), validar el catálogo con los ejemplos reales. R3 a R6 ya respondidas
+  (`docs/entendimiento-negocio.md` §9).
 
 ## Estado del entorno
 

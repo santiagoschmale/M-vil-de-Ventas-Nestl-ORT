@@ -7,7 +7,7 @@ Claude Code antes de tocar `domain/`, `importer/`, `movil/`, `routes/movil.py` o
 ## Cómo está armado
 
 ```
-importer/entradas.py   input 1 (Excel), input 2 (tabla pegada), base y apertura del mes anterior
+importer/entradas.py   objetivo (Excel), totales por canal (Excel o tabla), base y apertura del mes anterior
 domain/cruce.py        cruce SKU × canal: filas = input 1, columnas = input 2
 domain/flujo.py        flujo máximo y de costo mínimo (sin dependencias)
 domain/reparto.py      largest remainder: repartir un total por pesos relativos
@@ -104,7 +104,8 @@ celda. El cruce no cambia al apagar un distribuidor.
 - **A2**: el input 2 cierra exacto. Si admite margen (±500 kg), es un parámetro
   nuevo del cruce: las columnas pasan a ser rangos.
 - **A3**: formato de la apertura (hoy formato largo en una hoja de la base).
-- **A4**: SKU o entidad sin reparto previo: error explícito, no se inventa.
+- **A14**: una celda que cae donde ningún vendedor o distribuidor vendió ese SKU el mes
+  anterior no se abre: se avisa (amarillo) y queda en el canal. No se inventa.
 - **A10**: los vendedores cuelgan de Directa y de cada territorio.
 - **A11** (2 SKUs en los dos segmentos): **lo resuelve el cruce**. Es una fila con
   base en canales de los dos segmentos; el ajuste la parte según los totales de
@@ -152,19 +153,32 @@ celda. El cruce no cambia al apagar un distribuidor.
   avisa (`_REGLAS_JUSTAS`). En los casos de prueba armados al límite pasa ~3%.
 - **Tests del front y RAM**: `vitest.config.ts` (no `vite.config.ts`, que no manda
   para los tests) limita a 2 workers; con uno por núcleo el pico pasaba 2 GB.
+- **Rojo o amarillo**: rojo es solo lo que no cierra (las inconsistencias del cruce) y
+  bloquea exportar. Todo problema del archivo o de la apertura es amarillo: no bloquea,
+  y al exportar se muestra y se pide confirmar.
+- **La API se reinicia sola en local** (`reload` en `app.py` con IS_LOCAL): cada cambio al
+  código del backend borra la sesión en memoria. Hay que volver a cargar la muestra.
+- **Otro programa en el puerto 3000**: vite reenvía a `127.0.0.1:3000`, no a
+  `localhost` (que puede resolver a `::1` y caer en otra app). Si igual contesta HTML,
+  la pantalla dice "contestó otra aplicación".
+- **Subir archivos en los tests del front**: jsdom + axios + msw se cuelgan con un
+  `FormData`. Los tests de la pantalla prueban que se llama a la acción; el pedido
+  HTTP lo cubre el test de la API.
 - **Librerías `nbra-*`**: no existen en los registros públicos y no hay que
   pedirlas ahí (dependency confusion). `make deps-local` usa `local_shims/`.
 
 ## Falta
 
-- Reglas (catálogo de tipos): tope o mínimo en %, valor fijo, dónde se vende un
-  SKU. Hoy solo existen el total por canal (input 2) y las celdas fijadas.
 - Margen del input 2 (A2).
 - Reglas: hoy tope, mínimo y fijo en % del total del canal por categorías (cruce,
   sesión, API y panel). Faltan las de vendedor dentro de un canal (apertura), la
   herencia del mes anterior (necesita persistencia) y lo abierto en
   `docs/entendimiento-negocio.md` §9.
-- Aprobación del móvil por una persona (hoy se exporta sin aprobar).
+- Aprobación del móvil por una persona ("Aprobar y exportar"; hoy se exporta con
+  confirmación si quedan cosas para revisar, sin registrar la aprobación).
+- Editar el mes anterior en la plataforma (A12). Resolvería también A14.
+- Guardar las cargas sin perderlas: con la recarga automática, cada cambio al código del
+  backend reinicia la sesión (ver Persistencia).
 - Persistencia en Postgres (otra implementación de `repositorio.py`).
 - Entra ID (otro proveedor en `auth/proveedor.py`).
 - Buscador de SKUs en la matriz, si la cantidad real lo pide.

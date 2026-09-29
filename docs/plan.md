@@ -29,7 +29,7 @@ Documento vivo. Última actualización: después de la reunión con la referente
 | **Cambios de entidades** | Vendedores y distribuidores cambian poco; los productos entran y salen |
 | **Base SKU-canal** | No todos los SKUs se venden por todos los canales |
 | **Input 1** | De Contraloría: SKU, kilos, plata. Esenciales: SKU y kilos |
-| **Input 2** | Del planner: canal, kilos, plata. Tabla pegada cada mes, precargada con la del mes anterior |
+| **Input 2** | Del planner: canal, kilos, plata. Cada mes, precargada con la del mes anterior. En la herramienta se sube en Excel y se edita por canal |
 | **Base de partida** | La distribución del mes anterior, editable |
 | **Plata** | Es input por canal: cada canal tiene su precio. No se valoriza |
 | **SKUs en cero** | Son obsoletos o estacionales |
@@ -64,7 +64,7 @@ Documento vivo. Última actualización: después de la reunión con la referente
 |---|---|---|
 | A1 | **Criterio de re-normalización**: cuando se modifica un SKU o se deshabilita una entidad, ¿cómo se reparte la diferencia? ¿Proporcional o en partes iguales? | Alta, es MUST |
 | A2 | **Margen en los totales por canal**: ¿el input 2 admite margen (se mencionó ±500 kg) o cierra exacto como el input 1? | Alta |
-| A3 | Formato exacto del input 2 para pegar en la herramienta | Media |
+| ~~A3~~ | ~~Formato del input 2~~ — **Resuelto**: se sube en Excel como los otros dos, y se puede editar por canal en la pantalla | — |
 | A4 | SKU sin reparto previo (nuevo, no estaba el mes anterior): ¿el planner indica en qué canales se vende? ¿se reparte en proporción al total de cada canal? **Implementado así como supuesto** ("Dónde se vende"); confirmar | Alta |
 | A12 | Editar el mes anterior en la plataforma (confirmado que es editable): ¿es cambiar cuánto vendió un SKU en un canal, o marcar que ahora se vende en un canal donde antes no? | Media |
 | A5 | ¿La entidad vendedor es la persona o el par persona-sistema? | Media |
@@ -74,6 +74,7 @@ Documento vivo. Última actualización: después de la reunión con la referente
 | A10 | Ubicación de territorios y vendedores dentro de Soluciones (hipótesis: bajo la vía Directa) | Alta |
 | A11 | 2 SKUs aparecen en Ingredientes y en Soluciones: ¿cómo se parte su objetivo entre segmentos? | Media |
 | A13 | Siglas y nombres propios del archivo: KAS y otros dos (ver notas internas) | Baja |
+| A14 | SKU que cae en un territorio o en Distribuidores donde nadie lo vendió el mes anterior: ¿se reparte como el canal entero, se asigna a alguien o se saca de ese canal? Hoy se avisa y queda en el canal | Media |
 
 **Reglas**
 
@@ -147,17 +148,19 @@ Objetivo: tener el recorrido end-to-end feo pero funcional sobre datos de prueba
 
 ## 4. Octubre — Construcción
 
-1. Persistencia: modelo en Postgres, migraciones, el motor operando contra la base
-2. API con FastAPI y la autenticación detrás de una interfaz
-3. **Pantalla central**: carga del input 2, carga de reglas, lista de inconsistencias
-4. **Panel de reglas** sobre el catálogo de tipos: alta, edición y baja; herencia desde el mes anterior
-5. Aplicación de reglas en el cruce y debajo del canal, con detección de reglas incumplibles y conflictos
-6. Excepciones ON/OFF de SKUs, vendedores y distribuidores
-7. Re-normalización: SKUs modificados y entidades deshabilitadas
-8. Revisión y edición manual: valores fijados, recálculo, registro de interacción humana
-9. Front en React: importar, cargar input 2 y reglas, ver inconsistencias, corregir, aprobar
-10. Exportación a Excel
-11. Enchufar Entra real si IT confirma factibilidad
+Estado al 28/9 (rama `feat/template-nestle`): ✅ hecho · 🟡 en parte · ⬜ pendiente.
+
+1. ⬜ Persistencia: modelo en Postgres, migraciones, el motor operando contra la base (hoy la sesión vive en memoria)
+2. ✅ API con FastAPI y la autenticación detrás de una interfaz (proveedor local)
+3. ✅ **Pantalla central**: carga de las tres entradas en Excel, reglas, lista de inconsistencias
+4. 🟡 **Panel de reglas**: alta, edición y baja de tope / mínimo / fijo por categoría y "Dónde se vende". Falta la herencia desde el mes anterior (necesita persistencia)
+5. 🟡 Reglas en el cruce con detección de incumplibles y conflictos. Faltan las reglas debajo del canal (vendedor)
+6. ✅ Excepciones ON/OFF de SKUs, vendedores y distribuidores
+7. ✅ Re-normalización: SKUs modificados y entidades deshabilitadas (proporcional, A1)
+8. ✅ Revisión y edición manual: valores fijados, recálculo, historial con motivo
+9. 🟡 Front en React: importar, reglas, inconsistencias, corregir. Falta **aprobar**
+10. ✅ Exportación a Excel (pide confirmar si quedan cosas para revisar)
+11. ⬜ Enchufar Entra real si IT confirma factibilidad
 
 El panel de reglas es parte del núcleo. Simulación de escenarios, dashboard y carga a SAP quedan fuera hasta que todo lo anterior ande.
 
