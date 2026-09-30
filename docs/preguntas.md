@@ -1,139 +1,83 @@
-# Preguntas pendientes al cliente
+# Preguntas abiertas
 
 POC Distribución del Móvil · Nestlé DIL Región Plata · Universidad ORT
 
-Consolidado de lo que falta definir. Separado por destinatario, porque no todo va
-a la misma persona.
+Solo lo que falta definir. Cuando una se responde, la respuesta pasa a
+`entendimiento-negocio.md` (marcada [confirmado]) y se borra de acá. Los ids (A1,
+R1…) se citan en el código: no se renumeran.
+
+**Supuesto** = ya está implementado así, falta que lo confirmen.
 
 ---
 
-# Para IT
+## Para negocio
 
-## Entorno y accesos
+### Bloquean los MUST
 
-**1. Repositorio.** ¿El repo remoto es el mismo template que nos compartieron como
-ejemplo, o va a tener diferencias? ¿Cuándo tendríamos acceso?
+| # | Pregunta | Qué hacemos hoy |
+|---|---|---|
+| B1 | **% manual por vendedor o distribuidor.** Cuando a uno se le asigna un % en vez del histórico: ¿es un % del total del canal, igual para todos los SKUs? ¿El mismo % para kilos y para pesos? ¿El resto se reparte por histórico entre los demás? | Nada: es el MUST que falta |
+| B2 | **Vendedor o distribuidor nuevo.** ¿Se da de alta en la herramienta con un %, o siempre viene en el archivo? | Solo existen los que vienen en el archivo |
+| B3 | **Aprobación.** ¿Alcanza con una aprobación final, o hay que dar el OK etapa por etapa (canal, después vendedores y distribuidores)? ¿Hay un umbral de desvío formal o alcanza con que cuadre? ¿Quién aprueba? | Se exporta con confirmación; no se registra aprobación |
+| A1 | **Distribuidor apagado.** Su parte se reparte entre los demás "con el criterio que se defina". ¿Alcanza con proporcional al histórico de cada uno? | Supuesto: proporcional |
+| B4 | **Base de cálculo.** En la reunión quedó "el reparto del mes anterior"; el documento funcional y el archivo de mayo usan el año 2025. ¿Con qué se arranca el primer mes, y después? | Supuesto: el mes anterior |
 
-**2. Librerías internas.** ¿De dónde se instalan las librerías `nbra-*` del backend
-y los paquetes del registry de npm del frontend? ¿Hacen falta credenciales, VPN o
-estar en la red de Nestlé? Sin esto no podemos ni instalar dependencias.
+### Estructura
 
-**3. Entorno sandbox.** ¿Cómo se solicita el acceso y qué demora tiene?
+| # | Pregunta | Qué hacemos hoy |
+|---|---|---|
+| A10 | En Soluciones, ¿los vendedores cuelgan de Directa y de cada territorio (Córdoba, Rosario), y los distribuidores de Distribuidores? ¿Hace falta algún nivel más? | Supuesto: un nivel debajo de cada canal |
+| B5 | **Clientes exclusivos o puntuales.** El documento habla de "cartera de clientes exclusivos" y de ventas puntuales a clientes nuevos, y el archivo tiene clientes con kilos propios. ¿Es un nivel más de apertura, un valor fijo o una regla? | Se fija la celda a mano |
+| A5 | ¿La entidad es la persona o la persona más el sistema de origen (el mismo vendedor aparece con dos sufijos)? | Cada columna es una entidad |
+| A14 | Un SKU que cae donde ningún vendedor o distribuidor lo vendió: ¿se reparte como el canal entero, se le asigna a alguien o se saca del canal? | Se avisa y queda sin abrir |
+| A11 | Los SKUs que están en Ingredientes y en Soluciones: ¿se parten como cualquier otro? | Supuesto: los parte el cruce según los totales de cada canal |
 
-**4. Base de datos.** ¿La instancia de PostgreSQL la proveen ustedes en el sandbox
-o la desplegamos nosotros dentro del namespace? Si hay un circuito formal para
-solicitarla, nos gustaría iniciarlo temprano para que no frene la construcción.
+### Datos de entrada y salida
 
-## Pipeline y calidad
+| # | Pregunta | Qué hacemos hoy |
+|---|---|---|
+| A15 | **Excel de salida**: ¿qué hojas y columnas espera quien lo recibe? ¿Se vuelve a cargar en SAP? | Lo definimos nosotros: Kilos, Plata, Apertura, Problemas |
+| B6 | **Formato de entrada**: ¿el mes viene en un solo archivo con bloques (como mayo) o en archivos separados? | Tres archivos separados |
+| B7 | **NNS c/IIBB**: ¿se usa para algo o alcanza con NNS? | Se ignora |
+| A2 | ¿Los totales por canal admiten margen (se mencionó ±500 kg) o cierran exacto? | Supuesto: exacto |
+| A4 | SKU nuevo sin historia: ¿el planner dice en qué canales va y se reparte en proporción al total de cada uno? | Supuesto: así ("Dónde se vende") |
+| A12 | Editar el mes anterior: ¿qué se edita, cuánto vendió un SKU en un canal o dónde se vende? | No se edita |
 
-**5. Verificaciones del pipeline.** Entendemos que el pipeline lo declaran ustedes
-y que cada merge dispara la construcción de la imagen. ¿Qué verifica exactamente
-antes de construir? ¿Impone umbrales de cobertura o de mutation testing que
-bloqueen el merge?
+### Reglas
 
-**6. Framework de tests.** El template trae nose2. ¿Es obligatorio o podemos usar
-pytest? Lo preguntamos porque nose2 está prácticamente discontinuado y para un
-equipo que está aprendiendo la diferencia en material de consulta es grande.
+| # | Pregunta | Qué hacemos hoy |
+|---|---|---|
+| R1 | El % de una regla, ¿es siempre sobre el total del canal? | Supuesto: sí |
+| R2 | Reglas debajo del canal ("ningún vendedor supera el 25%"): ¿van? ¿Sobre qué base? | No existen |
+| R7 | Los 4 o 5 ejemplos reales de reglas que iban a mandar | Pendiente |
 
-**7. Aprobación de cambios.** ¿Quién figura en CODEOWNERS? ¿Nuestros pull requests
-los aprueba alguien de Nestlé o los administramos nosotros?
+### Historial y usuarios
 
-**8. QA.** ¿TestSprite es de uso obligatorio o una sugerencia?
-
-## Autenticación
-
-**9. Entra ID.** Para la autenticación necesitaríamos un app registration en el
-tenant: client ID, tenant ID, secret y redirect URIs por ambiente. Más definir cómo
-accedemos nosotros siendo externos con cuenta institucional de ORT.
-
-¿Qué tan factible es tenerlo resuelto en las próximas semanas y qué circuito hay
-que iniciar? Si no es viable en ese plazo, lo tenemos en cuenta para la
-planificación.
-
-## Estructura del proyecto
-
-**10. Persistencia.** El scaffold no incluye capa de base de datos: no trae
-modelos, migraciones ni ORM. ¿Existe un estándar de Nestlé que debamos adoptar, o
-lo definimos nosotros?
-
----
-
-# Para negocio
-
-## Bloqueante para el motor
-
-**11. Criterio de redistribución.** Cuando se deshabilita una entidad o se modifica
-un SKU, la parte que le correspondía se reparte entre las que quedan. ¿Con qué
-criterio? ¿Proporcional al peso de cada una, o en partes iguales?
-
-Es el mismo criterio para los dos casos y es la única regla del alcance obligatorio
-que todavía no está definida.
-
-## Valorización
-
-**12. Kilos y facturación.** ¿La facturación se reparte junto con los kilos, o los
-kilos son el dato principal y la facturación se deriva?
-
-**13. Lista de precios.** Comparando el precio implícito por kilo del móvil de mayo
-contra el histórico 2025, la diferencia no es uniforme: varía según el producto.
-Eso sugiere que se aplica una lista de precios que no está en el archivo
-compartido.
-
-¿El móvil llega ya valorizado desde Contraloría, o el sistema tiene que
-valorizarlo? Si tiene que valorizarlo, ¿cuál es la fuente de la lista y con qué
-vigencia?
-
-**14. Prioridad al ajustar.** Cuando el planner ajusta un valor a mano, ¿qué unidad
-manda, los kilos o la facturación?
-
-## Datos y reglas
-
-**15. Entidades sin histórico.** Un SKU nuevo, o uno estacional sin venta en el
-período: no hay participación que calcular. ¿Qué debería hacer el sistema?
-
-**16. Identidad del vendedor.** En el archivo hay columnas de vendedor que se
-repiten con un sufijo distinto, que parece indicar el sistema de origen del dato.
-¿La entidad que recibe el móvil es la persona, o la combinación de persona y
-sistema?
-
-**17. Origen del histórico.** La base de cálculo del mes siguiente, ¿se alimenta de
-la venta real o de los móviles asignados?
-
-**18. Apertura futura.** ¿Un canal que hoy cierra a nivel canal podría necesitar
-abrirse por vendedor más adelante? Lo preguntamos porque la arquitectura ya lo
-contempla y queremos confirmar que tiene sentido.
-
-## Roles
-
-**19. Perfiles de usuario.** ¿Los roles y permisos vienen de grupos de Entra, o los
-administramos nosotros dentro del sistema? ¿Cuántos perfiles distintos hay, más
-allá del planner?
-
----
-
-# Pedidos pendientes
-
-| Qué | Estado |
+| # | Pregunta |
 |---|---|
-| Ejemplos de reglas de negocio vigentes | Prometidos en la reunión |
-| Sesión de observación del armado del móvil | Pendiente de fecha |
-| Documentación adicional prometida por el cliente | Prometida |
-| Archivo de referencia anonimizado | El compartido incluye nombres de vendedores y razones sociales |
-
-> **La sesión de observación es la más importante de las cuatro.** Buena parte del
-> criterio de distribución no está documentado, y los ejemplos escritos no
-> reemplazan ver el proceso en vivo y poder preguntar por qué se toma cada decisión.
+| A16 | ¿Un mes aprobado se puede reabrir? Si sí, se guardan versiones |
+| A6 | ¿Los roles vienen de Entra o los administramos? ¿Todos los planners ven los meses anteriores? |
 
 ---
 
-# Cómo impacta cada respuesta
+## Para IT
 
-| Pregunta | Qué condiciona |
+| # | Pregunta |
 |---|---|
-| 2, 3, 4 | Cuándo podemos empezar a construir sobre la infraestructura real |
-| 5, 6, 7 | El ritmo de trabajo y cuánto esfuerzo va a testing |
-| 9 | Si la autenticación corporativa entra en el alcance de la POC |
-| 11 | El motor de distribución, que es el núcleo obligatorio |
-| 12, 13, 14 | Si la valorización es una etapa del sistema o un dato de entrada |
-| 15, 16 | El modelo de datos |
-| 19 | Si hace falta administración de usuarios dentro del sistema |
+| I1 | Credenciales del índice privado (`nbra-*`) y del registry de npm. Sin esto el pipeline de Nestlé no instala |
+| I2 | Acceso al sandbox y cómo se despliega |
+| I3 | PostgreSQL: ¿lo proveen o lo desplegamos? ¿Hay un estándar para la capa de datos? |
+| I4 | ¿Qué verifica el pipeline antes de mergear (cobertura, mutation testing)? ¿Quién aprueba los PRs? |
+| I5 | ¿nose2 es obligatorio o podemos usar pytest? |
+| I6 | App registration en Entra para el login |
+| I7 | ¿TestSprite es obligatorio? (A9) |
+
+---
+
+## Pedidos pendientes
+
+- **Archivos anonimizados.** El documento funcional dice que se comparten con
+  vendedores A/B/C; el de mayo trae nombres reales de vendedores, distribuidores y
+  clientes. No lo subimos a ningún lado.
+- La sesión para ver armar el móvil en vivo.
+- Un móvil ya terminado (con el reparto hecho), para comparar contra el nuestro.

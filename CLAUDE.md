@@ -44,11 +44,16 @@ como confirmada, de datos o a confirmar).
   informan**, no se resuelven solas.
 - **Excepciones ON/OFF** (MUST): prender o apagar SKUs, vendedores y
   distribuidores antes del reparto.
+- **Base de cálculo** (MUST, falta): cada vendedor o distribuidor reparte por
+  histórico o por un % manual. **Aprobación** (MUST, falta): la da una persona.
+  Plan en `docs/plan.md` §3.
 - **Cuadratura**: en cada nivel la suma de las partes da **exactamente** el total
   de arriba. Kilos y plata por separado.
 - **Usuario**: el planner (~20 concurrentes, web desktop). El vendedor no entra al
   sistema.
-- **Integración**: entran tres Excel (objetivo, totales por canal, mes anterior), sale un Excel. SAP es
+- **Integración**: hoy entran tres Excel (objetivo, totales por canal, mes
+  anterior) y sale uno. El real viene en un solo `.xlsb` con bloques (B6) y la
+  salida va a SAP, así que su formato no se cambia sin confirmar (A15). SAP es
   nice to have.
 
 ## Reglas innegociables
@@ -85,10 +90,30 @@ como confirmada, de datos o a confirmar).
   Nestlé y hay entorno sandbox.
 - **Autenticación: Microsoft Entra ID**, sujeta a la factibilidad que informe IT.
   Mientras tanto, detrás de una interfaz con proveedor local.
-- **E1: el repo del equipo tiene la API en Express + Prisma y un servicio de Excel
-  aparte. Hay que alinearlo al stack confirmado**: motor, reglas e importador en
-  Python, sobre la estructura del template. Hasta que se alinee, no construir
-  lógica de negocio nueva sobre `apps/api`.
+- **E1**: en `main` el repo del equipo tiene la API en Express + Prisma. Esta rama
+  (`feat/template-nestle`) la reemplaza por Python sobre la estructura del
+  template; el merge a `main` lo decide el equipo. No construir lógica de negocio
+  sobre `apps/api`.
+
+## Comandos
+
+Desde la raíz, en Mac o Linux (en Windows no hay `make`: los pasos equivalentes
+están en `backend/src/domain/NOTES.md`):
+
+```bash
+make instalar                  # una vez; otra versión: make instalar PYTHON=python3.14
+make dev                       # API :3000 + pantalla http://localhost:5175
+make test                      # suite completa (backend + front): antes de subir
+```
+
+Un solo archivo de tests, mientras se trabaja:
+
+```bash
+cd backend && IS_LOCAL=false .venv/bin/python -m nose2 -s . tests.movil.test_sesion
+cd frontend && npx vitest --watch=false src/presentation/pages/Movil/Movil.test.tsx
+```
+
+Mapa del código, supuestos en uso y gotchas: `backend/src/domain/NOTES.md`.
 
 ## Decisiones ya tomadas (no reabrir sin avisar)
 
@@ -114,28 +139,29 @@ como confirmada, de datos o a confirmar).
 
 ## Pendiente del cliente (no inventar respuestas)
 
-Lista completa con prioridades: `docs/plan.md`, sección 0 ("Abierto").
+Todo lo abierto, con qué hacemos hoy en cada caso: `docs/preguntas.md`. Los que
+más pesan ahora:
 
-- **A1** criterio de re-normalización (hoy proporcional, supuesto).
-- **A2** si el input 2 admite margen (se mencionó ±500 kg) o cierra exacto.
-- **A4** SKU sin reparto previo: implementado como supuesto ("Dónde se vende",
-  proporcional al total de cada canal); confirmar.
-- **A10** dónde cuelgan territorios y vendedores dentro de Soluciones.
-- **A11** los 2 SKUs que están en Ingredientes y en Soluciones.
-- **A12** qué significa editar el mes anterior.
-- **A14** SKU que cae donde ningún vendedor o distribuidor lo vendió el mes anterior.
-- **R1, R2, R7** base del % para todas las reglas, reglas de vendedor (debajo del
-  canal), validar el catálogo con los ejemplos reales. R3 a R6 ya respondidas
-  (`docs/entendimiento-negocio.md` §9).
+- **B1 a B4**: cómo se aplica el % manual, alta de entidades, aprobación por etapa,
+  base de cálculo (mes anterior o 2025). Definen los MUST que faltan.
+- **A1** criterio al apagar una entidad (hoy proporcional, supuesto).
+- **A10** un nivel debajo de cada canal: vendedores en Directa y territorios,
+  distribuidores en Distribuidores (supuesto).
+- **A15** formato del Excel de salida (va a SAP: no cambiarlo sin confirmar).
 
 ## Estado del entorno
 
-El repo real de Nestlé (scaffold de Backstage) todavía no está disponible.
-Trabajamos acá.
+El repo real de Nestlé (scaffold de Backstage) todavía no está disponible. El
+equipo trabaja en su propio repo de GitHub; el backend en Python está en la rama
+`feat/template-nestle`.
 
 - Las librerías internas `nbra-*` y el registry npm privado **no son accesibles**.
   No las agregues. Usá reemplazos locales con la misma interfaz, marcados para
   cambiarlos por los reales.
+- **El archivo real de mayo** (un `.xlsb`) circula fuera del repo, con nombres
+  reales. Se puede leer en local para entender la forma; nunca se copia al repo
+  ni a un servicio externo. Lo que muestra está resumido, sin nombres, en
+  `docs/entendimiento-negocio.md` §15.
 - Tests del dominio con `assert` plano. El template trae nose2; si es obligatorio
   o se puede usar pytest está preguntado a IT.
 
@@ -145,12 +171,9 @@ No se cargan solos: leé el que la tarea pida antes de actuar.
 
 | Doc | Para qué |
 |---|---|
-| `docs/entendimiento-negocio.md` | **Referencia de dominio vigente**: flujo, inputs, cruce, estructura, reglas |
-| `docs/plan.md` | Plan de trabajo vivo: decisiones cerradas, abiertas, riesgos, próximos pasos |
-| `docs/alcance.md` | Alcance funcional por épicas |
-| `docs/minuta.md` | Qué dijo el cliente en la primera reunión |
-| `docs/preguntas.md` | Preguntas enviadas a IT y a negocio |
-| `docs/contexto-negocio.md` | Cómo se arma hoy el móvil, contado desde el planner |
+| `docs/entendimiento-negocio.md` | **Referencia de dominio vigente**: cómo se hace hoy, flujo, inputs, cruce, estructura, reglas, excepciones, lo que muestra el archivo real |
+| `docs/plan.md` | **Qué se hizo y qué falta**: backlog con estado, plan de los MUST, decisiones, riesgos. Se actualiza en el mismo PR que cambia el estado |
+| `docs/preguntas.md` | Todo lo abierto, para negocio y para IT, con qué hacemos hoy en cada caso |
 | `docs/template-reference.md` | Estructura del scaffold que entrega Nestlé |
 | `backend/src/domain/NOTES.md` | Cómo está armado el código, cómo correrlo, supuestos en uso y gotchas |
 
@@ -161,7 +184,10 @@ avisá.
 ## Cómo trabajar
 
 - Test primero en todo lo del dominio.
-- Cambios chicos, verificables. Corré los tests antes de dar algo por terminado.
+- Cambios chicos, verificables. Mientras se trabaja, los tests del archivo tocado;
+  la suite completa (`make test`), antes de subir. Varias suites en paralelo no
+  entran en la RAM de una máquina de desarrollo.
+- Al cerrar una tarea, su estado se actualiza en `docs/plan.md` en el mismo commit.
 - Señalá decisiones en vez de asumirlas. Si hay dos caminos, proponé y esperá.
 - Comentarios y docstrings en español. Código (nombres) en español del dominio
   donde tenga sentido: `repartir`, `cuadra`, `participacion`.

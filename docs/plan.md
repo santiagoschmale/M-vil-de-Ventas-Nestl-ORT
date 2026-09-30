@@ -1,357 +1,273 @@
 # Plan de trabajo — POC Distribución del Móvil
 
 Nestlé DIL Región Plata · Universidad ORT · septiembre a noviembre 2026
-Documento vivo. Última actualización: después de la reunión con la referente de negocio saliente y su transcripción.
+
+Documento vivo: **qué se hizo, qué falta y en qué orden**. El dominio está en
+`entendimiento-negocio.md`, lo que falta definir en `preguntas.md` y lo técnico en
+`backend/src/domain/NOTES.md`. Se actualiza en el mismo PR que cambia el estado.
+
+Fuentes: documento funcional v1.0 del cliente (26/08/2026, prioridades MoSCoW de su
+§10), reunión inicial, reunión de reglas y archivo de mayo.
+
+Estado: ✅ hecho · 🟡 en parte · ⬜ pendiente. Todo lo hecho está en la rama
+`feat/template-nestle`.
 
 ---
 
-## 0. Estado de las decisiones
+## 1. Dónde estamos (29/09)
 
-### Cerrado por el cliente
+El recorrido completo funciona sobre datos de prueba:
+
+- carga de las tres entradas;
+- reparto SKU × canal con reglas;
+- apertura debajo del canal;
+- ON/OFF;
+- ajuste a mano con historial;
+- exportación a Excel.
+
+Todo vive en memoria y hay un solo móvil.
+
+De los MUST del cliente faltan dos cosas grandes:
+
+- la **base de cálculo con % manual por entidad**;
+- la **aprobación**.
+
+La persistencia no figura en los MUST del cliente, pero la aprobación y el
+histórico la necesitan para tener sentido.
+
+---
+
+## 2. Backlog
+
+### MUST
+
+| Funcionalidad | Estado | Qué falta |
+|---|---|---|
+| Distribución en cascada con recálculo | ✅ | Cruce SKU × canal y apertura debajo del canal; cada cambio recalcula todo. Confirmar que un nivel debajo del canal alcanza (A10) |
+| Excepciones ON/OFF de SKUs, vendedores y distribuidores | ✅ | Criterio al apagar: proporcional como supuesto (A1) |
+| Ajuste manual con valor fijado y motivo | ✅ | — |
+| Base de cálculo histórico / % manual por entidad | ⬜ | **M2** |
+| Alta de vendedor o distribuidor nuevo | ⬜ | **M3**, depende de B2 |
+| Aprobación del móvil | ⬜ | **M1** |
+| Revisión por etapa | 🟡 | Cada etapa se ve (matriz, apertura por celda), pero no se aprueba por separado. **M4**, depende de B3 |
+| Exportación a Excel | ✅ | Formato de salida a confirmar (A15) |
+| Trazabilidad (quién, qué, cuándo, por qué) | ✅ | En memoria; se pierde al reiniciar |
+
+### Necesario para los MUST (no figura en el MoSCoW)
+
+| Funcionalidad | Estado | Qué falta |
+|---|---|---|
+| Persistencia en Postgres, un móvil por mes | ⬜ | §6. Otra implementación de `repositorio.py` |
+| Autenticación | 🟡 | Proveedor local detrás de una interfaz. Entra depende de IT (I6) |
+| Entorno de pruebas para el cliente | ⬜ | Depende de IT (I1, I2) |
+| Tests en CI | ✅ | Backend y front |
+| Deshacer el último cambio | ✅ | Una vez. Con login: solo el propio |
+
+### SHOULD
+
+| Funcionalidad | Estado |
+|---|---|
+| Reglas por back office: tope, mínimo y fijo en % por categorías, "Dónde se vende" | 🟡 Faltan las reglas debajo del canal (R2), las estacionales y la herencia del mes anterior (necesita persistencia) |
+| Histórico con realimentación: el aprobado es la base del mes siguiente; importar 2025 | ⬜ Depende de la persistencia y de B4 |
+| Simulación de escenarios | ⬜ |
+| Cuadratura automática de totales | ✅ |
+
+### COULD
+
+Dashboard vendedor × kilos y facturación · template de carga para SAP (A15) · cargas
+masivas · multi-país y multi-negocio. Nada empezado.
+
+### Fuera de la POC
+
+Reemplazar la validación humana, carga automática o en tiempo real a SAP, seguimiento
+durante el mes, versión mobile, IA.
+
+---
+
+## 3. Plan de los MUST
+
+En este orden. Cada uno con tests primero y verificación en la pantalla.
+
+### M1 · Aprobación del móvil
+
+No depende de preguntas abiertas, salvo el detalle de A16 y B3.
+
+- **Botón "Aprobar"**. Pide que kilos y pesos cierren y que no haya nada en rojo. Si
+  queda algo en amarillo, se muestra y se pide confirmar, igual que al exportar.
+- **Aprobado es solo lectura**: la sesión rechaza cualquier ajuste y deshacer queda
+  deshabilitado.
+- **Queda en el historial**: quién aprobó y cuándo. El estado se ve en el
+  encabezado.
+- **"Reabrir" con motivo**, como supuesto (A16): vuelve a borrador y queda en el
+  historial.
+- **Sin base de datos**: la aprobación vive en la sesión en memoria; cuando llegue
+  Postgres, se guarda con el móvil del mes.
+
+Hecho cuando se puede aprobar un móvil que cierra, no se lo puede tocar aprobado, se
+puede reabrir con motivo y todo queda en el historial.
+
+### M2 · Base de cálculo: histórico o % manual por entidad
+
+Depende de B1. Se puede construir con un supuesto y mostrarlo el viernes, como se
+hizo con A4.
+
+- **Qué es**: en un canal que se abre, a un vendedor o distribuidor se le puede
+  asignar un % en vez de su histórico. Caso típico: le cambiaron la cartera.
+- **Supuesto (B1)**:
+  - el % es del total del canal y vale para cada SKU de ese canal, en kilos y en
+    pesos;
+  - lo que queda (100 − la suma de los %) se reparte entre los demás por
+    histórico.
+- **Cómo cierra exacto**: en cada celda, primero se reparte el total entre los que
+  tienen % y el grupo de los que van por histórico, con mayores restos. Después la
+  parte del grupo se reparte por histórico. Lo fijado a mano sigue mandando.
+- **Validaciones**:
+  - los % de un canal no pasan de 100;
+  - si todos los prendidos tienen %, tienen que sumar 100;
+  - un apagado no recibe nada aunque tenga %.
+- **Dónde toca**:
+  - `domain/apertura.py`: el reparto entre hijos;
+  - `movil/sesion.py`: la operación y el historial;
+  - la API;
+  - la apertura en la pantalla: elegir histórico o % por entidad.
+
+Hecho cuando a un vendedor se le pone 30% en Córdoba, recibe el 30% de cada celda de
+Córdoba, el resto se reparte por histórico y todo cuadra.
+
+### M3 · Alta de vendedor o distribuidor nuevo
+
+Depende de B2 y se apoya en M2.
+
+- **Se agrega a un canal** con nombre y un %. No tiene historia, así que sin % no
+  recibe nada.
+- **Queda en el historial** y se puede apagar como cualquier otro.
+
+### M4 · Revisión por etapa
+
+Depende de B3. Si alcanza con la aprobación final (M1), se descarta.
+
+- **Marcar cada etapa como revisada**: primero el canal, después la apertura.
+- **Un cambio en una etapa** desmarca las siguientes, porque las recalcula.
+- **Aprobar exige** todas las etapas revisadas.
+
+### Después de los MUST
+
+1. Persistencia (§6), que habilita la herencia de reglas y el histórico.
+2. El formato real de entrada y salida, según B6 y A15.
+3. Los SHOULD.
+
+---
+
+## 4. Cómo lo encaramos
+
+- **De a un MUST, en secuencia y en esta rama.** M1, M2 y M3 tocan los mismos
+  archivos (`sesion.py`, `apertura.py`, `routes/movil.py`, `Movil.tsx`). En paralelo,
+  en worktrees separados, chocarían al mergear, y cada worktree necesita su propio
+  entorno de Python y `node_modules` y corre sus tests: no entra en la RAM de una
+  máquina que ya tiene otros trabajos corriendo.
+- **Agentes solo para lo que no escribe código**: la revisión de código al cerrar
+  cada MUST, o buscar algo en muchos archivos.
+- **Tests**: los del archivo que se toca. La suite completa, antes de subir.
+- **Cada MUST cierra** con su estado actualizado en este documento, en el mismo
+  commit.
+
+---
+
+## 5. Decisiones
+
+### Cerradas por el cliente
 
 | Tema | Definición |
 |---|---|
-| Stack backend | Python + FastAPI |
-| Base de datos | PostgreSQL |
-| Autenticación | Microsoft Entra ID (SSO), sujeto a la factibilidad que informe IT |
-| Frontend | React |
-| Repositorio | GitHub Enterprise, cuentas @ort |
-| Scaffold | Monorepo generado por Backstage |
-| Deploy | ArgoCD. Cada merge dispara el pipeline, que lo declara Nestlé. Hay entorno sandbox |
-| **Qué resuelve** | La herramienta hace el primer reparto sola a partir de los lineamientos del planner. El planner corrige solo lo que no cierra |
-| **Flujo** | Input 1 + input 2 + reglas → reparto automático → inconsistencias → ajuste humano → Excel |
-| **Reglas** | Matemáticas, definidas por el negocio. Combinan dónde aplican, sobre qué variable (kilos o plata) y qué límite. Se heredan del mes anterior |
-| **Tipos de regla** | Total por canal · dónde se vende un SKU · tope o mínimo en % · valor fijo en kilos |
-| **Rol del planner** | Supervisión: define reglas, revisa el resultado, corrige lo puntual |
-| **Excepciones ON/OFF** | Prender o apagar SKUs, vendedores o distribuidores antes del reparto. MUST |
-| **Profundidad de apertura** | Variable. Catering, Vending, Mayoristas y KAM Ingredientes cierran a nivel canal. Soluciones se abre en Distribuidores, Directa (BA), Córdoba, Rosario y KAM Sol, y baja más |
-| **Territorios** | Existen: Buenos Aires, Córdoba, Rosario. En el input 2 figuran como canales |
-| **Cambios de entidades** | Vendedores y distribuidores cambian poco; los productos entran y salen |
-| **Base SKU-canal** | No todos los SKUs se venden por todos los canales |
-| **Input 1** | De Contraloría: SKU, kilos, plata. Esenciales: SKU y kilos |
-| **Input 2** | Del planner: canal, kilos, plata. Cada mes, precargada con la del mes anterior. En la herramienta se sube en Excel y se edita por canal |
-| **Base de partida** | La distribución del mes anterior, editable |
-| **Plata** | Es input por canal: cada canal tiene su precio. No se valoriza |
-| **SKUs en cero** | Son obsoletos o estacionales |
-| **Desvíos en los controles** | No deberían existir. Son errores, no lógica a replicar |
-| **Histórico** | Guardar cómo quedó abierto el reparto y la interacción humana |
-| Alcance SAP | Nice to have. Fuera del MUST |
-| Alcance negocio | Professional Argentina |
-| Escala | ~20 usuarios concurrentes, web desktop |
-| Periodicidad | Mensual |
-| Seguimiento de avance | Externo (SAP + dashboards de Nestlé) |
-| **Entorno de pruebas** | **Requisito: ambiente accesible para que el cliente pruebe por su cuenta** |
-| IA / ML | Fuera de alcance |
+| Stack | Python + FastAPI, PostgreSQL, React. Monorepo de Backstage, deploy con ArgoCD |
+| Autenticación | Microsoft Entra ID, sujeto a IT |
+| Alcance | Professional Argentina. SAP es nice to have |
+| Escala | ~20 planners concurrentes, web desktop, ciclo mensual |
+| Entorno de pruebas | El cliente quiere probar por su cuenta, no ver demos: al grupo anterior las demos le andaban y el producto no. Cada merge despliega al sandbox, así que no se mergea sin verificar |
 
-### Inferido por nosotros (no lo dijo el cliente)
+El dominio confirmado (inputs, cruce, estructura, reglas) está en
+`entendimiento-negocio.md`.
 
-- **Dos segmentos.** Ingredientes es producto usado como insumo (puré, leche en polvo, cacao, café soluble). Soluciones es café servido (Nescafé Alegría, vasos, tapas, vajilla, azúcar en stick).
-- **El cálculo central es un cruce SKU × canal**: filas que suman el input 1, columnas que suman el input 2, celdas en cero donde el SKU no se vende. Se resuelve con ajuste biproporcional (RAS / IPF) partiendo del reparto del mes anterior.
-- **Los distribuidores son hojas.** Los vendedores cuelgan de la venta directa y los territorios: la proporción directa contra distribuidores en el input 2 (78 / 22) coincide con Call Center contra Distribuidores en el histórico (77 / 23).
-- La hoja de participaciones tiene cuatro bloques con estructura distinta. Los bloques 2, 3 y 4 son los mismos 38 SKUs; el bloque 4 ya viene como fracciones que suman 1.
-- 108 SKUs de los cuales 45 con objetivo; 12 SKUs son el 80% del volumen.
-- 15 columnas de vendedor corresponden a 12 personas (sufijo distinto según sistema de origen).
-- El precio implícito por kilo varía entre 3% y 29% contra el histórico, consistente con precios propios por canal.
-- Hay SKUs de UY, BR, CL y PE en un archivo que se presenta como de Argentina.
-- El archivo de mayo ya viene con la distribución hecha: la hoja de participaciones es trabajo del planner.
-- Los porcentajes redondeados del input 2 de ejemplo suman 101%.
+### Técnicas propias
 
-### Abierto
-
-**Reparto y datos**
-
-| # | Pregunta | Prioridad |
-|---|---|---|
-| A1 | **Criterio de re-normalización**: cuando se modifica un SKU o se deshabilita una entidad, ¿cómo se reparte la diferencia? ¿Proporcional o en partes iguales? | Alta, es MUST |
-| A2 | **Margen en los totales por canal**: ¿el input 2 admite margen (se mencionó ±500 kg) o cierra exacto como el input 1? | Alta |
-| ~~A3~~ | ~~Formato del input 2~~ — **Resuelto**: se sube en Excel como los otros dos, y se puede editar por canal en la pantalla | — |
-| A4 | SKU sin reparto previo (nuevo, no estaba el mes anterior): ¿el planner indica en qué canales se vende? ¿se reparte en proporción al total de cada canal? **Implementado así como supuesto** ("Dónde se vende"); confirmar | Alta |
-| A12 | Editar el mes anterior en la plataforma (confirmado que es editable): ¿es cambiar cuánto vendió un SKU en un canal, o marcar que ahora se vende en un canal donde antes no? | Media |
-| A5 | ¿La entidad vendedor es la persona o el par persona-sistema? | Media |
-| A6 | ¿Los roles vienen de grupos de Entra o los administramos nosotros? ¿Todos los planners ven los móviles de meses anteriores (incluido lo que hizo otro)? ¿Hay un rol aprobador? | Media |
-| A8 | ¿Un canal que hoy cierra a nivel canal podría abrirse por vendedor más adelante? | Baja (la arquitectura ya lo cubre) |
-| A9 | ¿TestSprite es obligatorio o sugerido? | Baja |
-| A10 | Ubicación de territorios y vendedores dentro de Soluciones (hipótesis: bajo la vía Directa) | Alta |
-| A11 | 2 SKUs aparecen en Ingredientes y en Soluciones: ¿cómo se parte su objetivo entre segmentos? | Media |
-| A13 | Siglas y nombres propios del archivo: KAS y otros dos (ver notas internas) | Baja |
-| A15 | **Formato del Excel de salida**: ¿qué hojas y columnas espera quien lo recibe? ¿Vuelve a cargarse en algún sistema (SAP)? Hoy lo definimos nosotros (Kilos, Plata, Apertura, Problemas) | Alta |
-| A16 | **¿Un mes aprobado se puede reabrir?** Si sí, hay que guardar versiones ("la aprobada del 5/3", "la corregida del 9/3"), no solo el último estado | Media |
-| A14 | SKU que cae en un territorio o en Distribuidores donde nadie lo vendió el mes anterior: ¿se reparte como el canal entero, se asigna a alguien o se saca de ese canal? Hoy se avisa y queda en el canal | Media |
-
-**Reglas**
-
-| # | Pregunta | Prioridad |
-|---|---|---|
-| R1 | **Base del porcentaje**: implementado como % del total del canal (ejemplo del cliente); confirmar para todas y para las de vendedor | Alta |
-| R2 | En qué nivel del árbol actúa cada tipo de regla | Alta |
-| ~~R3~~ | ~~Tope compartido~~ — **Respondido**: no hay; cada regla es de un canal con su % | — |
-| ~~R4~~ | ~~Regla contra histórico~~ — **Respondido**: vale la regla, se recorta y redistribuye. Si no se puede cumplir con los datos, se marca | — |
-| ~~R5~~ | ~~Prioridad entre reglas~~ — **Respondido**: no hay; se marca el conflicto | — |
-| ~~R6~~ | ~~Kilos y precio a la vez~~ — **Respondido**: independientes, un % para kilos y otro para NNS en la misma regla | — |
-| R7 | Validar el catálogo de tipos con los 4 o 5 ejemplos reales que envía el cliente | Alta |
-
-**Del equipo**
-
-| # | Tema | Prioridad |
-|---|---|---|
-| E1 | El repo del equipo tiene la API en Express + Prisma. Alinearlo con el stack confirmado: motor, reglas e importador en Python | Alta |
+- **Decimal, nunca float.** Los montos viajan como texto; el front no calcula.
+- **Cuadratura exacta**: mayores restos debajo del canal y redondeo controlado en el
+  cruce (filas y columnas a la vez).
+- **Cruce SKU × canal por ajuste biproporcional (RAS / IPF)** desde la base, con
+  reglas como restricciones y conflictos informados, no resueltos en silencio.
+- **Pesos relativos**, no porcentajes que sumen 1. Apagar una entidad es sacarla del
+  reparto.
+- **Árbol de profundidad variable**: cada canal se abre hasta donde diga el archivo.
+- **Canales, entidades y reglas son datos**, nunca código.
+- **"No aplica" ≠ "aplica con cero".**
+- **Cada nodo tiene valor y estado** (calculado / fijado). Lo fijado no se pisa.
+- **Cada cambio es una transacción**: si el recálculo falla, vuelve atrás. Se
+  recalcula el mes entero.
+- **El dominio no conoce FastAPI, ni la base, ni Excel.**
+- **Autenticación y almacenamiento detrás de una interfaz** (`auth/proveedor.py`,
+  `movil/repositorio.py`): Entra y Postgres se enchufan sin tocar el resto.
+- **Nada de datos reales en el repo.** La muestra es inventada y replica la forma
+  real.
+- **E1**: el repo del equipo tenía la API en Express + Prisma (`main`). Esta rama la
+  reemplaza por Python; falta que el equipo decida el merge a `main`.
 
 ---
 
-## 1. Dependencias externas
+## 6. Propuesta: historial y un móvil por mes
 
-| Dependencia | Estado | Riesgo si llega tarde |
-|---|---|---|
-| **Nuevo referente de negocio** | La owner dejó la organización. Nestlé tiene que designar reemplazo | **Alto.** Sin referente no se validan las reglas reales |
-| **Sesión de observación** con quien arma el móvil hoy | Pendiente, depende del nuevo referente | **Alto.** Las reglas no están documentadas |
-| **Ejemplos de reglas de negocio** | Comprometidos 4 o 5 ejemplos reales. Hay un input 2 de ejemplo | Alto. Validan el catálogo de tipos |
-| **Distribuciones mensuales del último año** | Pedidas. El planner las tiene | Medio. Base de partida y datos de prueba |
-| **Excel de Contraloría sin distribuir** | Pedido | Medio. Es el formato real del input 1 |
-| **App registration en Entra** (client ID, tenant ID, redirect URIs) | Consultada la factibilidad y el plazo a IT | Medio. Mitigable con proveedor local |
-| **Credenciales del índice privado** para las librerías `nbra-*` y el registry de npm | No solicitado | **Alto.** Sin esto no se puede ni instalar dependencias |
-| **Acceso al entorno sandbox** | Existe, falta acceso | Alto a partir de octubre |
-| **Instancia de PostgreSQL** en el sandbox | Consultado si la proveen o la desplegamos | Medio |
-| **Archivo anonimizado** | Solicitado | Bajo técnicamente, alto en cumplimiento |
-| **Documentación de la referente saliente** | Prometida | Medio |
+Estado: propuesta. Depende de la persistencia y de A6, A15 y A16.
 
----
-
-## 2. Preguntas técnicas sobre el scaffold
-
-Salen de revisar el template que mandó IT. Consolidadas con el resto en el documento de preguntas pendientes.
-
-1. **¿De dónde se instalan las librerías `nbra-*` y el registry de npm?** ¿Hacen falta credenciales o VPN?
-2. **El scaffold no trae capa de persistencia.** No hay modelos, ni migraciones, ni SQLAlchemy. ¿Hay un estándar de Nestlé, o lo definimos nosotros?
-3. **¿El pipeline exige umbrales** de cobertura o de mutation testing para poder mergear?
-4. **¿nose2 es obligatorio o podemos usar pytest?**
-5. **¿Quién figura en CODEOWNERS?** ¿Nuestros PRs los aprueba alguien de Nestlé?
+- **Un móvil por mes**, compartido por todos los planners. El historial es del móvil
+  y cada entrada dice quién la hizo: "lo que hizo Juan" es un filtro, no otra
+  sesión.
+- **Retomar**: cerrás hoy y mañana abrís el móvil del mes tal como quedó. Si alguien
+  está de vacaciones, otro planner lo sigue desde su cuenta.
+- **Borrador → aprobado.** Aprobado es solo lectura. Si se puede reabrir (A16), cada
+  reapertura es una versión.
+- **Meses anteriores**: se abren en solo lectura. En cada celda se ve su historia y el
+  historial se filtra por persona, SKU o canal.
+- **El mes siguiente** es un móvil nuevo que hereda las reglas. No hace falta
+  "limpiar la sesión".
+- **El Excel no es la fuente del historial**: no se le agregan hojas hasta saber el
+  formato de salida (A15). El Excel de entrada no se modifica nunca.
+- **Modelo mínimo**: `Movil(mes, estado, versión)`, sus entradas y reglas, y
+  `Ajuste(movil, acción, detalle, autor, cuándo, motivo)`, que es lo que hoy guarda
+  `Sesion.historial`. Al hacerlo, renombrar `Sesion` a *móvil del mes*.
 
 ---
 
-## 3. Septiembre — Definición
+## 7. Dependencias externas
 
-Objetivo: tener el recorrido end-to-end feo pero funcional sobre datos de prueba, y el entendimiento del negocio consolidado.
-
-**Motor de reparto.** Módulo Python puro con largest remainder y cuadratura exacta. Tests escritos y verificados; implementación en curso.
-
-**Árbol de profundidad variable.** Debajo del canal, nodos con valor y estado, base SKU-canal.
-
-**Importador del input 1.** Cruce por código de SKU, detección de columnas por nombre, reporte de problemas de calidad.
-
-**Carga del input 2.** Tabla canal, kilos, plata, precargada con el mes anterior.
-
-**Cruce SKU × canal.** Ajuste biproporcional con celdas en cero forzado y detección de inconsistencias.
-
-**Recorrido completo end-to-end**: input 1 + input 2 → cruce → inconsistencias → exportar. Sin interfaz, sin autenticación.
-
-**Entendimiento del negocio** consolidado en el documento de dominio, listo para validar con el nuevo referente.
+| Dependencia | Riesgo si llega tarde |
+|---|---|
+| Respuestas del viernes (B1 a B4, A10) | **Alto.** Definen M2, M3 y M4 |
+| Credenciales del índice privado (`nbra-*`, npm) | **Alto.** El pipeline de Nestlé no instala |
+| Acceso al sandbox | **Alto.** Es el entorno donde prueba el cliente |
+| PostgreSQL: ¿lo proveen o lo desplegamos? | Medio. En local se usa un contenedor |
+| App registration en Entra | Medio. Mitigado con el proveedor local |
+| Archivos anonimizados | Bajo técnicamente, alto en cumplimiento |
+| Sesión para ver armar el móvil en vivo | Medio. Las reglas no están documentadas |
 
 ---
 
-## 4. Octubre — Construcción
+## 8. Riesgos
 
-Estado al 28/9 (rama `feat/template-nestle`): ✅ hecho · 🟡 en parte · ⬜ pendiente.
-
-1. ⬜ Persistencia: modelo en Postgres, migraciones, el motor operando contra la base (hoy la sesión vive en memoria)
-2. ✅ API con FastAPI y la autenticación detrás de una interfaz (proveedor local)
-3. ✅ **Pantalla central**: carga de las tres entradas en Excel, reglas, lista de inconsistencias
-4. 🟡 **Panel de reglas**: alta, edición y baja de tope / mínimo / fijo por categoría y "Dónde se vende". Falta la herencia desde el mes anterior (necesita persistencia)
-5. 🟡 Reglas en el cruce con detección de incumplibles y conflictos. Faltan las reglas debajo del canal (vendedor)
-6. ✅ Excepciones ON/OFF de SKUs, vendedores y distribuidores
-7. ✅ Re-normalización: SKUs modificados y entidades deshabilitadas (proporcional, A1)
-8. ✅ Revisión y edición manual: valores fijados, recálculo, historial con motivo
-9. 🟡 Front en React: importar, reglas, inconsistencias, corregir. Falta **aprobar**
-10. ✅ Exportación a Excel (pide confirmar si quedan cosas para revisar)
-11. ⬜ Enchufar Entra real si IT confirma factibilidad
-
-El panel de reglas es parte del núcleo. Simulación de escenarios, dashboard y carga a SAP quedan fuera hasta que todo lo anterior ande.
-
-A partir de octubre, el entorno de pruebas está arriba (ver sección 6).
+| Riesgo | Mitigación |
+|---|---|
+| Se construye M2 sobre un supuesto que el cliente cambia | Mostrarlo funcionando el viernes; el reparto está aislado en `apertura.py` |
+| El formato real de entrada o de salida es distinto del nuestro | Preguntarlo (B6, A15). La lectura está aislada en `importer/` |
+| Una salida mal armada se carga en SAP (ya pasó: aperturas invertidas con totales correctos) | Cuadratura en cada nivel, no solo en el total. No cambiar el formato sin confirmarlo |
+| Datos reales en el repo | Solo muestra inventada. El archivo de mayo no se sube |
+| Algo que se ve bien en la demo y falla en uso | Entorno de pruebas abierto al cliente y tests en CI |
+| Reglas reales fuera del catálogo | Validar con los ejemplos (R7) |
 
 ---
 
-## 5. Noviembre — Validación y entrega
-
-1. Pruebas con datos reales de varios meses
-2. Validación con el usuario real
-3. Ajustes
-4. Documentación funcional y técnica
-5. Entrega y demo
-
-Reservar la última semana completa para documentación y ensayo.
-
----
-
-## 6. El entorno de pruebas
-
-El cliente lo pidió explícitamente y dio el motivo: al grupo anterior las demos se le veían bien, pero el producto entregado tenía fallas y agujeros.
-
-Quieren **entrar a probar por su cuenta**, no ver demos guiadas.
-
-Qué implica:
-
-- Desplegar seguido a ese entorno desde octubre, no esperar a tener algo lindo
-- Que lo que esté publicado funcione de verdad, aunque haga poco
-- Tests automáticos antes de invitarlos a romper cosas, no después
-- Lo que esté a medias, que se note
-- Como cada merge despliega, lo que rompe la rama principal rompe el entorno del cliente: no se mergea sin verificar
-
-Esto también nos sirve para la defensa: un proceso de entrega continua con estrategia de testing se argumenta mejor que un prototipo demostrado en vivo.
-
----
-
-## 7. Decisiones técnicas propias
-
-### Decimal, nunca float
-
-Todo cálculo de kilos o plata usa `decimal.Decimal` con redondeo explícito. En una cascada de varios niveles los errores de redondeo se acumulan y en la última etapa son imposibles de rastrear.
-
-Regla de code review desde el primer día. El front no calcula: muestra lo que devuelve el backend.
-
-### Reparto de restos con largest remainder
-
-Repartir por porcentaje y redondear no suma el total exacto. Se reparte el sobrante entre las entidades con mayor resto decimal, con desempate determinístico, en cada nivel, y por separado para kilos y facturación.
-
-### Cruce SKU × canal por ajuste biproporcional
-
-Filas = input 1, columnas = input 2, celdas prohibidas en cero. Se parte del reparto del mes anterior y se ajusta alternando filas y columnas (RAS / IPF). Determinístico. Si no converge porque filas y columnas son incompatibles, se informa dónde. Los totales por SKU cierran exacto.
-
-### Pesos relativos
-
-`repartir` recibe pesos relativos, no porcentajes que deban sumar 1. Tres tercios en Decimal suman 0,999…, no 1. Deshabilitar una entidad es sacarla del conjunto. Validar que los porcentajes del Excel sumen 100% es trabajo del importador.
-
-### Árbol de profundidad variable
-
-Cada rama define hasta dónde baja. En Soluciones, Distribuidores termina en distribuidores y la venta directa baja a vendedores. Una escalera fija funciona para el caso simple y se rompe en el complejo.
-
-### Las reglas son una capa sobre el motor
-
-La herramienta implementa un catálogo de tipos de regla; el planner crea las reglas concretas. Las reglas producen restricciones y el motor reparte respetándolas. Una regla fuera del catálogo requiere desarrollo. Son datos persistentes, con vigencia mensual y heredables. Las reglas imposibles de cumplir juntas o en conflicto se detectan y se informan; el sistema no las resuelve en silencio.
-
-### "No aplica" y "aplica con cero" son estados distintos
-
-Que un canal no venda cierto SKU no es lo mismo que venderlo en cantidad cero. El primero no entra al reparto, el segundo sí.
-
-### Re-normalización: una sola regla
-
-Acomodar los porcentajes al modificar un SKU y repartir la parte de una entidad deshabilitada son el mismo mecanismo. Se implementa una vez. Criterio pendiente (A1), proporcional como supuesto.
-
-### Cada nodo tiene valor y estado
-
-Hay que saber si un valor fue **calculado** o **editado a mano**. El valor editado queda fijo, el recálculo no lo pisa y el resto absorbe la diferencia.
-
-- Una edición imposible (negativa o mayor que el padre) se rechaza.
-- Si todos los hermanos quedan fijados y el nivel no cierra, el nivel se marca "no cuadra" y bloquea la aprobación.
-
-### Trazabilidad
-
-Cada ajuste registra qué cambió, quién, cuándo y por qué. El autor sale de la interfaz de autenticación. Hoy el historial vive en la sesión en memoria; cómo se guarda y se consulta está en la sección 11.
-
-### Autenticación detrás de una interfaz
-
-Dos implementaciones: un proveedor local para desarrollar y el de Entra real.
-
-### El importador cruza por código
-
-Las hojas se cruzan por código de SKU, nunca por nombre. Columnas detectadas por nombre de encabezado, no por posición.
-
-### Nada de datos reales en el repo
-
-Datos de prueba anonimizados o generados que repliquen la estructura real, incluidos los casos raros. Archivo real en `.gitignore`.
-
-### El motor de dominio, separado
-
-```
-domain/            ← reparto, árbol, reglas, cuadratura, re-normalización
-  reparto.py       ← largest remainder, aislado y testeado
-models/            ← SQLAlchemy
-routes/            ← API
-```
-
-El dominio no sabe nada de FastAPI ni de la base. Se testea sin levantar servidor.
-
----
-
-## 8. El factor humano como principio de diseño
-
-El planner pasa a un rol de supervisión: define reglas, revisa el resultado y corrige lo puntual. El sistema hace el trabajo mecánico.
-
-El planner tiene **conocimiento empírico que el histórico no captura**: sabe qué SKUs están mal cargados, qué desvío es real y cuál es error de datos, qué cambió en una cartera.
-
-**La validación humana es el control de calidad del dato**, no un paso administrativo. La aprobación siempre la da una persona, aunque todo cuadre.
-
----
-
-## 9. Riesgos
-
-| Riesgo | Impacto | Mitigación |
-|---|---|---|
-| Nestlé tarda en designar nuevo referente | Alto. No se validan las reglas | Pedirlo explícito. Avanzar con el motor y marcar todo supuesto |
-| La sesión de observación se corre a octubre | Alto. Se construye con reglas inventadas | Pedir fecha con el nuevo referente |
-| El panel de reglas agranda el alcance | Alto. En el funcional figuraba como SHOULD | Catálogo cerrado de tipos; validarlo con los ejemplos reales |
-| Reglas reales fuera del catálogo | Medio | Pedir los ejemplos antes de cerrar el catálogo |
-| Reglas superpuestas vuelven el reparto un problema de optimización | Medio | Pocos tipos de regla; conflictos se informan, no se resuelven solos |
-| Repo del equipo con stack distinto al confirmado | Alto. Reescritura tardía | Alinear ya (E1), antes de que el motor se apoye encima |
-| No llegan credenciales del índice privado | Alto. No se puede ni instalar | Preguntarlo esta semana |
-| El scaffold no trae persistencia | Medio. Trabajo no contemplado | Modelo de datos en paralelo al motor |
-| Errores de redondeo en la cascada | Alto. Rompe la cuadratura | Decimal desde el día uno, tests en CI |
-| Entregar algo que se ve bien en demo y falla en uso | Alto | Entorno de pruebas abierto desde octubre |
-| Datos personales en el repo | Medio, reputacional | Datos anonimizados, gitignore |
-
----
-
-## 10. Próximos pasos
-
-1. Pedir a Nestlé la designación del nuevo referente de negocio
-2. Conseguir los ejemplos de reglas reales y validar el catálogo de tipos (R7)
-3. Validar con el nuevo referente el margen del input 2 (A2), la estructura del árbol (A10) y las preguntas de reglas (R1 a R4)
-4. Alinear el repo del equipo con el stack confirmado (E1)
-5. ~~Implementar el cruce SKU × canal y terminar el motor de reparto~~ (hecho en `feat/template-nestle`, ver §4)
-6. Mandar las preguntas técnicas del scaffold a IT
-7. Preguntar el criterio de re-normalización (A1)
-
----
-
-## 11. Propuesta: historial y un móvil por mes
-
-Estado: **propuesta**, no implementada. Depende de la persistencia (§4, punto 1) y de las
-respuestas A6, A15 y A16.
-
-**Para qué sirve el historial** (la trazabilidad la pidió el cliente; el resto es lo que
-habilita):
-
-1. Explicar el móvil después: por qué una celda vale lo que vale, quién la tocó y con qué
-   motivo, aunque esa persona ya no esté.
-2. Aprobar con criterio: quien aprueba revisa lo que se tocó a mano, no miles de celdas.
-3. Arrancar el mes siguiente: las reglas se heredan (confirmado) y el historial dice qué se
-   decidió y por qué.
-4. Mejorar la herramienta: lo que se fija a mano todos los meses es candidato a regla.
-
-**Un móvil por mes, compartido.** El móvil es uno solo por mes para todos los planners (ya
-decidido: una sola versión). No hay "una sesión por persona": el historial es del móvil y
-cada entrada dice quién la hizo. "Lo que hizo Juan" es un filtro, no otra sesión.
-
-- **Móvil del mes**: sus tres archivos, reglas, ON/OFF, fijadas, historial y estado
-  (borrador → aprobado).
-- **Aprobado = solo lectura.** Si se puede reabrir (A16), cada reapertura es una versión nueva.
-- **Consultar un mes anterior**: Móviles → Febrero → ver la tabla, abrir una celda y ver su
-  historia, filtrar el historial por persona, SKU o canal. Quién puede verlo depende de A6.
-
-**Ejemplo**: en el mes 6 preguntan por algo del mes 2 que hizo Juan, que está de
-vacaciones. Cualquier planner con acceso abre el móvil de febrero (aprobado, solo lectura) y
-ve en la celda "fijada por Juan el 12/02, motivo: acuerdo con la cadena".
-
-**El Excel no es la fuente del historial.** La plataforma es la fuente de verdad. Una hoja
-Historial en el Excel exportado sería una copia útil para quien lo recibe, pero **no se
-agrega hasta saber el formato de salida (A15)**: si el Excel se vuelve a cargar en otro
-sistema, una hoja de más puede romper esa carga. El Excel de SAP o Contraloría que entra no
-se modifica nunca.
-
-**Nombres**: en el código, `Sesion` hoy es "el móvil del mes que se está armando". Cuando
-haya base y login, conviene renombrarla a *móvil del mes* (o período) para no confundirla con
-la sesión del usuario conectado.
-
-**Modelo mínimo** (cuando se haga la base): `Movil(mes, estado, versión)`, sus entradas y
-reglas, y `Ajuste(movil, acción, detalle, autor, cuándo, motivo)`, que es lo que hoy guarda
-`Sesion.historial`.
-
+## 9. Calendario
+
+- **Septiembre, definición**: ✅ recorrido end-to-end sobre datos de prueba y dominio
+  consolidado.
+- **Octubre, construcción**: los MUST (§3), la persistencia y el entorno de pruebas.
+- **Noviembre, validación y entrega**: datos reales de varios meses, validación con el
+  planner, documentación y defensa. La última semana, entera para documentación y
+  ensayo.

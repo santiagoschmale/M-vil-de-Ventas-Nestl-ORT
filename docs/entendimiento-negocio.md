@@ -7,7 +7,11 @@ Cada afirmación está marcada según su origen:
 
 - **[confirmado]** lo dijo o lo mostró el cliente
 - **[datos]** surge del análisis del archivo de mayo
-- **[a confirmar]** hipótesis o punto abierto
+- **[a confirmar]** hipótesis o punto abierto (el id está en `preguntas.md`)
+
+Fuentes: documento funcional v1.0 del cliente (26/08/2026), reunión inicial, reunión
+de reglas (sep 2026) y archivo de mayo. Si el documento funcional y una reunión
+posterior se contradicen, vale la reunión, y se anota la diferencia.
 
 ---
 
@@ -19,6 +23,26 @@ El planner revisa y corrige solo lo que no cierra. [confirmado]
 Sin la carga de los totales por canal y de dónde se vende cada SKU, la herramienta
 no resuelve el problema: la interacción sería la misma que hoy en el Excel.
 [confirmado]
+
+### Cómo se hace hoy
+
+[confirmado, documento funcional]
+
+- Se arma en Excel en unas 4 o 5 horas por país cada mes. La meta es bajarlo a 30 o
+  45 minutos.
+- Las fórmulas dan un primer reparto. Después, el responsable ajusta a mano:
+  - sube y baja participaciones de 2 a 5 puntos;
+  - cambia el mix por canal;
+  - abre casos por distribuidor y por vendedor;
+  - recuadra todo hasta que cierra.
+- Las reglas no están escritas: viven en la cabeza de quien lo arma.
+- El móvil aprobado va por Excel al equipo que lo carga en SAP (Noe → NBS), que
+  valida línea por línea. Una vez se cargó un móvil con los totales bien pero las
+  aperturas por vendedor invertidas, y se duplicó el volumen sin que nadie lo
+  detectara a tiempo.
+
+**Por eso la cuadratura se valida en cada nivel de apertura, no solo en el total, y
+el formato de salida no se cambia sin confirmarlo (A15).**
 
 ## 2. El flujo
 
@@ -58,7 +82,10 @@ para lo puntual. [confirmado]
 - En el input 2, la plata por canal la da el planner: **cada canal tiene su propio
   precio**. La herramienta no valoriza ni necesita lista de precios. [confirmado]
 - **La base de partida del reparto es la distribución del mes anterior**, editable.
-  [confirmado]
+  [confirmado en reunión] El documento funcional dice que el histórico se arma con
+  cada móvil aprobado, con la opción de importar 2025 como base inicial, y el
+  archivo de mayo trae la venta de enero a diciembre de 2025. Con qué se arranca y
+  qué se usa después está a confirmar (B4).
 
 El archivo de mayo compartido ya viene con la distribución hecha: la hoja
 "Participaciones" es el trabajo del planner, no lo que manda Contraloría.
@@ -182,6 +209,24 @@ MÓVIL
 
 La **profundidad es variable**: cada rama define hasta dónde se abre. [confirmado]
 
+**La cascada del documento funcional contra la real.** El documento dibuja canal →
+territorio → vendedor → distribuidor igual para todos. Pero él mismo aclara que
+Ingredientes cierra en el canal y que solo Soluciones se abre. Los territorios
+(Buenos Aires, Córdoba, Rosario) son canales del input 2. La cascada real queda
+así [a confirmar, A10]:
+
+- canal → distribuidores, en Distribuidores;
+- canal → vendedores, en Directa y en cada territorio.
+
+El documento recomienda que la profundidad sea configurable por canal, y así está
+hecho.
+
+En el archivo de mayo, la apertura de Soluciones viene en tres bloques [datos]:
+
+1. Los 5 distribuidores.
+2. Call Center contra Distribuidores.
+3. Los asesores, debajo del Call Center.
+
 ---
 
 ## 8. Actores
@@ -238,36 +283,17 @@ envía 4 o 5 ejemplos reales para validar que el catálogo alcanza. [confirmado]
 Implementado en el cruce (`domain/cruce.py`, tests en `test_reglas.py`): tope,
 mínimo y fijo en % del total del canal para una o más categorías.
 
-### Puntos abiertos [a confirmar]
+### Puntos abiertos
 
-1. **SKU nuevo (sin reparto el mes anterior)**: ¿el planner indica en qué canales se
-   vende? ¿Se reparte en proporción al total de cada uno de esos canales, en partes
-   iguales, o copiando un SKU parecido? Implementado como supuesto: el planner elige
-   los canales y se reparte en proporción al total de cada canal (A4).
-2. **Editar el mes anterior**: está confirmado que es editable. ¿Qué se edita:
-   cuánto vendió un SKU en un canal, o que ahora se vende en un canal donde antes no?
-   (A12)
-3. **SKU sin historia debajo del canal**: si un SKU cae en un territorio o en
-   Distribuidores y ningún vendedor o distribuidor de ahí lo vendió el mes anterior,
-   ¿se reparte como el territorio entero, se le asigna a alguien, o se saca de ese
-   canal? Hoy se avisa (amarillo) y los kilos quedan en el canal sin abrir. Conviene
-   contar cuántas celdas quedan así con el archivo real. (A14)
-4. **Formato del Excel de salida**: ¿qué hojas y columnas espera quien lo recibe? ¿Vuelve
-   a cargarse en algún sistema (SAP)? Hoy lo definimos nosotros. (A15)
-5. **Meses aprobados**: ¿se pueden reabrir y modificar? ¿Todos los planners ven los meses
-   anteriores, incluido lo que hizo otro? (A16, A6)
-6. **Base del porcentaje**: el ejemplo "Café + Chocolatería · mínimo 30% del total
-   del canal" dice del canal, y así está implementado. Falta confirmar que vale
-   para todas las reglas.
-7. **Reglas debajo del canal**: "En Córdoba ningún vendedor supera el 25%" actúa
-   en la apertura, no en el cruce. Falta confirmar que va (y la base del %).
-8. **Valor fijo en kilos** ("Córdoba siempre 2.500 kg"): a nivel canal ya es el
-   input 2. ¿Hay valores fijos en kilos para una categoría dentro de un canal, o
-   solo en %?
-9. **Segmento como alcance**: hace falta saber qué categorías forman cada segmento.
-10. **Dos reglas del mismo canal que comparten solo parte de las categorías**
-   (Café + Chocolatería y Chocolatería + Mixes): hoy se informan y no se
-   calculan. ¿Se da en la práctica?
+En `preguntas.md`: R1, R2 y R7, y los de reglas que tocan el reparto (A4, A12,
+A14, A15, A16). Los que siguen quedan acá hasta que se pregunten:
+
+- **Valor fijo en kilos** ("Córdoba siempre 2.500 kg"): a nivel canal ya es el
+  input 2. ¿Hay valores fijos en kilos para una categoría dentro de un canal, o
+  solo en %?
+- **Segmento como alcance**: hace falta saber qué categorías forman cada segmento.
+- **Dos reglas del mismo canal que comparten solo parte de las categorías**
+  (Café + Chocolatería y Chocolatería + Mixes): hoy se informan y no se calculan.
 
 ---
 
@@ -278,14 +304,42 @@ Definido por el cliente en el documento funcional, prioridad MUST. [confirmado]
 **Prender o apagar entidades** antes del reparto: SKUs, vendedores, distribuidores.
 Define **quién participa** del mes. Las reglas definen cuánto le toca a cada uno.
 
-- Distribuidor en convocatoria de acreedores: se apaga; su parte se reparte entre
-  los demás.
-- SKU discontinuado: se apaga.
-- Vendedor nuevo o que se fue: se prende o se apaga.
+Casos del documento funcional (§7) [confirmado]:
+
+| Caso | Qué se hace |
+|---|---|
+| Distribuidor en convocatoria de acreedores | Se apaga antes de repartir. Su parte se reparte entre los demás "con el criterio que se defina" (A1; hoy proporcional al histórico) |
+| Vendedor con la cartera cambiada | Se le asigna un % manual en vez del histórico |
+| SKU discontinuado o reemplazado | Se apaga |
+| Vendedor o territorio nuevo | Se da de alta sin desarrollo, con base histórica o % (B2) |
+| Venta puntual a un cliente nuevo | Ajuste manual con trazabilidad |
+| Cargas masivas | A futuro, no en la POC |
+
+## 11. Base de cálculo
+
+MUST del documento funcional. [confirmado]
+
+Cada vendedor y distribuidor reparte por **histórico** o por un **% manual**, caso
+por caso. El % sirve cuando la historia ya no lo representa: cartera cambiada o
+entidad nueva.
+
+Falta definir cómo se aplica el % (B1): si es sobre el total del canal, si es igual
+para todos los SKUs y para kilos y pesos, y cómo se reparte el resto.
+
+## 12. Aprobación
+
+Del histórico quieren conservar **cómo quedó abierto el reparto y la intervención
+humana**. No hace falta guardar las reglas que se aplicaron. [confirmado, reunión
+inicial]
+
+- En cada etapa, los totales cuadran contra el nivel de arriba. [confirmado]
+- La aprobación final combina esa cuadratura con el juicio del planner. [confirmado]
+- Si además hay que aprobar etapa por etapa, y si existe un umbral de desvío
+  formal, está a confirmar (B3).
 
 ---
 
-## 11. Revisión humana
+## 13. Revisión humana
 
 - El total por SKU **siempre cierra**: la herramienta lo garantiza.
 - Lo que se marca para revisión: totales por canal que no se pueden alcanzar,
@@ -298,7 +352,7 @@ Define **quién participa** del mes. Las reglas definen cuánto le toca a cada u
 
 ---
 
-## 12. Ejemplo del input 2
+## 14. Ejemplo del input 2
 
 Valores ilustrativos: misma forma que el ejemplo real del cliente, números inventados.
 
@@ -325,7 +379,27 @@ Siglas y nombres a confirmar: **KAS** y dos nombres propios del archivo (ver not
 
 ---
 
-## 13. Estado del proyecto
+## 15. Lo que muestra el archivo de mayo
+
+[datos]
+
+- **Objetivo**: 108 SKUs y solo 45 con kilos. 12 SKUs concentran el 80% del volumen,
+  así que la revisión conviene enfocarla en esos.
+- **Controles**: la columna de control por SKU no suma 100% en más de la mitad de
+  los casos, y hay participaciones negativas. Son errores: se reportan, no se
+  replican.
+- **Mezcla de países**: hay SKUs de Uruguay, Brasil, Chile y Perú en un archivo de
+  Argentina.
+- **Catálogo**: una categoría aparece escrita de dos formas ("Café" y una variante
+  con otro carácter), hay búsquedas con `#N/A` y hay un SKU con kilos pero sin
+  facturación.
+- **Identidades**: en el bloque de vendedores, 15 columnas corresponden a 12 personas
+  (A5).
+- **NNS c/IIBB**: viene en todas las hojas (B7).
+- **Un solo archivo `.xlsb`** con bloques apilados, no tres archivos (B6).
+- **Nombres reales** de vendedores, distribuidores y clientes: no entra al repo.
+
+## 16. Estado del proyecto
 
 - La referente de negocio deja la organización. Nestlé designa un nuevo referente
   para validar reglas y cerrar los puntos abiertos.
@@ -333,7 +407,7 @@ Siglas y nombres a confirmar: **KAS** y dos nombres propios del archivo (ver not
 
 ---
 
-## 14. Implicancias de diseño
+## 17. Implicancias de diseño
 
 - **Pantalla central**: carga del input 2 y de reglas, y lista de inconsistencias.
   La edición nodo por nodo es secundaria.

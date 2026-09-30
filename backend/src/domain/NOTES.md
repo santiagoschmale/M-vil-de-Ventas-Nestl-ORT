@@ -39,6 +39,24 @@ make dev        # API en :3000 y pantalla en http://localhost:5175
 make test       # tests del backend y del front
 ```
 
+**Otra versión de Python**: `make instalar PYTHON=python3.14` (anda con 3.13 y 3.14).
+
+**En Windows** no hay `make` y el entorno queda en `.venv\Scripts`. En PowerShell,
+desde la raíz:
+
+```
+cd backend
+py -3.14 -m venv .venv
+Get-Content requirements.txt | Where-Object { $_ -notmatch '^nbra-' } | Set-Content -Encoding ascii .requirements.publicas.txt
+.venv\Scripts\pip install -r .requirements.publicas.txt -r requirements.dev.txt .\local_shims\nbra_logger .\local_shims\nbra_envs_python
+cd ..\frontend
+npm ci --registry https://registry.npmjs.org
+```
+
+Para levantarlo, en dos terminales: en `backend`, `$env:IS_LOCAL="true"; .venv\Scripts\python app.py`;
+en `frontend`, `npx vite --port 5175 --strictPort`. Un `npm install` a secas falla:
+el `.npmrc` apunta al registro privado de Nestlé.
+
 `make api` y `make web` levantan cada parte por separado. Sin pantalla, el recorrido
 entero también corre por línea de comandos:
 
@@ -105,7 +123,7 @@ celda. El cruce no cambia al apagar un distribuidor.
 - **A1**: al apagar una entidad, su parte se reparte proporcional al histórico.
 - **A2**: el input 2 cierra exacto. Si admite margen (±500 kg), es un parámetro
   nuevo del cruce: las columnas pasan a ser rangos.
-- **A3**: formato de la apertura (hoy formato largo en una hoja de la base).
+- **B6**: formato de la apertura (hoy formato largo en una hoja de la base; el real viene en bloques).
 - **A14**: una celda que cae donde ningún vendedor o distribuidor vendió ese SKU el mes
   anterior no se abre: se avisa (amarillo) y queda en el canal. No se inventa.
 - **A10**: los vendedores cuelgan de Directa y de cada territorio.
@@ -171,16 +189,11 @@ celda. El cruce no cambia al apagar un distribuidor.
 
 ## Falta
 
-- Margen del input 2 (A2).
-- Reglas: hoy tope, mínimo y fijo en % del total del canal por categorías (cruce,
-  sesión, API y panel). Faltan las de vendedor dentro de un canal (apertura), la
-  herencia del mes anterior (necesita persistencia) y lo abierto en
-  `docs/entendimiento-negocio.md` §9.
-- Aprobación del móvil por una persona ("Aprobar y exportar"; hoy se exporta con
-  confirmación si quedan cosas para revisar, sin registrar la aprobación).
-- Editar el mes anterior en la plataforma (A12). Resolvería también A14.
-- Guardar las cargas sin perderlas: con la recarga automática, cada cambio al código del
-  backend reinicia la sesión (ver Persistencia).
-- Persistencia en Postgres (otra implementación de `repositorio.py`).
-- Entra ID (otro proveedor en `auth/proveedor.py`).
+Lo funcional (MUST, SHOULD, qué depende de qué respuesta) está en `docs/plan.md` §2 y
+§3. Acá, solo lo técnico:
+
+- Persistencia en Postgres: otra implementación de `repositorio.py`. Mientras tanto, la
+  recarga automática de la API borra la sesión con cada cambio al código.
+- Entra ID: otro proveedor en `auth/proveedor.py`.
+- Leer el formato real (un `.xlsb` con bloques, B6): `importer/` lee tres `.xlsx`.
 - Buscador de SKUs en la matriz, si la cantidad real lo pide.
