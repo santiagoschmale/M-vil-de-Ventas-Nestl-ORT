@@ -1,91 +1,86 @@
-# ${{ values.name }} - React + Python Monorepo
+# Móvil de Ventas — Nestlé Professional Argentina × ORT
 
-Single GitHub repository hosting a **React frontend** and a **Python backend** for the same application, generated from the IDP Backstage portal.
+Herramienta para armar el móvil de ventas, el objetivo mensual. El planner carga
+tres archivos:
 
-## Repository Layout
+- el objetivo de Contraloría por SKU;
+- los totales por canal;
+- el mes anterior.
 
-```
-.
-├── .github/
-│   ├── CODEOWNERS
-│   └── workflows/
-│       └── ci.yaml          # Combined pipeline (frontend + backend jobs)
-├── catalog-info.yaml        # Backstage component descriptor
-├── frontend/                # React 18 + Vite + TypeScript + MUI
-│   ├── Dockerfile
-│   ├── package.json
-│   ├── src/
-│   └── ...
-└── backend/                 # FastAPI + Uvicorn (Python 3.11)
-    ├── Dockerfile
-    ├── app.py
-    ├── requirements.txt
-    ├── src/
-    └── tests/
-```
+Con eso, la herramienta hace el primer reparto sola:
 
-Each subdirectory keeps its own `README.md` with component-specific instructions:
+- cruza SKU × canal;
+- abre cada canal entre sus distribuidores o vendedores;
+- respeta las reglas y el ON/OFF de cada entidad.
 
-- [`frontend/README.md`](frontend/README.md)
-- [`backend/README.md`](backend/README.md)
+Marca lo que no puede cerrar y deja que una persona lo ajuste, lo apruebe y lo
+exporte a Excel. Todo cuadra exacto, en kilos y en pesos, y cada ajuste queda con
+quién, cuándo y por qué.
 
-## Getting Started
+Proyecto final de la Universidad ORT para Nestlé DIL Región Plata, sep-nov 2026.
 
-Open two terminals — one per component.
+## Correrlo
 
-### Frontend
+Se necesita Python 3.13 o 3.14, Node con npm y `make` (en Mac viene con
+`xcode-select --install`). No hace falta Docker ni base de datos: por ahora todo
+vive en memoria.
 
 ```bash
-cd frontend
-echo "//pkgs.dev.azure.com/nestle-it/BR-DIGITAL-NEW-TECH/_packaging/nbra-js-feed/npm/registry/:_authToken=${AZ_DEVOPS_PAT}" >> .npmrc
-npm ci
-npm run dev
+make instalar
 ```
-
-The Vite dev server runs with MSW intercepting `/api/*` calls, so no backend is required to iterate on UI.
-
-> **Móvil de ventas:** en la raíz, `make instalar` y después `make dev` (API + pantalla en
-> http://localhost:5175). `/api/movil` no tiene mock; necesita el backend en `:3000`
-> (vite lo reenvía). Sin acceso a los feeds privados, `make deps-local` en el
-> backend usa los reemplazos de `local_shims/`. Cómo levantar todo y los gotchas:
-> [`backend/src/domain/NOTES.md`](backend/src/domain/NOTES.md).
-
-### Backend
 
 ```bash
-cd backend
-python3 -m venv venv
-source venv/bin/activate
-export PIP_EXTRA_INDEX_URL="<your-INDEX_URL>"
-make deps
-python3 app.py
+make dev
 ```
 
-FastAPI listens on `:3000`. With `IS_LOCAL=true` (the default), Key Vault initialization is skipped.
+Abrir http://localhost:5175 y tocar "Cargar datos de muestra".
 
-## CI / CD
+- **Otra versión de Python**: `make instalar PYTHON=python3.14`.
+- **Windows**: no hay `make`. Los pasos a mano están en
+  [`backend/src/domain/NOTES.md`](backend/src/domain/NOTES.md#correrlo).
+- **No correr `npm install` a secas en `frontend/`**: el `.npmrc` apunta al registro
+  privado de Nestlé, sin acceso desde acá. `make instalar` usa el registro público, y
+  para las librerías internas del backend, los reemplazos de `backend/local_shims/`.
+- **Tests**: `make test` corre backend y front.
 
-`.github/workflows/ci.yaml` calls the platform reusable workflow `nestle-it/nbra-platform-workflows/.github/workflows/pipeline-new-platform.yaml@main` **twice** — once per component — passing the same inputs the standalone templates use:
+## Estructura
 
-| Job        | `language` | `working_directory` | Notes                              |
-|------------|------------|---------------------|------------------------------------|
-| `frontend` | `react`    | `frontend`          |                                    |
-| `backend`  | `python`   | `backend`           | `dockerfile: Dockerfile.python-release` |
-
-Both jobs trigger on pushes to `main`, `release_candidate/*`, `hotfix/*`, `develop`, and on `workflow_dispatch`.
-
-## Docker
-
-Each component ships its own Dockerfile and is built independently:
-
-```bash
-docker build --build-arg AZ_DEVOPS_PAT=<token> -t ${{ values.name }}-frontend ./frontend
-docker build --build-arg INDEX_URL="<index-url>" -t ${{ values.name }}-backend ./backend
+```
+backend/            FastAPI (Python)
+  src/domain/       las cuentas: cruce, reparto, apertura. No conoce ni HTTP ni Excel
+  src/importer/     lectura de los Excel de entrada
+  src/movil/        el móvil del mes: entradas, ajustes, historial, exportación
+  src/routes/       la API /api/movil
+frontend/           React + MUI: la pantalla del móvil
+data/sample/        datos de prueba inventados, con la forma de los reales
+docs/               dominio, plan y preguntas abiertas
 ```
 
-See each component's README for the full build/run details.
+## Documentación
 
-## Tech Stack
+| Doc | Para qué |
+|---|---|
+| [`docs/entendimiento-negocio.md`](docs/entendimiento-negocio.md) | El dominio: cómo se arma hoy el móvil, inputs, cruce, estructura, reglas |
+| [`docs/plan.md`](docs/plan.md) | Qué se hizo, qué falta y en qué orden |
+| [`docs/preguntas.md`](docs/preguntas.md) | Lo que falta definir con el cliente y con IT |
+| [`backend/src/domain/NOTES.md`](backend/src/domain/NOTES.md) | Cómo está armado el código, supuestos en uso y gotchas |
+| [`CLAUDE.md`](CLAUDE.md) | Reglas innegociables y decisiones tomadas: lo lee el equipo y Claude Code |
 
-**Frontend** — React 18, Vite, TypeScript, MUI, Zustand, React Router, Vitest, MSW
-**Backend** — Python 3.11, FastAPI, Uvicorn, nbra-logger-py, nbra-envs-python, nose2, mutmut, black, flake8, pylint
+## Reglas del repo
+
+- **Ningún dato real de Nestlé**: ni archivos, ni cifras, ni nombres. La muestra es
+  inventada.
+- **Decimal, nunca float**, en kilos y pesos.
+- Los PRs usan el template de `.github/pull_request_template.md`.
+
+## Del template de Nestlé
+
+El repo parte del scaffold de Backstage
+([`docs/template-reference.md`](docs/template-reference.md)).
+
+- **CI**: `checks.yml` corre en cada PR los tests del backend y los tipos, tests y
+  build del front. `ci.yaml` es el del template: llama al workflow de plataforma de
+  Nestlé, que desde acá no corre. Cuando llegue el repo real, cada merge despliega
+  con ArgoCD.
+- **Docker**: cada parte tiene su `Dockerfile`, y necesita las credenciales de los
+  registros privados.
