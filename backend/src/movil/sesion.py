@@ -474,8 +474,11 @@ class Sesion:
             raise ErrorDeAjuste(f"La etapa {_NOMBRE_ETAPA[etapa]} ya está revisada.")
         if etapa == "apertura" and "canal" not in self.revisadas:
             raise ErrorDeAjuste("Primero revisá la etapa por canal: lo de abajo sale de ahí.")
+        antes = self._respaldo()
         self.revisadas[etapa] = Ajuste("revisar_etapa", f"Revisó la etapa {_NOMBRE_ETAPA[etapa]}", autor, cuando)
         self.historial.append(self.revisadas[etapa])
+        # Es lo último que hizo el planner: Deshacer saca este OK y nada más.
+        self._antes_del_ultimo, self.ultimo_cambio = antes, self.revisadas[etapa]
 
     def _invalidar_etapas(self, accion: str) -> None:
         desde = "apertura" if accion in _DEBAJO_DEL_CANAL else "canal"
@@ -524,7 +527,6 @@ class Sesion:
         proxima = self._proxima_regla  # ponytail: los ids de regla no se reusan, el historial los nombra
         self._restaurar(self._antes_del_ultimo)
         self._proxima_regla = proxima
-        self._invalidar_etapas(self.ultimo_cambio.accion)
         self.historial.append(Ajuste("deshacer", f"Deshizo: {self.ultimo_cambio.detalle}", autor, cuando))
         self._antes_del_ultimo = self.ultimo_cambio = None
 
@@ -533,11 +535,11 @@ class Sesion:
     def _respaldo(self) -> tuple:
         return (copy.copy(self._e), dict(self.apagados_skus), dict(self.entidades_apagadas),
                 {u: dict(f) for u, f in self._fijas.items()}, dict(self.reglas), self._proxima_regla,
-                dict(self.filas_elegidas), dict(self.canales_sku), dict(self.porcentajes), dict(self.entidades_nuevas), self.recorrido)
+                dict(self.filas_elegidas), dict(self.canales_sku), dict(self.porcentajes), dict(self.entidades_nuevas), dict(self.revisadas), self.recorrido)
 
     def _restaurar(self, respaldo: tuple) -> None:
         (self._e, self.apagados_skus, self.entidades_apagadas, self._fijas, self.reglas,
-         self._proxima_regla, self.filas_elegidas, self.canales_sku, self.porcentajes, self.entidades_nuevas, self.recorrido) = respaldo
+         self._proxima_regla, self.filas_elegidas, self.canales_sku, self.porcentajes, self.entidades_nuevas, self.revisadas, self.recorrido) = respaldo
 
     def _unidad(self, unidad: str) -> int:
         if unidad not in UNIDADES:
