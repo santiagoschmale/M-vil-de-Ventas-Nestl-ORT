@@ -8,6 +8,7 @@ pasa por float en JavaScript. El front muestra, el backend calcula.
 
 from __future__ import annotations
 
+from collections import defaultdict
 from datetime import datetime
 from decimal import Decimal
 from io import BytesIO
@@ -162,11 +163,11 @@ def _estado(s: Sesion) -> dict:
                               for c, t in e.canales.items()]}
     if e.base is not None:
         # Kilos por canal del mes anterior: el punto de partida para armar los totales en la pantalla.
-        por_canal: dict[str, Decimal] = {}
+        por_canal: dict[str, Decimal] = defaultdict(Decimal)  # en el orden del archivo
         for (_, canal), kilos in e.base.items():
-            por_canal[canal] = por_canal.get(canal, Decimal(0)) + kilos
+            por_canal[canal] += kilos
         base = {"archivo": e.archivo_base, "celdas": len(e.base), "aperturas": len(e.apertura),
-                "canales": [{"canal": c, "kilos": _texto(k, "kilos")} for c, k in sorted(por_canal.items())]}
+                "canales": [{"canal": c, "kilos": _texto(k, "kilos")} for c, k in por_canal.items()]}
     cruces = {"kilos": r.kilos if r else None, "plata": r.plata if r else None}
     return {
         "faltan": s.faltan(),

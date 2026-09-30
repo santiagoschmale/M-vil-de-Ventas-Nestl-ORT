@@ -281,5 +281,5 @@ def test_el_estado_trae_los_kilos_por_canal_del_mes_anterior():
     with (MUESTRA / "base_mes_anterior.xlsx").open("rb") as f:
         c.post("/api/movil/base", files={"archivo": ("base.xlsx", f)})
     canales = c.get("/api/movil").json()["entradas"]["base"]["canales"]
-    assert [x["canal"] for x in canales] == sorted(x["canal"] for x in canales) and len(canales) > 1
+    assert len(canales) > 1 and len({x["canal"] for x in canales}) == len(canales)
     assert all(D(x["kilos"]) > 0 and D(x["kilos"]).as_tuple().exponent == -3 for x in canales)

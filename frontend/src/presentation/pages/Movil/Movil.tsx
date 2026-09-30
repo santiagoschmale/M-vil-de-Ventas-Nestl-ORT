@@ -67,50 +67,56 @@ const Tarjeta = ({ titulo, children }: { titulo: string; children: React.ReactNo
 type Totales = NonNullable<Estado['entradas']['input2']>;
 type Objetivo = Estado['entradas']['input1'];
 type Sugerencia = NonNullable<Estado['entradas']['base']>['canales'];
-type Fila = { id: number; canal: string; kilos: string; plata: string; nueva: boolean };
+type Fila = { id: string; canal: string; kilos: string; plata: string; nueva: boolean };
+type Campo = 'kilos' | 'plata';
 
-let proximaFila = 0;
-const fila = (canal = '', kilos = '', plata = '', nueva = false): Fila => ({ id: proximaFila++, canal, kilos, plata, nueva });
+const fila = (f: Partial<Fila>): Fila => ({ id: crypto.randomUUID(), canal: '', kilos: '', plata: '', nueva: false, ...f });
+const aTexto = (m: string | null) => (m == null ? '' : formatear(m));
+// La misma regla que `normalizar` del backend: sin tildes, mayúsculas ni espacios de más.
+const claveDeCanal = (canal: string) =>
+  canal.normalize('NFKD').replace(/\p{M}/gu, '').replace(/\s+/g, ' ').trim().toLowerCase();
 
 /**
  * Los totales por canal, en la pantalla: editar los cargados (una fila por canal) o
  * armarlos sin Excel, arrancando de los kilos del mes anterior si ya se cargó.
  */
 const TotalesDialog = ({ totales, sugerencia, objetivo, onCerrar }: {
-  totales?: Totales; sugerencia?: Sugerencia; objetivo: Objetivo; onCerrar: () => void;
+  totales: Totales | null; sugerencia?: Sugerencia; objetivo: Objetivo; onCerrar: () => void;
 }) => {
   const { editarTotales, ocupado } = useMovil();
-  // Lo cargado, para mostrar "antes: …" en lo que se cambie (se compara texto: el front no calcula).
-  const [originales] = useState(() => new Map((totales?.detalle ?? []).map(t => [
-    t.canal, { kilos: formatear(t.kilos), plata: t.plata == null ? '' : formatear(t.plata) },
-  ])));
-  const [filas, setFilas] = useState<Fila[]>(() => {
-    if (totales) return totales.detalle.map(t => fila(t.canal, formatear(t.kilos), t.plata == null ? '' : formatear(t.plata)));
-    if (sugerencia?.length) return sugerencia.map(t => fila(t.canal, formatear(t.kilos)));
-    return [fila('', '', '', true)];
+  const [iniciales] = useState<Fila[]>(() => {
+    if (totales) return totales.detalle.map(t => fila({ canal: t.canal, kilos: aTexto(t.kilos), plata: aTexto(t.plata) }));
+    if (sugerencia?.length) return sugerencia.map(t => fila({ canal: t.canal, kilos: aTexto(t.kilos) }));
+    return [fila({ nueva: true })];
   });
-  const antes = (f: Fila, campo: 'kilos' | 'plata') => {
-    const original = originales.get(f.canal);
-    return original && f[campo].trim() !== original[campo] ? `antes: ${original[campo] || 'vacío'}` : undefined;
-  };
+  // Lo cargado, por fila, para mostrar "antes: …" y qué canales se sacan (se compara texto: el front no calcula).
+  const [originales] = useState(() => new Map(totales ? iniciales.map(f => [f.id, f]) : []));
+  const [filas, setFilas] = useState(iniciales);
   const [error, setError] = useState<string | null>(null);
-  const cambiar = (id: number, campo: 'canal' | 'kilos' | 'plata', valor: string) => {
+  const cambiar = (id: string, campo: 'canal' | Campo, valor: string) => {
     setFilas(fs => fs.map(f => (f.id === id ? { ...f, [campo]: valor } : f)));
     setError(null);
   };
+  const antes = (f: Fila, campo: Campo) => {
+    const original = originales.get(f.id);
+    return original && f[campo].trim() !== original[campo] ? `antes: ${original[campo] || 'vacío'}` : undefined;
+  };
   const nombre = (f: Fila, i: number) => f.canal.trim() || `canal ${i + 1}`;
 
-  // Lo que va a pasar al guardar, dicho antes: el backend lo acepta, pero conviene saberlo.
-  const completas = filas.filter(f => f.canal.trim() || f.kilos.trim() || f.plata.trim());
-  const sinPesos = completas.filter(f => !f.plata.trim()).length;
-  const sacados = [...originales.keys()].filter(c => !filas.some(f => f.canal === c));
-  const clave = (canal: string) => canal.trim().toLowerCase();
-  const repetido = (f: Fila) => !!f.canal.trim() && filas.some(x => x.id !== f.id && clave(x.canal) === clave(f.canal));
+  // Avisos de lo que va a pasar al guardar; la regla la aplica el backend.
+  const conCanal = filas.filter(f => f.canal.trim());
+  const cuantas = new Map<string, number>();
+  conCanal.forEach(f => cuantas.set(claveDeCanal(f.canal), (cuantas.get(claveDeCanal(f.canal)) ?? 0) + 1));
+  const repetido = (f: Fila) => (cuantas.get(claveDeCanal(f.canal)) ?? 0) > 1;
+  const sinNombre = (f: Fila) => !f.canal.trim() && !!(f.kilos.trim() || f.plata.trim());
+  const sinPesos = conCanal.filter(f => !f.plata.trim()).length;
+  const sacados = [...originales.values()].filter(o => !filas.some(f => f.id === o.id)).map(o => o.canal);
+  const puedeGuardar = conCanal.length > 0 && !filas.some(f => repetido(f) || sinNombre(f));
 
   const guardar = async (e: React.FormEvent) => {
     e.preventDefault();
     // La misma tabla que lee el backend, con los números como se escriben acá (1.234,5).
-    const texto = ['Canal\tKilos\tPlata', ...completas.map(f => `${f.canal.trim()}\t${f.kilos.trim()}\t${f.plata.trim()}`)]
+    const texto = ['Canal\tKilos\tPlata', ...conCanal.map(f => `${f.canal.trim()}\t${f.kilos.trim()}\t${f.plata.trim()}`)]
       .join('\n');
     const falla = await editarTotales(texto);
     if (falla) setError(falla);
@@ -152,20 +158,24 @@ const TotalesDialog = ({ totales, sugerencia, objetivo, onCerrar }: {
                 <TableCell>
                   {f.nueva
                     ? <TextField size="small" value={f.canal} onChange={e => cambiar(f.id, 'canal', e.target.value)}
-                        error={repetido(f)} helperText={repetido(f) ? 'Ya está en la tabla' : undefined}
+                        error={repetido(f) || sinNombre(f)}
+                        helperText={repetido(f) ? 'Ya está en la tabla' : sinNombre(f) ? 'Falta el nombre' : undefined}
                         inputProps={{ 'aria-label': `Canal ${i + 1}` }} />
                     : f.canal}
                 </TableCell>
-                <TableCell>
-                  <TextField size="small" value={f.kilos} onChange={e => cambiar(f.id, 'kilos', e.target.value)}
-                    helperText={antes(f, 'kilos')} color={antes(f, 'kilos') ? 'warning' : undefined} focused={!!antes(f, 'kilos') || undefined}
-                    inputProps={{ 'aria-label': `Kilos de ${nombre(f, i)}`, inputMode: 'decimal', style: numeros }} />
-                </TableCell>
-                <TableCell>
-                  <TextField size="small" value={f.plata} onChange={e => cambiar(f.id, 'plata', e.target.value)}
-                    helperText={antes(f, 'plata')} color={antes(f, 'plata') ? 'warning' : undefined} focused={!!antes(f, 'plata') || undefined}
-                    inputProps={{ 'aria-label': `Pesos de ${nombre(f, i)}`, inputMode: 'decimal', style: numeros }} />
-                </TableCell>
+                {(['kilos', 'plata'] as const).map(campo => {
+                  const a = antes(f, campo);
+                  return (
+                    <TableCell key={campo}>
+                      <TextField size="small" value={f[campo]} onChange={e => cambiar(f.id, campo, e.target.value)}
+                        helperText={a} color={a ? 'warning' : undefined} focused={!!a || undefined}
+                        inputProps={{
+                          'aria-label': `${campo === 'kilos' ? 'Kilos' : 'Pesos'} de ${nombre(f, i)}`,
+                          inputMode: 'decimal', style: numeros,
+                        }} />
+                    </TableCell>
+                  );
+                })}
                 <TableCell padding="checkbox">
                   <IconButton size="small" aria-label={`Sacar ${nombre(f, i)}`}
                     onClick={() => setFilas(fs => fs.filter(x => x.id !== f.id))}>
@@ -177,13 +187,15 @@ const TotalesDialog = ({ totales, sugerencia, objetivo, onCerrar }: {
           </TableBody>
         </Table>
         <Button size="small" startIcon={<AddRoundedIcon />} sx={{ mt: 1 }}
-          onClick={() => setFilas(fs => [...fs, fila('', '', '', true)])}>
+          onClick={() => setFilas(fs => [...fs, fila({ nueva: true })])}>
           Agregar canal
         </Button>
         {sinPesos > 0 && (
           <Alert severity="warning" sx={{ mt: 2 }}>
-            Falta el peso de {sinPesos} {sinPesos === 1 ? 'canal' : 'canales'}: se toma 0 y los pesos no van a cerrar
-            hasta que lo completes.
+            {sinPesos === conCanal.length
+              ? 'Sin pesos, se reparten solo los kilos hasta que los completes.'
+              : `Falta el peso de ${sinPesos} ${sinPesos === 1 ? 'canal' : 'canales'}: se toma 0 y los pesos no van a ` +
+                'cerrar hasta que lo completes.'}
           </Alert>
         )}
         {sacados.length > 0 && (
@@ -195,9 +207,7 @@ const TotalesDialog = ({ totales, sugerencia, objetivo, onCerrar }: {
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2 }}>
         <Button onClick={onCerrar}>Cancelar</Button>
-        <Button type="submit" variant="contained" disabled={ocupado || !completas.length || filas.some(repetido)}>
-          Guardar
-        </Button>
+        <Button type="submit" variant="contained" disabled={ocupado || !puedeGuardar}>Guardar</Button>
       </DialogActions>
     </Dialog>
   );
@@ -225,21 +235,11 @@ const Entradas = ({ estado }: { estado: Estado }) => {
         <Tarjeta titulo="Totales por canal">
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
             <Subir cargado={!!input2} etiqueta="Excel de totales por canal" alElegir={cargarInput2} />
-            {input2 ? (
-              <Button size="small" startIcon={<EditRoundedIcon />} onClick={() => setEditar(true)} disabled={ocupado || soloLectura}
-                aria-label="Editar totales por canal">
-                Editar
-              </Button>
-            ) : (
-              <Tooltip title={base ? 'Arranca con los canales y los kilos del mes anterior' : 'Una fila por canal, sin Excel'}>
-                <span>
-                  <Button size="small" startIcon={<EditRoundedIcon />} onClick={() => setEditar(true)}
-                    disabled={ocupado || soloLectura} aria-label="Armar totales por canal en la pantalla">
-                    Armar en pantalla
-                  </Button>
-                </span>
-              </Tooltip>
-            )}
+            {/* Sin Excel, se arman en la pantalla; el diálogo explica desde dónde arranca. */}
+            <Button size="small" startIcon={<EditRoundedIcon />} onClick={() => setEditar(true)} disabled={ocupado || soloLectura}
+              aria-label={input2 ? 'Editar totales por canal' : 'Armar totales por canal en la pantalla'}>
+              {input2 ? 'Editar' : 'Armar en pantalla'}
+            </Button>
           </Box>
           {input2 && (
             <Box>
@@ -267,7 +267,7 @@ const Entradas = ({ estado }: { estado: Estado }) => {
         </Box>
       )}
       {editar && (
-        <TotalesDialog totales={input2 ?? undefined} sugerencia={base?.canales} objetivo={input1}
+        <TotalesDialog totales={input2} sugerencia={base?.canales} objetivo={input1}
           onCerrar={() => setEditar(false)} />
       )}
     </>
