@@ -30,7 +30,7 @@ const ACCIONES: Record<string, string> = {
   apagar_entidad: 'Apagó un distribuidor o vendedor', prender_entidad: 'Prendió un distribuidor o vendedor',
   fijar: 'Fijó una celda', desfijar: 'Volvió una celda a calculada',
   deshacer: 'Deshizo el último cambio',
-  aprobar: 'Aprobó el móvil', reabrir: 'Volvió el móvil a borrador',
+  aprobar: 'Aprobó el móvil', reabrir: 'Volvió el móvil a borrador', revisar_etapa: 'Revisó una etapa',
   elegir_fila: 'Eligió qué fila vale de un SKU repetido',
   elegir_canales: 'Eligió dónde se vende un SKU', quitar_canales: 'Volvió un SKU a sus canales del mes anterior',
   porcentaje: 'Cambió la base de cálculo',
@@ -354,6 +354,41 @@ const Seccion = ({ titulo, resumen, abierta = false, pedido, ayuda, children }: 
   );
 };
 
+const NOMBRE_ETAPA = { canal: 'por canal', apertura: 'debajo del canal' } as const;
+
+/** Las etapas en orden: cada una se da por revisada después de la anterior. */
+const Etapas = ({ estado }: { estado: Estado }) => {
+  const { revisarEtapa, ocupado } = useMovil();
+  const soloLectura = useSoloLectura();
+  const cierra = estado.cierra.kilos && estado.cierra.plata;
+  return (
+    <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1.5 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+        <Typography variant="subtitle2" fontWeight={700}>Revisión por etapa</Typography>
+        <Ayuda ayuda={AYUDA.etapas} />
+      </Box>
+      {estado.etapas.map(({ etapa, revisada }, n) => {
+        const anteriorOk = estado.etapas.slice(0, n).every(e => e.revisada);
+        const nombre = NOMBRE_ETAPA[etapa];
+        return revisada ? (
+          <Chip key={etapa} size="small" icon={<TaskAltRoundedIcon />} variant="outlined"
+            label={`${n + 1} · ${nombre}: revisada por ${revisada.autor}`} sx={{ borderColor: CIERRA, color: CIERRA }} />
+        ) : (
+          <Tooltip key={etapa} title={!cierra ? 'Se revisa cuando kilos y pesos cierran'
+            : !anteriorOk ? 'Primero revisá la etapa anterior: esta sale de ahí' : ''}>
+            <span>
+              <Button size="small" variant="outlined" disabled={!cierra || !anteriorOk || ocupado || soloLectura}
+                aria-label={`Marcar revisada la etapa ${nombre}`} onClick={() => revisarEtapa(etapa)}>
+                {n + 1} · {nombre}: marcar revisada
+              </Button>
+            </span>
+          </Tooltip>
+        );
+      })}
+    </Box>
+  );
+};
+
 /** Aprobar es una decisión de una persona: se confirma, y lo que quede para revisar se ve antes. */
 const AprobarDialog = ({ estado, onCerrar }: { estado: Estado; onCerrar: () => void }) => {
   const { aprobar, ocupado } = useMovil();
@@ -427,6 +462,7 @@ export const MovilPage = () => {
     paraRevisar && `${paraRevisar} para revisar`,
   ].filter(Boolean).join(' · ') || 'Nada';
   const cierraTodo = estado.cierra.kilos && estado.cierra.plata;
+  const sinRevisar = estado.etapas.filter(e => !e.revisada).map(e => NOMBRE_ETAPA[e.etapa]);
   const queDeshace = estado.deshacer
     && `Deshacer: ${ACCIONES[estado.deshacer.accion] ?? estado.deshacer.accion} · ${estado.deshacer.detalle}`;
   const chocan = new Set([...estado.inconsistencias.kilos, ...estado.inconsistencias.plata].flatMap(i => i.reglas)).size;
@@ -471,9 +507,11 @@ export const MovilPage = () => {
           {estado.aprobado ? (
             <Button size="small" color="inherit" onClick={() => setReabriendo(true)} disabled={ocupado}>Reabrir</Button>
           ) : (
-            <Tooltip title={cierraTodo ? 'Da por bueno el móvil del mes. Después no se puede cambiar sin reabrirlo' : 'Se puede aprobar cuando kilos y pesos cierran'}>
+            <Tooltip title={!cierraTodo ? 'Se puede aprobar cuando kilos y pesos cierran'
+              : sinRevisar.length ? `Falta revisar la etapa ${sinRevisar.join(' y la ')}`
+                : 'Da por bueno el móvil del mes. Después no se puede cambiar sin reabrirlo'}>
               <span>
-                <Button variant="outlined" startIcon={<TaskAltRoundedIcon />} disabled={!cierraTodo || ocupado}
+                <Button variant="outlined" startIcon={<TaskAltRoundedIcon />} disabled={!cierraTodo || sinRevisar.length > 0 || ocupado}
                   onClick={() => setConfirmarAprobar(true)}>
                   Aprobar
                 </Button>
@@ -496,6 +534,7 @@ export const MovilPage = () => {
             </span>
           </Tooltip>
         </Box>
+        {estado.faltan.length === 0 && <Etapas estado={estado} />}
         {estado.aprobado && (
           <Alert severity="success" icon={<TaskAltRoundedIcon />}>
             Aprobado por {estado.aprobado.autor} el {new Date(estado.aprobado.cuando).toLocaleString('es-AR')}. Es de

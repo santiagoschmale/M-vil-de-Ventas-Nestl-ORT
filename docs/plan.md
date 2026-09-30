@@ -31,7 +31,9 @@ Además, el móvil se aprueba y queda de solo lectura (M1).
 
 Y cada vendedor o distribuidor puede ir por histórico o con un % manual (M2, con el
 supuesto B1), y se dan de alta distribuidores o vendedores nuevos con un % (M3, supuesto
-B2). De los MUST queda la revisión por etapa (M4), si el viernes dicen que hace falta.
+B2), y cada etapa (por canal, debajo del canal) se da por revisada antes de aprobar (M4,
+supuesto B3). Están todos los MUST, salvo el nivel "cliente" debajo del distribuidor
+(B5): no hay clientes en el modelo ni en la muestra.
 
 La persistencia no figura en los MUST del cliente, pero la aprobación y el
 histórico la necesitan para tener sentido.
@@ -50,7 +52,7 @@ histórico la necesitan para tener sentido.
 | Base de cálculo histórico / % manual por entidad | ✅ | **M2**, con el supuesto B1 |
 | Alta de vendedor o distribuidor nuevo | ✅ | **M3**, con el supuesto B2 |
 | Aprobación del móvil | ✅ | **M1**: aprobar si cierra, solo lectura, reabrir con motivo. En memoria hasta la persistencia |
-| Revisión por etapa | 🟡 | Cada etapa se ve (matriz, apertura por celda), pero no se aprueba por separado. **M4**, depende de B3 |
+| Revisión por etapa | ✅ | **M4**, con el supuesto B3: OK por etapa, en orden, y aprobar lo exige |
 | Exportación a Excel | ✅ | Formato de salida a confirmar (A15) |
 | Trazabilidad (quién, qué, cuándo, por qué) | ✅ | En memoria; se pierde al reiniciar |
 
@@ -151,9 +153,13 @@ es por nombre). En las celdas del canal que no se abren (A14), la nueva no entra
   recibe nada.
 - **Queda en el historial** y se puede apagar como cualquier otro.
 
-### M4 · Revisión por etapa
+### M4 · Revisión por etapa ✅
 
-Depende de B3. Si alcanza con la aprobación final (M1), se descarta.
+Hecho el 30/09 con el supuesto B3 (aprobar exige las etapas revisadas). Un cambio por
+canal borra el OK de las dos etapas; uno debajo del canal (ON/OFF de entidades, %,
+altas), solo el de esa. Si el cliente dice que alcanza con aprobar al final, se saca.
+Pendiente de UX: la etapa 2 se revisa celda por celda; una vista por canal (vendedores
+× SKU) la haría revisable de una vez.
 
 - **Marcar cada etapa como revisada**: primero el canal, después la apertura.
 - **Un cambio en una etapa** desmarca las siguientes, porque las recalcula.

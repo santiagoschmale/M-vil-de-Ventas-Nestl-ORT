@@ -148,6 +148,7 @@ export const useMovil = create<TUseMovil>((set, get) => {
       cambiar(() => api.post('/movil/entidades', { canal, entidad, porcentaje, motivo }), enDialogo),
     eliminarEntidad: (canal, entidad, motivo) =>
       cambiar(() => api.delete('/movil/entidades', { data: { canal, entidad, motivo } }), enDialogo),
+    revisarEtapa: etapa => cambiar(() => api.post(`/movil/etapas/${ruta(etapa)}`, {}), { aviso: 'Etapa revisada.' }),
     reabrir: motivo =>
       cambiar(() => api.post('/movil/reabrir', { motivo }), { errorEnDialogo: true, aviso: 'El móvil volvió a borrador.' }),
 

@@ -41,6 +41,11 @@ from src.movil.recorrido import Recorrido, Regla, armar
 
 UNIDADES = {"kilos": KILOS, "plata": PLATA}
 
+# Revisión por etapa, en orden. Un cambio en una etapa borra el OK de esa y de las siguientes.
+ETAPAS = ("canal", "apertura")
+# Los ajustes que solo tocan debajo del canal; todos los demás cambian el reparto por canal.
+_DEBAJO_DEL_CANAL = {"apagar_entidad", "prender_entidad", "porcentaje", "agregar_entidad", "eliminar_entidad"}
+
 
 class ErrorDeAjuste(ValueError):
     """El ajuste pedido es imposible o está incompleto; no se aplicó nada."""
@@ -105,6 +110,8 @@ class Sesion:
         self.ultimo_cambio: Ajuste | None = None
         # Aprobado: quién y cuándo. Mientras no sea None, el móvil es de solo lectura.
         self.aprobado: Ajuste | None = None
+        # Etapa -> quién le dio el OK. Aprobar exige las que aplican (supuesto B3).
+        self.revisadas: dict[str, Ajuste] = {}
 
     # --- entradas -----------------------------------------------------------
 
@@ -442,14 +449,46 @@ class Sesion:
             return Ajuste("eliminar_regla", _describir(regla), autor, cuando, motivo)
         self._aplicar(cambio)
 
+    # --- revisión por etapa -------------------------------------------------
+
+    def etapas(self) -> tuple[str, ...]:
+        """Las que aplican: si ningún canal se abre debajo, solo la etapa por canal."""
+        return ETAPAS if self.recorrido is not None and self.recorrido.aperturas else ETAPAS[:1]
+
+    def revisar_etapa(self, etapa: str, autor: str, cuando: datetime) -> None:
+        """El OK del planner a una etapa. En orden: la anterior tiene que estar revisada."""
+        self._exigir_borrador()
+        if etapa not in self.etapas():
+            raise ErrorDeAjuste(f"No hay una etapa {etapa} para revisar.")
+        if not self._cierra():
+            raise ErrorDeAjuste("Para dar por revisada una etapa, kilos y pesos tienen que cerrar.")
+        anterior = ETAPAS[:ETAPAS.index(etapa)]
+        if any(e not in self.revisadas for e in anterior):
+            raise ErrorDeAjuste("Primero revisá la etapa por canal: lo de abajo sale de ahí.")
+        nombre = {"canal": "por canal", "apertura": "debajo del canal"}[etapa]
+        self.revisadas[etapa] = Ajuste("revisar_etapa", f"Revisó la etapa {nombre}", autor, cuando)
+        self.historial.append(self.revisadas[etapa])
+
+    def _invalidar_etapas(self, accion: str) -> None:
+        desde = "apertura" if accion in _DEBAJO_DEL_CANAL else "canal"
+        for etapa in ETAPAS[ETAPAS.index(desde):]:
+            self.revisadas.pop(etapa, None)
+
+    def _cierra(self) -> bool:
+        r = self.recorrido
+        return not (r is None or r.kilos.celdas is None or r.plata is None or r.plata.celdas is None)
+
     # --- aprobación ---------------------------------------------------------
 
     def aprobar(self, autor: str, cuando: datetime) -> None:
         """Solo si kilos y pesos cierran. Desde acá el móvil es de solo lectura."""
         self._exigir_borrador()
-        r = self.recorrido
-        if r is None or r.kilos.celdas is None or r.plata is None or r.plata.celdas is None:
+        if not self._cierra():
             raise ErrorDeAjuste("Para aprobar, kilos y pesos tienen que cerrar.")
+        faltan = [e for e in self.etapas() if e not in self.revisadas]
+        if faltan:
+            nombres = {"canal": "por canal", "apertura": "debajo del canal"}
+            raise ErrorDeAjuste(f"Falta revisar la etapa {' y la '.join(nombres[e] for e in faltan)}.")
         self.aprobado = Ajuste("aprobar", "Aprobó el móvil", autor, cuando)
         self.historial.append(self.aprobado)
         self._antes_del_ultimo = self.ultimo_cambio = None  # aprobar no se deshace
@@ -478,6 +517,7 @@ class Sesion:
         proxima = self._proxima_regla  # ponytail: los ids de regla no se reusan, el historial los nombra
         self._restaurar(self._antes_del_ultimo)
         self._proxima_regla = proxima
+        self._invalidar_etapas(self.ultimo_cambio.accion)
         self.historial.append(Ajuste("deshacer", f"Deshizo: {self.ultimo_cambio.detalle}", autor, cuando))
         self._antes_del_ultimo = self.ultimo_cambio = None
 
@@ -516,6 +556,7 @@ class Sesion:
             self._restaurar(respaldo)
             raise
         self.historial.append(ajuste)
+        self._invalidar_etapas(ajuste.accion)
         self._antes_del_ultimo, self.ultimo_cambio = respaldo, ajuste
 
     def _fijas_vigentes(self, unidad: str) -> dict[Celda, Decimal]:
