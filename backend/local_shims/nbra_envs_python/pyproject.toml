@@ -1,0 +1,8 @@
+[project]
+name = "nbra-envs-python"
+version = "0.0.0+local"
+description = "Reemplazo local de nbra-envs-python (ver local_shims/README.md)"
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"

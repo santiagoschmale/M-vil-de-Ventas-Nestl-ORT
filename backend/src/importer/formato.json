@@ -1,0 +1,90 @@
+{
+  "_comentario": "Nombres de columna aceptados en cada entrada. Son datos, no reglas: si Contraloría o el planner cambian un encabezado, se agrega acá. Se comparan normalizados (minúsculas, sin tildes, espacios simples).",
+  "input1": {
+    "sku": [
+      "codigo sku",
+      "sku",
+      "codigo",
+      "cod. sku",
+      "material"
+    ],
+    "descripcion": [
+      "descripcion",
+      "producto",
+      "descripcion sku"
+    ],
+    "categoria": [
+      "categoria"
+    ],
+    "pais": [
+      "pais"
+    ],
+    "kilos": [
+      "kilos",
+      "kg",
+      "volumen kg",
+      "objetivo kg"
+    ],
+    "nns": [
+      "nns",
+      "net net sales"
+    ]
+  },
+  "input2": {
+    "canal": [
+      "canal",
+      "canales"
+    ],
+    "kilos": [
+      "kilos",
+      "kg"
+    ],
+    "plata": [
+      "plata",
+      "nns",
+      "facturacion",
+      "$"
+    ]
+  },
+  "base": {
+    "sku": [
+      "codigo sku",
+      "sku",
+      "codigo",
+      "cod. sku",
+      "material"
+    ],
+    "descripcion": [
+      "descripcion",
+      "producto",
+      "descripcion sku"
+    ],
+    "categoria": [
+      "categoria"
+    ]
+  },
+  "apertura": {
+    "sku": [
+      "codigo sku",
+      "sku",
+      "codigo",
+      "cod. sku",
+      "material"
+    ],
+    "canal": [
+      "canal",
+      "canales"
+    ],
+    "entidad": [
+      "entidad",
+      "distribuidor",
+      "vendedor",
+      "distribuidor / vendedor"
+    ],
+    "kilos": [
+      "kilos",
+      "kg"
+    ]
+  },
+  "pais_local": "AR"
+}

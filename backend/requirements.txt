@@ -1,0 +1,9 @@
+# TODO - To project developers
+# Please keep the requirements updated and all libraries updated to the most recent one
+
+nbra-logger-py==1.1.0
+nbra-envs-python==0.2.2
+uvicorn==0.53.0
+fastapi==0.141.1
+openpyxl==3.1.5
+python-multipart==0.0.32

@@ -1,0 +1,53 @@
+name: nams-nestle-playgroundeinstein-monorepo
+
+on:
+  push:
+    branches:
+      - main
+      - release_candidate/*
+      - hotfix/*
+      - develop
+  workflow_dispatch:
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      frontend: ${{ steps.filter.outputs.frontend }}
+      backend: ${{ steps.filter.outputs.backend }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            frontend:
+              - 'frontend/**'
+            backend:
+              - 'backend/**'
+
+  frontend:
+    needs: changes
+    if: ${{ needs.changes.outputs.frontend == 'true' || github.event_name == 'workflow_dispatch' }}
+    uses: nestle-it/nbra-platform-workflows/.github/workflows/pipeline-new-platform-build-only.yaml@feat/create-monorepo
+    with:
+      project: playground-einstein
+      gitops_repo: nams-playground-einstein-gitops
+      component_name: nams-nestle-playgroundeinstein-monorepo-frontend
+      language: react
+      build_context: frontend
+      dockerfile: Dockerfile.react-new
+    secrets: inherit
+
+  backend:
+    needs: changes
+    if: ${{ needs.changes.outputs.backend == 'true' || github.event_name == 'workflow_dispatch' }}
+    uses: nestle-it/nbra-platform-workflows/.github/workflows/pipeline-new-platform-build-only.yaml@feat/create-monorepo
+    with:
+      project: playground-einstein
+      gitops_repo: nams-playground-einstein-gitops
+      component_name: nams-nestle-playgroundeinstein-monorepo-backend
+      language: python
+      dockerfile: Dockerfile.python-release
+      build_context: backend
+    secrets: inherit
