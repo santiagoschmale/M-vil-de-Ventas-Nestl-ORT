@@ -278,9 +278,9 @@ def leer_input2(origen) -> tuple[dict[str, TotalCanal], list[Problema]]:
     def _de(fila, nombre):
         return fila[cols[nombre]] if nombre in cols and cols[nombre] < len(fila) else None
 
-    con_canal = [f for f in filas[n + 1:] if str(_de(f, "canal") or "").strip()]
+    con_canal = [(c, f) for f in filas[n + 1:] if (c := str(_de(f, "canal") or "").strip())]
     # Una columna de pesos entera vacía (p. ej. armados en la pantalla desde el mes anterior) es "sin pesos", no ceros.
-    if "plata" in cols and all(not str(_de(f, "plata") or "").strip() for f in con_canal):
+    if "plata" in cols and all(not str(_de(f, "plata") or "").strip() for _, f in con_canal):
         del cols["plata"]
     if "plata" not in cols:
         problemas.append(Problema("aviso", "Los totales por canal no tienen pesos: se reparten solo los kilos.",
@@ -288,8 +288,7 @@ def leer_input2(origen) -> tuple[dict[str, TotalCanal], list[Problema]]:
 
     canales: dict[str, TotalCanal] = {}
     vistos: set[str] = set()  # repetido con la misma regla que usa el cruce: sin tildes, mayúsculas ni espacios de más
-    for fila in con_canal:
-        canal = str(_de(fila, "canal")).strip()
+    for canal, fila in con_canal:
         if normalizar(canal) in vistos:
             problemas.append(Problema("error", f"Canal {canal} repetido en los totales por canal: se usa la primera "
                                                f"fila.", bloque="input2"))
