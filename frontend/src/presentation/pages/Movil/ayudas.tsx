@@ -130,8 +130,9 @@ export const AYUDA = {
         </P>
         <P>
           <b>Base</b>: cada uno se reparte por histórico o con un <b>% manual</b>, por ejemplo si le cambiaron la
-          cartera. El % vale para todos los SKUs del canal, en kilos y en pesos; el resto se reparte por histórico
-          entre los demás.
+          cartera. El % vale para todos los SKUs del canal, en kilos y en pesos, sobre lo que queda después de lo
+          fijado a mano; el resto se reparte por histórico entre los demás. Si en una celda nadie más tiene historia,
+          los que tienen % se reparten todo entre ellos, en proporción a su %.
         </P>
       </>
     ),

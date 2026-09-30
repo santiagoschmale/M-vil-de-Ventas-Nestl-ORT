@@ -115,7 +115,8 @@ puede reabrir con motivo y todo queda en el historial.
 Hecho el 29/09 con el supuesto B1, para mostrarlo el viernes. Una decisión que salió
 al hacerlo: la entidad con % entra en **todas** las celdas del canal, aunque el mes
 anterior no haya vendido ese SKU (su historia ya no la representa). Si en una celda
-nadie más tiene historia, se lleva todo.
+nadie más tiene historia, se lleva todo. Un % cuyo canal o entidad desaparece al recargar las entradas
+no se aplica y se avisa en amarillo.
 
 - **Qué es**: en un canal que se abre, a un vendedor o distribuidor se le puede
   asignar un % en vez de su histórico. Caso típico: le cambiaron la cartera.

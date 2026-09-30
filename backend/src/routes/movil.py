@@ -188,6 +188,9 @@ def _estado(s: Sesion) -> dict:
         # Base de cálculo: las entidades con % manual. Las demás van por histórico.
         "porcentajes": [{"canal": c, "entidad": e, "porcentaje": _porcentaje(p), **_ajuste(a)}
                         for (c, e), (p, a) in sorted(s.porcentajes.items())],
+        # Cuánto % manual hay asignado en cada canal (para mostrar cuánto queda hasta 100).
+        "porcentaje_asignado": {c: _porcentaje(sum(p for (x, _), (p, _) in s.porcentajes.items() if x == c))
+                                for c in sorted({c for c, _ in s.porcentajes})},
     }
 
 

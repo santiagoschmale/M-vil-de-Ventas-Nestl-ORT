@@ -244,6 +244,7 @@ def test_porcentaje_manual_de_una_entidad():
     assert r.status_code == 200
     (p,) = r.json()["porcentajes"]
     assert (p["canal"], p["entidad"], p["porcentaje"], p["motivo"]) == ("Córdoba", "Nicolás Paz", "30", "cartera nueva")
+    assert r.json()["porcentaje_asignado"] == {"Córdoba": "30"}
     sku = next(f["codigo"] for f in c.get("/api/movil/cruce/kilos").json()["skus"]
                if D(f["celdas"].get("Córdoba", {}).get("monto", "0")) > 0)
     a = c.get(f"/api/movil/apertura/{sku}/Córdoba").json()

@@ -80,6 +80,7 @@ export type Estado = {
   deshacer: Ajuste | null; // el último cambio, si se puede deshacer (una sola vez)
   aprobado: Ajuste | null; // quién aprobó y cuándo; mientras no sea null, es de solo lectura
   porcentajes: (Ajuste & { canal: string; entidad: string; porcentaje: string })[]; // base de cálculo manual
+  porcentaje_asignado: Record<string, string>; // canal -> % manual asignado en total
 };
 
 export type Celda = { monto: Monto; fijada: boolean };

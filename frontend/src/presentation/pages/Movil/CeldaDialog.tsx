@@ -17,7 +17,9 @@ type Props = { sku: string; descripcion: string; canal: string; celda: Celda; on
 const BaseDialog = ({ canal, entidad, porcentaje, onCerrar }: {
   canal: string; entidad: string; porcentaje: string | null; onCerrar: () => void;
 }) => {
-  const { asignarPorcentaje, ocupado } = useMovil();
+  const { asignarPorcentaje, ocupado, estado } = useMovil();
+  const soloLectura = useSoloLectura();
+  const asignado = estado?.porcentaje_asignado[canal];  // lo suma el backend: el front no calcula
   const [manual, setManual] = useState(porcentaje != null);
   const [valor, setValor] = useState(porcentaje ? formatear(porcentaje) : '');
   const [motivo, setMotivo] = useState('');
@@ -35,8 +37,9 @@ const BaseDialog = ({ canal, entidad, porcentaje, onCerrar }: {
       <DialogTitle id="titulo-base">Base de cálculo de {entidad}</DialogTitle>
       <DialogContent>
         <DialogContentText sx={{ mb: 1 }}>
-          Vale para todos los SKUs de {canal}, en kilos y en pesos. Con % manual se lleva ese % de cada celda y el
-          resto se reparte por histórico entre los demás.
+          Vale para todos los SKUs de {canal}, en kilos y en pesos. Con % manual se lleva ese % de lo que hay para
+          repartir en cada celda (lo fijado a mano queda aparte) y el resto se reparte por histórico entre los demás.
+          {asignado && ` Hoy en ${canal} hay ${formatear(asignado)}% asignado a mano; no puede pasar de 100.`}
         </DialogContentText>
         <RadioGroup value={manual ? 'manual' : 'historico'} onChange={e => setManual(e.target.value === 'manual')}>
           <FormControlLabel value="historico" control={<Radio />} label="Por histórico (lo que vendió el mes anterior)" />
@@ -52,7 +55,7 @@ const BaseDialog = ({ canal, entidad, porcentaje, onCerrar }: {
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2 }}>
         <Button onClick={onCerrar}>Cancelar</Button>
-        <Button type="submit" variant="contained" disabled={!motivo.trim() || (manual && !valor.trim()) || ocupado}>
+        <Button type="submit" variant="contained" disabled={!motivo.trim() || (manual && !valor.trim()) || ocupado || soloLectura}>
           Guardar
         </Button>
       </DialogActions>
@@ -142,7 +145,7 @@ export const CeldaDialog = ({ sku, descripcion, canal, celda, onCerrar }: Props)
                     </TableCell>
                     <TableCell sx={{ color: 'inherit' }}>{e.nombre}</TableCell>
                     <TableCell>
-                      <Button size="small" color="inherit" disabled={ocupado} onClick={() => setBase(e)}
+                      <Button size="small" color="inherit" disabled={ocupado || soloLectura} onClick={() => setBase(e)}
                         aria-label={`Base de ${e.nombre}: ${e.porcentaje ? `${formatear(e.porcentaje)}%` : 'histórico'}`}
                         sx={{ fontWeight: e.porcentaje ? 700 : 400, textTransform: 'none', minWidth: 0 }}>
                         {e.porcentaje ? `${formatear(e.porcentaje)}%` : 'Histórico'}

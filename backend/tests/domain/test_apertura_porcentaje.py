@@ -74,3 +74,20 @@ def test_porcentajes_que_llegan_a_cien_dejan_en_cero_a_los_de_historico():
     raiz = _celda(ana="60", beto="40")
     recalcular(raiz, set())
     assert _kilos(raiz) == {"ana": D("600.000"), "beto": D("400.000"), "carla": D("0.000")}
+
+
+def test_si_los_de_historico_tienen_peso_cero_la_celda_no_se_cae():
+    """Antes de los %, A con historia se llevaba todo; con 30% no puede quedar en cero."""
+    hijos = [Nodo(entidad="a", nombre="a", peso=D(100), porcentaje=D(30)), Nodo(entidad="z", nombre="z", peso=D(0))]
+    raiz = Nodo(entidad="celda", nombre="c", peso=D(1), hijos=hijos)
+    raiz.valores["kilos"].monto = D("1000")
+    recalcular(raiz, set())
+    assert _kilos(raiz) == {"a": D("1000.000"), "z": D("0.000")}
+    assert raiz.cuadra["kilos"]
+
+
+def test_los_ceros_salen_con_los_decimales_de_la_unidad():
+    raiz = _celda(ana="60", beto="40")
+    recalcular(raiz, set())
+    assert raiz.hijos[2].valores["kilos"].monto.as_tuple().exponent == -3
+    assert raiz.hijos[2].valores["nns"].monto.as_tuple().exponent == -2
