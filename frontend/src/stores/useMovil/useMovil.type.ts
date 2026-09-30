@@ -2,6 +2,7 @@
 // el front no suma ni redondea, sólo muestra.
 
 export type Unidad = 'kilos' | 'plata';
+export type Etapa = 'canal' | 'apertura';
 export type Monto = string;
 
 export type Ajuste = {
@@ -79,6 +80,7 @@ export type Estado = {
   historial: Ajuste[];
   deshacer: Ajuste | null; // el último cambio, si se puede deshacer (una sola vez)
   aprobado: Ajuste | null; // quién aprobó y cuándo; mientras no sea null, es de solo lectura
+  etapas: { etapa: Etapa; revisada: Ajuste | null }[]; // revisión por etapa, en orden; solo las que aplican
   porcentajes: (Ajuste & { canal: string; entidad: string; porcentaje: string })[]; // base de cálculo manual
   entidades_nuevas: (Ajuste & { canal: string; entidad: string })[]; // altas hechas en la herramienta
   porcentaje_asignado: Record<string, string>; // canal -> % manual asignado en total
@@ -149,6 +151,7 @@ export type TUseMovil = {
   deshacer: () => Resultado;
   aprobar: () => Resultado;
   reabrir: (motivo: string) => Resultado;
+  revisarEtapa: (etapa: Etapa) => Resultado;
   asignarPorcentaje: (canal: string, entidad: string, porcentaje: string | null, motivo: string) => Resultado;
   agregarEntidad: (canal: string, entidad: string, porcentaje: string, motivo: string) => Resultado;
   eliminarEntidad: (canal: string, entidad: string, motivo: string) => Resultado;

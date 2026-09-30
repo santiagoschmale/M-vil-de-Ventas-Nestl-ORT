@@ -141,6 +141,21 @@ export const AYUDA = {
       </>
     ),
   },
+  etapas: {
+    titulo: 'Revisión por etapa',
+    texto: (
+      <>
+        <P>
+          El móvil se arma en dos etapas: primero <b>por canal</b> (la tabla SKU × canal) y después <b>debajo del
+          canal</b> (cómo se abre cada canal entre distribuidores o vendedores, al tocar una celda).
+        </P>
+        <P>
+          Cuando revisaste una etapa, marcala como revisada. Si después cambiás algo, el OK de esa etapa y de las
+          siguientes se borra, porque se recalculan. Para aprobar, las dos tienen que estar revisadas.
+        </P>
+      </>
+    ),
+  },
   historial: {
     titulo: 'Qué guarda el historial',
     texto: (

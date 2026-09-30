@@ -230,6 +230,12 @@ def test_aprobar_y_reabrir():
     c = _cargado()
     assert c.post("/api/movil/aprobar").status_code == 422  # no cierra
     c = _cerrado()
+    assert c.post("/api/movil/aprobar").status_code == 422  # faltan las etapas
+    assert [e["etapa"] for e in c.get("/api/movil").json()["etapas"]] == ["canal", "apertura"]
+    assert c.post("/api/movil/etapas/apertura").status_code == 422  # en orden
+    c.post("/api/movil/etapas/canal")
+    r = c.post("/api/movil/etapas/apertura").json()
+    assert all(e["revisada"] for e in r["etapas"])
     r = c.post("/api/movil/aprobar").json()
     assert r["aprobado"]["accion"] == "aprobar"
     assert c.put(f"/api/movil/skus/{NUEVO}", json={"activo": True, "motivo": "m"}).status_code == 422

@@ -37,6 +37,7 @@ beforeEach(() => {
     http.post('*/api/movil/deshacer', anotar),
     http.post('*/api/movil/aprobar', anotar),
     http.post('*/api/movil/reabrir', anotar),
+    http.post('*/api/movil/etapas/*', anotar),
     http.put('*/api/movil/porcentajes', anotar),
     http.post('*/api/movil/entidades', anotar),
     http.delete('*/api/movil/entidades', anotar),
@@ -367,6 +368,17 @@ describe('MovilPage', { timeout: 15000 }, () => {
     render(<MovilPage />);
     expect(await screen.findByRole('checkbox', { name: 'Apagar 100' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Reabrir' })).toBeEnabled();
+  });
+
+  it('cada etapa se da por revisada, en orden, y aprobar lo exige', async () => {
+    const etapas = [{ etapa: 'canal', revisada: null }, { etapa: 'apertura', revisada: null }];
+    server.use(http.get('*/api/movil', () => HttpResponse.json(estado({ etapas }))));
+    const user = userEvent.setup({ delay: null });
+    render(<MovilPage />);
+    expect(await screen.findByRole('button', { name: 'Aprobar' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Marcar revisada la etapa debajo del canal' })).toBeDisabled();
+    await user.click(screen.getByRole('button', { name: 'Marcar revisada la etapa por canal' }));
+    await waitFor(() => expect(pedidos).toEqual([{ metodo: 'POST', url: '/api/movil/etapas/canal', cuerpo: {} }]));
   });
 
   it('no se puede aprobar si no cierra', async () => {

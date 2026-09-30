@@ -11,8 +11,11 @@ DESPUES = datetime(2026, 9, 24, 11, 0)
 
 
 def _cerrado():
+    """Cierra y tiene las dos etapas revisadas: listo para aprobar."""
     s = _sesion("input2_sin_sku_nuevo.tsv")
     s.cambiar_sku(NUEVO, activo=False, autor=P, cuando=CUANDO, motivo="nuevo")
+    s.revisar_etapa("canal", P, CUANDO)
+    s.revisar_etapa("apertura", P, CUANDO)
     return s
 
 

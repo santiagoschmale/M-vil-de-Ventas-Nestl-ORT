@@ -55,6 +55,10 @@ export const estadoFactory = Factory.define<Estado>(() => ({
   historial: [],
   deshacer: null,
   aprobado: null,
+  etapas: [
+    { etapa: 'canal', revisada: { accion: 'revisar_etapa', detalle: 'Revisó la etapa por canal', autor: 'planner-local', cuando: '2026-09-24T10:00:00', motivo: null } },
+    { etapa: 'apertura', revisada: { accion: 'revisar_etapa', detalle: 'Revisó la etapa debajo del canal', autor: 'planner-local', cuando: '2026-09-24T10:00:00', motivo: null } },
+  ],
   porcentajes: [],
   entidades_nuevas: [],
   porcentaje_asignado: {},

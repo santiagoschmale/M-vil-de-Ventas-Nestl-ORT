@@ -198,6 +198,9 @@ def _estado(s: Sesion) -> dict:
         "deshacer": _ajuste(s.ultimo_cambio) if s.ultimo_cambio else None,
         # Quién aprobó y cuándo, o None si está en borrador.
         "aprobado": _ajuste(s.aprobado) if s.aprobado else None,
+        # Revisión por etapa, en orden: las que aplican y quién les dio el OK (o None).
+        "etapas": [{"etapa": e, "revisada": _ajuste(s.revisadas[e]) if e in s.revisadas else None}
+                   for e in s.etapas()],
         # Base de cálculo: las entidades con % manual. Las demás van por histórico.
         "porcentajes": [{"canal": c, "entidad": e, "porcentaje": _porcentaje(p), **_ajuste(a)}
                         for (c, e), (p, a) in sorted(s.porcentajes.items())],
@@ -442,4 +445,10 @@ def agregar_entidad(cuerpo: EntidadNuevaIn, s: Sesion = Depends(sesion), quien: 
 @router.delete("/entidades", summary="Sacar un distribuidor o vendedor dado de alta en la herramienta")
 def eliminar_entidad(cuerpo: EntidadIn, s: Sesion = Depends(sesion), quien: str = Depends(autor)):
     _aplicar(s.eliminar_entidad, cuerpo.canal, cuerpo.entidad, autor=quien, cuando=_ahora(), motivo=cuerpo.motivo)
+    return _estado(s)
+
+
+@router.post("/etapas/{etapa}", summary="Dar por revisada una etapa (canal o apertura), en orden")
+def revisar_etapa(etapa: str, s: Sesion = Depends(sesion), quien: str = Depends(autor)):
+    _aplicar(s.revisar_etapa, etapa, autor=quien, cuando=_ahora())
     return _estado(s)
