@@ -115,7 +115,8 @@ export const useMovil = create<TUseMovil>((set, get) => {
     cargarInput1: archivo => subir('/movil/input1', archivo, 'Objetivo de Contraloría cargado.'),
     cargarBase: archivo => subir('/movil/base', archivo, 'Mes anterior cargado.'),
     cargarInput2: archivo => subir('/movil/input2', archivo, 'Totales por canal cargados.'),
-    editarTotales: texto => cambiar(() => api.put('/movil/input2', { texto }), enDialogo),
+    editarTotales: texto =>
+      cambiar(() => api.put('/movil/input2', { texto }), { ...enDialogo, cargado: 'Totales por canal cargados.' }),
     cargarMuestra: () => cambiar(() => api.post('/movil/muestra', {})),
 
     cambiarSku: (sku, activo, motivo) =>

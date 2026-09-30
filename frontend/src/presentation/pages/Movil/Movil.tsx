@@ -100,10 +100,16 @@ const TotalesDialog = ({ totales, sugerencia, objetivo, onCerrar }: {
   };
   const nombre = (f: Fila, i: number) => f.canal.trim() || `canal ${i + 1}`;
 
+  // Lo que va a pasar al guardar, dicho antes: el backend lo acepta, pero conviene saberlo.
+  const completas = filas.filter(f => f.canal.trim() || f.kilos.trim() || f.plata.trim());
+  const sinPesos = completas.filter(f => !f.plata.trim()).length;
+  const sacados = [...originales.keys()].filter(c => !filas.some(f => f.canal === c));
+  const clave = (canal: string) => canal.trim().toLowerCase();
+  const repetido = (f: Fila) => !!f.canal.trim() && filas.some(x => x.id !== f.id && clave(x.canal) === clave(f.canal));
+
   const guardar = async (e: React.FormEvent) => {
     e.preventDefault();
     // La misma tabla que lee el backend, con los números como se escriben acá (1.234,5).
-    const completas = filas.filter(f => f.canal.trim() || f.kilos.trim() || f.plata.trim());
     const texto = ['Canal\tKilos\tPlata', ...completas.map(f => `${f.canal.trim()}\t${f.kilos.trim()}\t${f.plata.trim()}`)]
       .join('\n');
     const falla = await editarTotales(texto);
@@ -146,6 +152,7 @@ const TotalesDialog = ({ totales, sugerencia, objetivo, onCerrar }: {
                 <TableCell>
                   {f.nueva
                     ? <TextField size="small" value={f.canal} onChange={e => cambiar(f.id, 'canal', e.target.value)}
+                        error={repetido(f)} helperText={repetido(f) ? 'Ya está en la tabla' : undefined}
                         inputProps={{ 'aria-label': `Canal ${i + 1}` }} />
                     : f.canal}
                 </TableCell>
@@ -173,11 +180,24 @@ const TotalesDialog = ({ totales, sugerencia, objetivo, onCerrar }: {
           onClick={() => setFilas(fs => [...fs, fila('', '', '', true)])}>
           Agregar canal
         </Button>
+        {sinPesos > 0 && (
+          <Alert severity="warning" sx={{ mt: 2 }}>
+            Falta el peso de {sinPesos} {sinPesos === 1 ? 'canal' : 'canales'}: se toma 0 y los pesos no van a cerrar
+            hasta que lo completes.
+          </Alert>
+        )}
+        {sacados.length > 0 && (
+          <Alert severity="info" sx={{ mt: 2 }}>
+            Vas a sacar {sacados.join(', ')}: al guardar deja de estar en los totales por canal.
+          </Alert>
+        )}
         {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2 }}>
         <Button onClick={onCerrar}>Cancelar</Button>
-        <Button type="submit" variant="contained" disabled={ocupado}>Guardar</Button>
+        <Button type="submit" variant="contained" disabled={ocupado || !completas.length || filas.some(repetido)}>
+          Guardar
+        </Button>
       </DialogActions>
     </Dialog>
   );

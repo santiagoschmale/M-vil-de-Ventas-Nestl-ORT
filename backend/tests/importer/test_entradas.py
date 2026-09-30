@@ -283,3 +283,12 @@ def test_un_sku_repetido_dice_en_que_filas_y_guarda_todas_para_elegir():
     assert o.fila == 4 and o.kilos == D("7961.420")  # mientras nadie elija, vale la primera
     (otra,) = o.alternativas
     assert otra.fila == 51 and otra.kilos == D("1.000") and "repetido" in otra.descripcion
+
+
+def test_input2_sin_ningun_canal_se_rechaza():
+    """Una tabla con solo el encabezado no es 'totales cargados': se avisa y no se usa."""
+    try:
+        leer_input2("Canal\tKilos\tPlata")
+        assert False, "tenía que rechazarse"
+    except ErrorDeEntrada as e:
+        assert "ningún canal" in str(e)

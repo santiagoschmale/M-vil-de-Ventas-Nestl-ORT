@@ -244,6 +244,25 @@ describe('MovilPage', { timeout: 15000 }, () => {
       cuerpo: { texto: 'Canal\tKilos\tPlata\nVending\t100\t' } }]));
   });
 
+  it('al armar o editar los totales, el diálogo avisa lo que va a pasar antes de guardar', async () => {
+    const user = userEvent.setup({ delay: null });
+    render(<MovilPage />);
+    await user.click(await screen.findByRole('button', { name: /^Entradas/ }));
+    await user.click(screen.getByRole('button', { name: 'Editar totales por canal' }));
+    const dialogo = screen.getByRole('dialog', { name: 'Editar totales por canal' });
+    await user.clear(within(dialogo).getByLabelText('Pesos de Catering'));
+    expect(within(dialogo).getByText(/Falta el peso de 1 canal/)).toBeInTheDocument();
+    await user.click(within(dialogo).getByRole('button', { name: 'Sacar Directa (BA)' }));
+    expect(within(dialogo).getByText(/Vas a sacar Directa \(BA\)/)).toBeInTheDocument();
+    await user.click(within(dialogo).getByRole('button', { name: 'Agregar canal' }));
+    await user.type(within(dialogo).getByLabelText('Canal 2'), ' catering ');
+    expect(within(dialogo).getByText('Ya está en la tabla')).toBeInTheDocument();
+    expect(within(dialogo).getByRole('button', { name: 'Guardar' })).toBeDisabled();
+    await user.click(within(dialogo).getByRole('button', { name: 'Sacar catering' }));
+    await user.click(within(dialogo).getByRole('button', { name: 'Sacar Catering' }));
+    expect(within(dialogo).getByRole('button', { name: 'Guardar' })).toBeDisabled();  // sin ningún canal
+  });
+
   it('la tabla dice en qué unidad están los números', async () => {
     render(<MovilPage />);
     expect(await screen.findByRole('columnheader', { name: 'Objetivo (kg)' })).toBeInTheDocument();

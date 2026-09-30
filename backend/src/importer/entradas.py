@@ -310,6 +310,8 @@ def leer_input2(origen) -> tuple[dict[str, TotalCanal], list[Problema]]:
                 valor = Decimal(0)
             montos[nombre] = _al_paso(valor, decimales, f"{nombre.capitalize()} de {canal}", None, problemas)
         canales[canal] = TotalCanal(kilos=montos["kilos"], plata=montos["plata"])
+    if not canales:
+        raise ErrorDeEntrada("Totales por canal: no hay ningún canal con nombre.")
     return canales, problemas
 
 
