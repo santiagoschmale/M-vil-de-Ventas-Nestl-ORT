@@ -83,3 +83,22 @@ def test_volver_a_cargar_un_archivo_borra_las_dos():
 
 def test_una_etapa_que_no_existe_se_rechaza():
     assert _falla(_cerrado().revisar_etapa, "vendedor", P, DESPUES)
+
+
+def test_deshacer_despues_de_revisar_deshace_solo_ese_ok():
+    """Lo que pasó en la prueba: un ajuste, los dos OK y Deshacer. Tiene que sacar solo el último OK."""
+    s = _cerrado()
+    s.cambiar_entidad("Nicolás Paz", activo=False, autor=P, cuando=DESPUES, motivo="se fue")
+    _revisado(s)
+    s.deshacer(P, DESPUES)
+    assert set(s.revisadas) == {"canal"}
+    assert "Nicolás Paz" in s.entidades_apagadas  # el ajuste de antes sigue
+
+
+def test_deshacer_un_ajuste_devuelve_los_ok_que_habia_antes():
+    """Deshacer deja todo como estaba antes del ajuste, incluidas las etapas revisadas."""
+    s = _revisado(_cerrado())
+    s.cambiar_entidad("Nicolás Paz", activo=False, autor=P, cuando=DESPUES, motivo="se fue")
+    assert set(s.revisadas) == {"canal"}
+    s.deshacer(P, DESPUES)
+    assert set(s.revisadas) == {"canal", "apertura"}

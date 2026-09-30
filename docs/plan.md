@@ -158,7 +158,8 @@ es por nombre). En las celdas del canal que no se abren (A14), la nueva no entra
 
 Hecho el 30/09 con el supuesto B3 (aprobar exige las etapas revisadas). Un cambio por
 canal borra el OK de las dos etapas; uno debajo del canal (ON/OFF de entidades, %,
-altas), solo el de esa. Si el cliente dice que alcanza con aprobar al final, se saca.
+altas), solo el de esa. Deshacer deshace lo último que se hizo: si fue un OK, saca
+ese OK; si fue un ajuste, vuelve a como estaba antes, con los OK que había. Si el cliente dice que alcanza con aprobar al final, se saca.
 Los botones van arriba de la tabla SKU × canal y el encabezado muestra solo el estado.
 Pendiente de UX: la etapa 2 se revisa celda por celda; una vista por canal (vendedores
 × SKU) la haría revisable de una vez, y ahí iría su botón.
