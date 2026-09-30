@@ -37,6 +37,7 @@ beforeEach(() => {
     http.post('*/api/movil/deshacer', anotar),
     http.post('*/api/movil/aprobar', anotar),
     http.post('*/api/movil/reabrir', anotar),
+    http.put('*/api/movil/porcentajes', anotar),
   );
 });
 
@@ -375,6 +376,29 @@ describe('MovilPage', { timeout: 15000 }, () => {
     await user.type(screen.getByRole('textbox', { name: /Motivo/ }), 'faltó un acuerdo');
     await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Reabrir' }));
     await waitFor(() => expect(pedidos).toEqual([{ metodo: 'POST', url: '/api/movil/reabrir', cuerpo: { motivo: 'faltó un acuerdo' } }]));
+  });
+
+  it('en la apertura, a una entidad se le pone un % manual en vez del histórico', async () => {
+    const apertura = {
+      sku: '100', canal: 'Catering', kilos: '1000.000', plata: '500.00', cuadra: { kilos: true, plata: true }, aviso: null,
+      entidades: [
+        { nombre: 'Ana', activo: true, peso: '1', porcentaje: null, kilos: '500.000', plata: '250.00' },
+        { nombre: 'Beto', activo: true, peso: '1', porcentaje: '30', kilos: '300.000', plata: '150.00' },
+      ],
+    };
+    server.use(http.get('*/api/movil/apertura/*', () => HttpResponse.json(apertura)));
+    const user = userEvent.setup({ delay: null });
+    render(<MovilPage />);
+    await user.click(await screen.findByRole('button', { name: '100 en Catering: 1.000,000' }));
+    expect(await screen.findByRole('button', { name: 'Base de Beto: 30%' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Base de Ana: histórico' }));
+    const dialogo = screen.getByRole('dialog', { name: 'Base de cálculo de Ana' });
+    await user.click(within(dialogo).getByRole('radio', { name: '% manual' }));
+    await user.type(within(dialogo).getByRole('textbox', { name: '%' }), '25');
+    await user.type(within(dialogo).getByRole('textbox', { name: /Motivo/ }), 'cartera nueva');
+    await user.click(within(dialogo).getByRole('button', { name: 'Guardar' }));
+    await waitFor(() => expect(pedidos).toEqual([{ metodo: 'PUT', url: '/api/movil/porcentajes',
+      cuerpo: { canal: 'Catering', entidad: 'Ana', porcentaje: '25', motivo: 'cartera nueva' } }]));
   });
 
   it('exportar se habilita solo cuando kilos y pesos cierran', async () => {

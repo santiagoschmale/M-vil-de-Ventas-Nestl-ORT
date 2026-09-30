@@ -128,6 +128,11 @@ export const AYUDA = {
           los que siguen prendidos, en proporción a lo que vendió cada uno de ese SKU en ese canal el mes anterior.
           Los que tienen un valor fijado a mano no cambian.
         </P>
+        <P>
+          <b>Base</b>: cada uno se reparte por histórico o con un <b>% manual</b>, por ejemplo si le cambiaron la
+          cartera. El % vale para todos los SKUs del canal, en kilos y en pesos; el resto se reparte por histórico
+          entre los demás.
+        </P>
       </>
     ),
   },

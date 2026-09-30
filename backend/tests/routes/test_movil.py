@@ -235,3 +235,19 @@ def test_aprobar_y_reabrir():
     assert c.put(f"/api/movil/skus/{NUEVO}", json={"activo": True, "motivo": "m"}).status_code == 422
     r = c.post("/api/movil/reabrir", json={"motivo": "faltó un acuerdo"}).json()
     assert r["aprobado"] is None and r["historial"][-1]["motivo"] == "faltó un acuerdo"
+
+
+def test_porcentaje_manual_de_una_entidad():
+    c = _cerrado()
+    cuerpo = {"canal": "Córdoba", "entidad": "Nicolás Paz", "porcentaje": "30", "motivo": "cartera nueva"}
+    r = c.put("/api/movil/porcentajes", json=cuerpo)
+    assert r.status_code == 200
+    (p,) = r.json()["porcentajes"]
+    assert (p["canal"], p["entidad"], p["porcentaje"], p["motivo"]) == ("Córdoba", "Nicolás Paz", "30", "cartera nueva")
+    sku = next(f["codigo"] for f in c.get("/api/movil/cruce/kilos").json()["skus"]
+               if D(f["celdas"].get("Córdoba", {}).get("monto", "0")) > 0)
+    a = c.get(f"/api/movil/apertura/{sku}/Córdoba").json()
+    assert {e["nombre"]: e["porcentaje"] for e in a["entidades"]}["Nicolás Paz"] == "30"
+    assert c.put("/api/movil/porcentajes", json={**cuerpo, "porcentaje": "150"}).status_code == 422
+    r = c.put("/api/movil/porcentajes", json={**cuerpo, "porcentaje": None, "motivo": "vuelve"})
+    assert r.json()["porcentajes"] == []

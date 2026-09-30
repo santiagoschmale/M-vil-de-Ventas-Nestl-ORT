@@ -93,6 +93,8 @@ class Sesion:
         self.filas_elegidas: dict[str, tuple[int, Ajuste]] = {}
         # "Dónde se vende": SKU -> (canales, quién lo decidió). Resuelve el SKU sin historia (A4).
         self.canales_sku: dict[str, tuple[frozenset[str], Ajuste]] = {}
+        # Base de cálculo: (canal, entidad) -> (% manual, quién lo decidió). Sin entrada = histórico.
+        self.porcentajes: dict[tuple[str, str], tuple[Decimal, Ajuste]] = {}
         self._proxima_regla = 1  # los ids no se reusan: el historial los nombra
         self.historial: list[Ajuste] = []
         self.recorrido: Recorrido | None = None
@@ -174,6 +176,35 @@ class Sesion:
                 self.entidades_apagadas.pop(entidad, None)
             else:
                 self.entidades_apagadas[entidad] = ajuste
+            return ajuste
+        self._aplicar(cambio)
+
+    def asignar_porcentaje(self, canal: str, entidad: str, porcentaje: str | None, autor: str, cuando: datetime,
+                           motivo: str) -> None:
+        """
+        Base de cálculo de una entidad en un canal: un % manual (vale para todos los SKUs
+        del canal, en kilos y en pesos) o, con `porcentaje` vacío, el histórico.
+        """
+        motivo = _motivo(motivo)
+        en_el_canal = {e for (_, c), pesos in self._e.apertura.items() if normalizar(c) == normalizar(canal)
+                       for e in pesos}
+        if entidad not in en_el_canal:
+            raise ErrorDeAjuste(f"{entidad} no está en la apertura de {canal}.")
+        valor = _porcentaje(porcentaje, "la entidad")
+        if valor is not None and valor == 0:
+            raise ErrorDeAjuste("El % tiene que ser mayor que 0. Para que no reciba nada, apagala.")
+        if valor is not None:
+            otros = sum((p for (c, e), (p, _) in self.porcentajes.items() if c == canal and e != entidad), Decimal(0))
+            if otros + valor > 100:
+                raise ErrorDeAjuste(f"Los % de {canal} sumarían {a_texto(otros + valor)}%: no pueden pasar de 100.")
+
+        def cambio():
+            detalle = f"{entidad} en {canal}: " + (f"{a_texto(valor)}%" if valor is not None else "por histórico")
+            ajuste = Ajuste("porcentaje", detalle, autor, cuando, motivo)
+            if valor is None:
+                self.porcentajes.pop((canal, entidad), None)
+            else:
+                self.porcentajes[(canal, entidad)] = (valor, ajuste)
             return ajuste
         self._aplicar(cambio)
 
@@ -368,11 +399,11 @@ class Sesion:
     def _respaldo(self) -> tuple:
         return (copy.copy(self._e), dict(self.apagados_skus), dict(self.entidades_apagadas),
                 {u: dict(f) for u, f in self._fijas.items()}, dict(self.reglas), self._proxima_regla,
-                dict(self.filas_elegidas), dict(self.canales_sku), self.recorrido)
+                dict(self.filas_elegidas), dict(self.canales_sku), dict(self.porcentajes), self.recorrido)
 
     def _restaurar(self, respaldo: tuple) -> None:
         (self._e, self.apagados_skus, self.entidades_apagadas, self._fijas, self.reglas,
-         self._proxima_regla, self.filas_elegidas, self.canales_sku, self.recorrido) = respaldo
+         self._proxima_regla, self.filas_elegidas, self.canales_sku, self.porcentajes, self.recorrido) = respaldo
 
     def _unidad(self, unidad: str) -> int:
         if unidad not in UNIDADES:
@@ -431,6 +462,7 @@ class Sesion:
                 entidades_apagadas=set(self.entidades_apagadas),
                 reglas=[r.regla for r in self.reglas.values()],
                 canales_sku={k: c for k, (c, _) in self.canales_sku.items()},
+                porcentajes={k: p for k, (p, _) in self.porcentajes.items()},
             )
         except ErrorDeCruce as e:
             raise ErrorDeAjuste(str(e)) from e
