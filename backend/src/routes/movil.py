@@ -161,7 +161,12 @@ def _estado(s: Sesion) -> dict:
                   "detalle": [{"canal": c, "kilos": _texto(t.kilos, "kilos"), "plata": _texto(t.plata, "plata")}
                               for c, t in e.canales.items()]}
     if e.base is not None:
-        base = {"archivo": e.archivo_base, "celdas": len(e.base), "aperturas": len(e.apertura)}
+        # Kilos por canal del mes anterior: el punto de partida para armar los totales en la pantalla.
+        por_canal: dict[str, Decimal] = {}
+        for (_, canal), kilos in e.base.items():
+            por_canal[canal] = por_canal.get(canal, Decimal(0)) + kilos
+        base = {"archivo": e.archivo_base, "celdas": len(e.base), "aperturas": len(e.apertura),
+                "canales": [{"canal": c, "kilos": _texto(k, "kilos")} for c, k in sorted(por_canal.items())]}
     cruces = {"kilos": r.kilos if r else None, "plata": r.plata if r else None}
     return {
         "faltan": s.faltan(),

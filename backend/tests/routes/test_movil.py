@@ -273,3 +273,13 @@ def test_alta_y_baja_de_una_entidad_nueva():
     assert c.post("/api/movil/entidades", json=cuerpo).status_code == 422  # ya está
     r = c.request("DELETE", "/api/movil/entidades", json={"canal": "Córdoba", "entidad": "Vendedora Nueva", "motivo": "error"})
     assert r.status_code == 200 and r.json()["entidades_nuevas"] == []
+
+
+def test_el_estado_trae_los_kilos_por_canal_del_mes_anterior():
+    """Para armar los totales por canal en la pantalla, arrancando del mes anterior."""
+    c = _cliente()
+    with (MUESTRA / "base_mes_anterior.xlsx").open("rb") as f:
+        c.post("/api/movil/base", files={"archivo": ("base.xlsx", f)})
+    canales = c.get("/api/movil").json()["entradas"]["base"]["canales"]
+    assert [x["canal"] for x in canales] == sorted(x["canal"] for x in canales) and len(canales) > 1
+    assert all(D(x["kilos"]) > 0 and D(x["kilos"]).as_tuple().exponent == -3 for x in canales)

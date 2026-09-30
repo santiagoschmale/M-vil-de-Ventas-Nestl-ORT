@@ -73,7 +73,7 @@ para lo puntual. [confirmado]
 |---|---|---|
 | **Quién lo arma** | Contraloría | El planner |
 | **Qué trae** | Producto (SKU), kilos, plata | Canal, kilos, plata |
-| **Cómo entra** | Excel | Hoy la pega. En la herramienta se sube en Excel y se edita por canal (decisión nuestra, por UX) |
+| **Cómo entra** | Excel | Hoy la pega. En la herramienta se sube en Excel o se arma en la pantalla, arrancando con los canales y kilos del mes anterior (decisión nuestra, por UX) |
 | **Frecuencia** | Mensual | Mensual, precargada con la del mes anterior |
 
 [confirmado]
