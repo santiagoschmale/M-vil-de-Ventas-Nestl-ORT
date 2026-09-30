@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Box, Switch, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography } from '@mui/material';
 import PushPinRoundedIcon from '@mui/icons-material/PushPinRounded';
-import { useMovil } from '../../../stores/useMovil';
+import { useMovil, useSoloLectura } from '../../../stores/useMovil';
 import { Celda, Cruce } from '../../../stores/useMovil/useMovil.type';
 import { formatear, UNIDADES } from './formato';
 import { APAGADO, AVENA, CIERRA, ENFOCADA, NO_CIERRA, TINTA, numeros } from './estilo';
@@ -14,6 +14,7 @@ const fija = { position: 'sticky' as const, left: 0, zIndex: 2, background: '#ff
 
 export const Matriz = ({ cruce }: { cruce: Cruce }) => {
   const { cambiarSku, ocupado, foco, soltarFoco } = useMovil();
+  const soloLectura = useSoloLectura();
   const [abierta, setAbierta] = useState<{ sku: Sku; canal: string; celda: Celda }>();
   const [prender, setPrender] = useState<Sku>();
   // "Ver celda" desde Para revisar: abre esa celda con su apertura.
@@ -64,7 +65,7 @@ export const Matriz = ({ cruce }: { cruce: Cruce }) => {
                 <TableCell sx={fija}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                     <Switch
-                      size="small" checked={s.activo} disabled={ocupado}
+                      size="small" checked={s.activo} disabled={ocupado || soloLectura}
                       inputProps={{ 'aria-label': `${s.activo ? 'Apagar' : 'Prender'} ${s.codigo}` }}
                       onChange={() => setPrender(s)}
                     />

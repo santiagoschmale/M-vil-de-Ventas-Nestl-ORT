@@ -349,14 +349,22 @@ describe('MovilPage', { timeout: 15000 }, () => {
     expect(await screen.findByRole('button', { name: 'Deshacer' })).toBeDisabled();
   });
 
-  it('aprobar pide confirmar y avisa que queda de solo lectura', async () => {
+  it('aprobar pide confirmar y avisa que después no se puede cambiar', async () => {
     const user = userEvent.setup({ delay: null });
     render(<MovilPage />);
     await user.click(await screen.findByRole('button', { name: 'Aprobar' }));
     const dialogo = screen.getByRole('dialog');
-    expect(within(dialogo).getByText(/solo lectura/)).toBeInTheDocument();
+    expect(within(dialogo).getByText(/nadie puede cambiarlo/)).toBeInTheDocument();
     await user.click(within(dialogo).getByRole('button', { name: 'Aprobar' }));
     await waitFor(() => expect(pedidos).toEqual([{ metodo: 'POST', url: '/api/movil/aprobar', cuerpo: {} }]));
+  });
+
+  it('aprobado, lo que edita queda deshabilitado', async () => {
+    const aprobado = { accion: 'aprobar', detalle: 'Aprobó el móvil', autor: 'planner-local', cuando: '2026-09-24T10:00:00', motivo: null };
+    server.use(http.get('*/api/movil', () => HttpResponse.json(estado({ aprobado }))));
+    render(<MovilPage />);
+    expect(await screen.findByRole('checkbox', { name: 'Apagar 100' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Reabrir' })).toBeEnabled();
   });
 
   it('no se puede aprobar si no cierra', async () => {

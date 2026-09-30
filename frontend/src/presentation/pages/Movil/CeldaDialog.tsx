@@ -3,7 +3,7 @@ import {
   Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Divider,
   FormControlLabel, Radio, RadioGroup, Switch, Table, TableBody, TableCell, TableHead, TableRow, TextField, Typography,
 } from '@mui/material';
-import { useMovil } from '../../../stores/useMovil';
+import { useMovil, useSoloLectura } from '../../../stores/useMovil';
 import { Apertura, Celda } from '../../../stores/useMovil/useMovil.type';
 import { formatear, UNIDADES } from './formato';
 import { APAGADO, TINTA, numeros } from './estilo';
@@ -62,6 +62,7 @@ const BaseDialog = ({ canal, entidad, porcentaje, onCerrar }: {
 
 export const CeldaDialog = ({ sku, descripcion, canal, celda, onCerrar }: Props) => {
   const { unidad, estado, fijar, desfijar, cambiarEntidad, apertura: traerApertura, ocupado } = useMovil();
+  const soloLectura = useSoloLectura();
   const [monto, setMonto] = useState(formatear(celda.monto));
   const [motivo, setMotivo] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -134,7 +135,7 @@ export const CeldaDialog = ({ sku, descripcion, canal, celda, onCerrar }: Props)
                   <TableRow key={e.nombre} sx={{ color: e.activo ? undefined : APAGADO }}>
                     <TableCell padding="checkbox">
                       <Switch
-                        size="small" checked={e.activo} disabled={ocupado}
+                        size="small" checked={e.activo} disabled={ocupado || soloLectura}
                         inputProps={{ 'aria-label': `${e.activo ? 'Apagar' : 'Prender'} ${e.nombre}` }}
                         onChange={() => setEntidad(e)}
                       />
@@ -158,12 +159,12 @@ export const CeldaDialog = ({ sku, descripcion, canal, celda, onCerrar }: Props)
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2 }}>
         {celda.fijada && (
-          <Button onClick={alDesfijar} disabled={!motivo.trim() || ocupado} sx={{ mr: 'auto' }}>
+          <Button onClick={alDesfijar} disabled={!motivo.trim() || ocupado || soloLectura} sx={{ mr: 'auto' }}>
             Volver a calculado
           </Button>
         )}
         <Button onClick={onCerrar}>Cancelar</Button>
-        <Button type="submit" variant="contained" disabled={!motivo.trim() || !monto.trim() || ocupado}>
+        <Button type="submit" variant="contained" disabled={!motivo.trim() || !monto.trim() || ocupado || soloLectura}>
           Fijar
         </Button>
       </DialogActions>

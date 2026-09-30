@@ -10,7 +10,7 @@ import UploadFileRoundedIcon from '@mui/icons-material/UploadFileRounded';
 import EditRoundedIcon from '@mui/icons-material/EditRounded';
 import UndoRoundedIcon from '@mui/icons-material/UndoRounded';
 import TaskAltRoundedIcon from '@mui/icons-material/TaskAltRounded';
-import { useMovil } from '../../../stores/useMovil';
+import { useMovil, useSoloLectura } from '../../../stores/useMovil';
 import { Estado, Unidad } from '../../../stores/useMovil/useMovil.type';
 import { conUnidad, formatear, UNIDADES } from './formato';
 import { AVENA, CIERRA, NO_CIERRA, numeros } from './estilo';
@@ -38,8 +38,9 @@ const ACCIONES: Record<string, string> = {
 
 const Subir = ({ cargado, etiqueta, alElegir }: { cargado: boolean; etiqueta: string; alElegir: (f: File) => void }) => {
   const { ocupado } = useMovil();
+  const soloLectura = useSoloLectura();
   return (
-    <Button component="label" variant="outlined" size="small" startIcon={<UploadFileRoundedIcon />} disabled={ocupado}>
+    <Button component="label" variant="outlined" size="small" startIcon={<UploadFileRoundedIcon />} disabled={ocupado || soloLectura}>
       {cargado ? 'Reemplazar' : 'Subir Excel'}
       <input
         hidden type="file" accept=".xlsx" aria-label={etiqueta}
@@ -137,6 +138,7 @@ const TotalesDialog = ({ totales, objetivo, onCerrar }: { totales: Totales; obje
 
 const Entradas = ({ estado }: { estado: Estado }) => {
   const { cargarInput1, cargarInput2, cargarBase, cargarMuestra, ocupado } = useMovil();
+  const soloLectura = useSoloLectura();
   const { input1, input2, base } = estado.entradas;
   const [editar, setEditar] = useState(false);
 
@@ -157,7 +159,7 @@ const Entradas = ({ estado }: { estado: Estado }) => {
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
             <Subir cargado={!!input2} etiqueta="Excel de totales por canal" alElegir={cargarInput2} />
             {input2 && (
-              <Button size="small" startIcon={<EditRoundedIcon />} onClick={() => setEditar(true)} disabled={ocupado}
+              <Button size="small" startIcon={<EditRoundedIcon />} onClick={() => setEditar(true)} disabled={ocupado || soloLectura}
                 aria-label="Editar totales por canal">
                 Editar
               </Button>
@@ -183,7 +185,7 @@ const Entradas = ({ estado }: { estado: Estado }) => {
       </Box>
       {import.meta.env.DEV && (
         <Box sx={{ mt: 1.5 }}>
-          <Link component="button" variant="body2" disabled={ocupado} onClick={() => cargarMuestra()}>
+          <Link component="button" variant="body2" disabled={ocupado || soloLectura} onClick={() => cargarMuestra()}>
             Cargar datos de muestra (solo en desarrollo)
           </Link>
         </Box>
@@ -214,6 +216,7 @@ const Ir = ({ destinos }: { destinos: [Foco['tipo'], string][] }) => {
 /** Un SKU repetido en el objetivo de Contraloría: el planner elige cuál fila vale, sin tocar el Excel. */
 const FilaDialog = ({ repetido, onCerrar }: { repetido: Repetido; onCerrar: () => void }) => {
   const { elegirFila, ocupado } = useMovil();
+  const soloLectura = useSoloLectura();
   const [fila, setFila] = useState(repetido.elegida);
   const [motivo, setMotivo] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -243,7 +246,7 @@ const FilaDialog = ({ repetido, onCerrar }: { repetido: Repetido; onCerrar: () =
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2 }}>
         <Button onClick={onCerrar}>Cancelar</Button>
-        <Button type="submit" variant="contained" disabled={!motivo.trim() || ocupado}>Usar esta fila</Button>
+        <Button type="submit" variant="contained" disabled={!motivo.trim() || ocupado || soloLectura}>Usar esta fila</Button>
       </DialogActions>
     </Dialog>
   );
@@ -364,7 +367,8 @@ const AprobarDialog = ({ estado, onCerrar }: { estado: Estado; onCerrar: () => v
       <DialogTitle>Aprobar el móvil</DialogTitle>
       <DialogContent>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-          Kilos y pesos cierran. Aprobado queda de solo lectura: para cambiarlo hay que reabrirlo, con motivo.
+          Al aprobarlo, nadie puede cambiarlo hasta que alguien lo reabra, con motivo. Queda en el historial quién lo
+          aprobó y cuándo.
         </Typography>
         {estado.problemas.length > 0 && (
           <>
@@ -466,7 +470,7 @@ export const MovilPage = () => {
           {estado.aprobado ? (
             <Button size="small" color="inherit" onClick={() => setReabriendo(true)} disabled={ocupado}>Reabrir</Button>
           ) : (
-            <Tooltip title={cierraTodo ? 'Queda de solo lectura' : 'Se puede aprobar cuando kilos y pesos cierran'}>
+            <Tooltip title={cierraTodo ? 'Da por bueno el móvil del mes. Después no se puede cambiar sin reabrirlo' : 'Se puede aprobar cuando kilos y pesos cierran'}>
               <span>
                 <Button variant="outlined" startIcon={<TaskAltRoundedIcon />} disabled={!cierraTodo || ocupado}
                   onClick={() => setConfirmarAprobar(true)}>
