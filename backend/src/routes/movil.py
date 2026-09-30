@@ -176,6 +176,8 @@ def _estado(s: Sesion) -> dict:
         "historial": [_ajuste(a) for a in s.historial],
         # Lo que se puede deshacer (una sola vez), o None.
         "deshacer": _ajuste(s.ultimo_cambio) if s.ultimo_cambio else None,
+        # Quién aprobó y cuándo, o None si está en borrador.
+        "aprobado": _ajuste(s.aprobado) if s.aprobado else None,
     }
 
 
@@ -379,4 +381,16 @@ def eliminar_regla(id_: str, cuerpo: MotivoIn, s: Sesion = Depends(sesion), quie
 @router.post("/deshacer", summary="Deshacer el último cambio (una sola vez)")
 def deshacer(s: Sesion = Depends(sesion), quien: str = Depends(autor)):
     _aplicar(s.deshacer, autor=quien, cuando=_ahora())
+    return _estado(s)
+
+
+@router.post("/aprobar", summary="Aprobar el móvil: solo si kilos y pesos cierran. Queda de solo lectura")
+def aprobar(s: Sesion = Depends(sesion), quien: str = Depends(autor)):
+    _aplicar(s.aprobar, autor=quien, cuando=_ahora())
+    return _estado(s)
+
+
+@router.post("/reabrir", summary="Volver el móvil aprobado a borrador, con motivo")
+def reabrir(cuerpo: MotivoIn, s: Sesion = Depends(sesion), quien: str = Depends(autor)):
+    _aplicar(s.reabrir, autor=quien, cuando=_ahora(), motivo=cuerpo.motivo)
     return _estado(s)

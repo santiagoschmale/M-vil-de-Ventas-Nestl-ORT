@@ -33,6 +33,8 @@ type Opciones = {
   cargado?: string;
   // Desde un diálogo el error se muestra ahí, junto al campo; si no, como aviso.
   errorEnDialogo?: boolean;
+  // El aviso si salió bien, cuando no es un recálculo (aprobar, reabrir).
+  aviso?: string;
 };
 
 // El aviso dura unos segundos: corto e informativo. Si cierra o no ya se ve en el encabezado.
@@ -55,7 +57,7 @@ export const useMovil = create<TUseMovil>((set, get) => {
       const estado = (await pedido()).data;
       set({ estado, errorDeCarga: undefined });
       await traerCruce(estado);
-      avisar(estado.faltan.length ? opciones.cargado ?? 'Guardado.' : RECALCULADO, 'info');
+      avisar(opciones.aviso ?? (estado.faltan.length ? opciones.cargado ?? 'Guardado.' : RECALCULADO), 'info');
       return null;
     } catch (e) {
       const mensaje = mensajeDeError(e);
@@ -132,6 +134,9 @@ export const useMovil = create<TUseMovil>((set, get) => {
     quitarCanales: (sku, motivo) =>
       cambiar(() => api.delete(`/movil/skus/${ruta(sku)}/canales`, { data: { motivo } }), enDialogo),
     deshacer: () => cambiar(() => api.post('/movil/deshacer', {})),
+    aprobar: () => cambiar(() => api.post('/movil/aprobar', {}), { errorEnDialogo: true, aviso: 'Móvil aprobado.' }),
+    reabrir: motivo =>
+      cambiar(() => api.post('/movil/reabrir', { motivo }), { errorEnDialogo: true, aviso: 'El móvil volvió a borrador.' }),
 
     apertura: async (sku, canal) => {
       try {

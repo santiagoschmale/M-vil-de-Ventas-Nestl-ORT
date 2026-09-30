@@ -78,6 +78,7 @@ export type Estado = {
   opciones: { canales: string[]; categorias: string[] };
   historial: Ajuste[];
   deshacer: Ajuste | null; // el último cambio, si se puede deshacer (una sola vez)
+  aprobado: Ajuste | null; // quién aprobó y cuándo; mientras no sea null, es de solo lectura
 };
 
 export type Celda = { monto: Monto; fijada: boolean };
@@ -139,4 +140,6 @@ export type TUseMovil = {
   elegirCanales: (sku: string, canales: string[], motivo: string) => Resultado;
   quitarCanales: (sku: string, motivo: string) => Resultado;
   deshacer: () => Resultado;
+  aprobar: () => Resultado;
+  reabrir: (motivo: string) => Resultado;
 };

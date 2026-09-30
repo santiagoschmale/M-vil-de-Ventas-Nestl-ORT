@@ -35,6 +35,8 @@ beforeEach(() => {
     http.put('*/api/movil/skus/*/canales', anotar),
     http.delete('*/api/movil/skus/*/canales', anotar),
     http.post('*/api/movil/deshacer', anotar),
+    http.post('*/api/movil/aprobar', anotar),
+    http.post('*/api/movil/reabrir', anotar),
   );
 });
 
@@ -344,6 +346,35 @@ describe('MovilPage', { timeout: 15000 }, () => {
   it('sin un cambio para deshacer, el botón está deshabilitado', async () => {
     render(<MovilPage />);
     expect(await screen.findByRole('button', { name: 'Deshacer' })).toBeDisabled();
+  });
+
+  it('aprobar pide confirmar y avisa que queda de solo lectura', async () => {
+    const user = userEvent.setup({ delay: null });
+    render(<MovilPage />);
+    await user.click(await screen.findByRole('button', { name: 'Aprobar' }));
+    const dialogo = screen.getByRole('dialog');
+    expect(within(dialogo).getByText(/solo lectura/)).toBeInTheDocument();
+    await user.click(within(dialogo).getByRole('button', { name: 'Aprobar' }));
+    await waitFor(() => expect(pedidos).toEqual([{ metodo: 'POST', url: '/api/movil/aprobar', cuerpo: {} }]));
+  });
+
+  it('no se puede aprobar si no cierra', async () => {
+    server.use(http.get('*/api/movil', () => HttpResponse.json(estado({ cierra: { kilos: false, plata: true } }))));
+    render(<MovilPage />);
+    expect(await screen.findByRole('button', { name: 'Aprobar' })).toBeDisabled();
+  });
+
+  it('aprobado se ve en el encabezado y se reabre con motivo', async () => {
+    const aprobado = { accion: 'aprobar', detalle: 'Aprobó el móvil', autor: 'planner-local', cuando: '2026-09-24T10:00:00', motivo: null };
+    server.use(http.get('*/api/movil', () => HttpResponse.json(estado({ aprobado }))));
+    const user = userEvent.setup({ delay: null });
+    render(<MovilPage />);
+    expect(await screen.findByText(/Aprobado por planner-local/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Aprobar' })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Reabrir' }));
+    await user.type(screen.getByRole('textbox', { name: /Motivo/ }), 'faltó un acuerdo');
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Reabrir' }));
+    await waitFor(() => expect(pedidos).toEqual([{ metodo: 'POST', url: '/api/movil/reabrir', cuerpo: { motivo: 'faltó un acuerdo' } }]));
   });
 
   it('exportar se habilita solo cuando kilos y pesos cierran', async () => {

@@ -99,6 +99,8 @@ class Sesion:
         # El último cambio y el estado de antes, para deshacerlo. Una sola vez: después queda en None.
         self._antes_del_ultimo: tuple | None = None
         self.ultimo_cambio: Ajuste | None = None
+        # Aprobado: quién y cuándo. Mientras no sea None, el móvil es de solo lectura.
+        self.aprobado: Ajuste | None = None
 
     # --- entradas -----------------------------------------------------------
 
@@ -322,6 +324,30 @@ class Sesion:
             return Ajuste("eliminar_regla", _describir(regla), autor, cuando, motivo)
         self._aplicar(cambio)
 
+    # --- aprobación ---------------------------------------------------------
+
+    def aprobar(self, autor: str, cuando: datetime) -> None:
+        """Solo si kilos y pesos cierran. Desde acá el móvil es de solo lectura."""
+        self._exigir_borrador()
+        r = self.recorrido
+        if r is None or r.kilos.celdas is None or r.plata is None or r.plata.celdas is None:
+            raise ErrorDeAjuste("Para aprobar, kilos y pesos tienen que cerrar.")
+        self.aprobado = Ajuste("aprobar", "Aprobó el móvil", autor, cuando)
+        self.historial.append(self.aprobado)
+        self._antes_del_ultimo = self.ultimo_cambio = None  # aprobar no se deshace
+
+    def reabrir(self, autor: str, cuando: datetime, motivo: str) -> None:
+        """Vuelve a borrador para poder cambiarlo (supuesto, A16: se puede reabrir)."""
+        motivo = _motivo(motivo)
+        if self.aprobado is None:
+            raise ErrorDeAjuste("El móvil no está aprobado: ya se puede cambiar.")
+        self.aprobado = None
+        self.historial.append(Ajuste("reabrir", "Volvió el móvil a borrador", autor, cuando, motivo))
+
+    def _exigir_borrador(self) -> None:
+        if self.aprobado is not None:
+            raise ErrorDeAjuste("El móvil está aprobado: para cambiarlo, reabrilo.")
+
     # --- deshacer -----------------------------------------------------------
 
     def deshacer(self, autor: str, cuando: datetime) -> None:
@@ -363,6 +389,7 @@ class Sesion:
         Aplica un cambio como transacción: si recalcular falla, el estado vuelve a como
         estaba antes y no queda nada a medias. Si sale bien, va al historial.
         """
+        self._exigir_borrador()
         respaldo = self._respaldo()
         try:
             ajuste = cambio()
