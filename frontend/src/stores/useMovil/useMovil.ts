@@ -39,6 +39,7 @@ type Opciones = {
 
 // El aviso dura unos segundos: corto e informativo. Si cierra o no ya se ve en el encabezado.
 const RECALCULADO = 'Reparto recalculado.';
+const TOTALES_CARGADOS = 'Totales por canal cargados.';
 
 /** Aprobado es de solo lectura: lo que edita se deshabilita (el backend igual lo rechaza). */
 export const useSoloLectura = () => useMovil(s => !!s.estado?.aprobado);
@@ -114,8 +115,9 @@ export const useMovil = create<TUseMovil>((set, get) => {
 
     cargarInput1: archivo => subir('/movil/input1', archivo, 'Objetivo de Contraloría cargado.'),
     cargarBase: archivo => subir('/movil/base', archivo, 'Mes anterior cargado.'),
-    cargarInput2: archivo => subir('/movil/input2', archivo, 'Totales por canal cargados.'),
-    editarTotales: texto => cambiar(() => api.put('/movil/input2', { texto }), enDialogo),
+    cargarInput2: archivo => subir('/movil/input2', archivo, TOTALES_CARGADOS),
+    editarTotales: texto =>
+      cambiar(() => api.put('/movil/input2', { texto }), { ...enDialogo, cargado: TOTALES_CARGADOS }),
     cargarMuestra: () => cambiar(() => api.post('/movil/muestra', {})),
 
     cambiarSku: (sku, activo, motivo) =>

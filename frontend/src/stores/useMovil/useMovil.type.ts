@@ -62,7 +62,8 @@ export type Estado = {
       plata: Monto;
       detalle: { canal: string; kilos: Monto; plata: Monto | null }[];
     } | null;
-    base: { archivo: string; celdas: number; aperturas: number } | null;
+    // canales: kilos por canal del mes anterior, para arrancar los totales en la pantalla.
+    base: { archivo: string; celdas: number; aperturas: number; canales: { canal: string; kilos: Monto }[] } | null;
   };
   cierra: Record<Unidad, boolean>;
   inconsistencias: Record<Unidad, Inconsistencia[]>;

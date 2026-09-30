@@ -245,6 +245,8 @@ def leer_input1(origen) -> tuple[dict[str, ObjetivoSku], list[Problema]]:
             todos.append(Problema("error", f"Está repetido en el objetivo de Contraloría (filas {filas_txt}): se "
                                            f"usa la fila {o.fila} hasta que elijas cuál vale.",
                                   sku=codigo, bloque="input1", tipo="sku_repetido"))
+    if not objetivos:
+        raise ErrorDeEntrada("Objetivo de Contraloría: no hay ningún SKU.")
     return objetivos, todos
 
 
@@ -272,16 +274,22 @@ def leer_input2(origen) -> tuple[dict[str, TotalCanal], list[Problema]]:
     filas, n, cols = _encabezado(hojas, "input2", {"canal", "kilos"}, "Totales por canal")
     ancho = len(filas[n])
     problemas: list[Problema] = []
+
+    def _de(fila, nombre):
+        return fila[cols[nombre]] if nombre in cols and cols[nombre] < len(fila) else None
+
+    con_canal = [(c, f) for f in filas[n + 1:] if (c := str(_de(f, "canal") or "").strip())]
+    # Una columna de pesos entera vacía (p. ej. armados en la pantalla desde el mes anterior) es "sin pesos", no ceros.
+    if "plata" in cols and all(not str(_de(f, "plata") or "").strip() for _, f in con_canal):
+        del cols["plata"]
     if "plata" not in cols:
-        problemas.append(Problema("aviso", "Los totales por canal no tienen columna de plata: se reparten solo "
-                                           "los kilos.", bloque="input2"))
+        problemas.append(Problema("aviso", "Los totales por canal no tienen pesos: se reparten solo los kilos.",
+                                  bloque="input2"))
 
     canales: dict[str, TotalCanal] = {}
-    for fila in filas[n + 1:]:
-        canal = str(fila[cols["canal"]] or "").strip() if cols["canal"] < len(fila) else ""
-        if not canal:
-            continue
-        if canal in canales:
+    vistos: set[str] = set()  # repetido con la misma regla que usa el cruce: sin tildes, mayúsculas ni espacios de más
+    for canal, fila in con_canal:
+        if normalizar(canal) in vistos:
             problemas.append(Problema("error", f"Canal {canal} repetido en los totales por canal: se usa la primera "
                                                f"fila.", bloque="input2"))
             continue
@@ -296,7 +304,7 @@ def leer_input2(origen) -> tuple[dict[str, TotalCanal], list[Problema]]:
             if nombre not in cols:
                 montos[nombre] = None
                 continue
-            crudo = fila[cols[nombre]] if cols[nombre] < len(fila) else None
+            crudo = _de(fila, nombre)
             # Del texto llega "1.234,5"; de Excel, el número de la celda (1.234 es 1,234, no miles).
             valor, error = _celda(crudo)
             if valor is None and error is None:
@@ -310,6 +318,9 @@ def leer_input2(origen) -> tuple[dict[str, TotalCanal], list[Problema]]:
                 valor = Decimal(0)
             montos[nombre] = _al_paso(valor, decimales, f"{nombre.capitalize()} de {canal}", None, problemas)
         canales[canal] = TotalCanal(kilos=montos["kilos"], plata=montos["plata"])
+        vistos.add(normalizar(canal))
+    if not canales:
+        raise ErrorDeEntrada("Totales por canal: no hay ningún canal con nombre.")
     return canales, problemas
 
 
@@ -343,6 +354,8 @@ def leer_base(origen) -> tuple[dict[tuple[str, str], Decimal], list[Problema]]:
                                                    f"archivo, no se usa.", sku=codigo, bloque="base"))
             elif valor is not None:
                 base[(codigo, canal)] = valor
+    if not base and not vistos:
+        raise ErrorDeEntrada("Base del mes anterior: no hay ningún SKU.")
     return base, problemas
 
 

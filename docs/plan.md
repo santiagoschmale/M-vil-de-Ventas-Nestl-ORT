@@ -65,6 +65,7 @@ histórico la necesitan para tener sentido.
 | Entorno de pruebas para el cliente | ⬜ | Depende de IT (I1, I2) |
 | Tests en CI | ✅ | Backend y front |
 | Deshacer el último cambio | ✅ | Una vez. Con login: solo el propio |
+| Totales por canal sin Excel | ✅ | Se arman en la pantalla con los canales y kilos del mes anterior; los pesos los completa el planner. Con persistencia, arrancar con el input 2 del mes anterior (kilos y pesos) |
 
 ### SHOULD
 

@@ -283,3 +283,45 @@ def test_un_sku_repetido_dice_en_que_filas_y_guarda_todas_para_elegir():
     assert o.fila == 4 and o.kilos == D("7961.420")  # mientras nadie elija, vale la primera
     (otra,) = o.alternativas
     assert otra.fila == 51 and otra.kilos == D("1.000") and "repetido" in otra.descripcion
+
+
+def test_input2_sin_ningun_canal_se_rechaza():
+    """Una tabla con solo el encabezado no es 'totales cargados': se avisa y no se usa."""
+    try:
+        leer_input2("Canal\tKilos\tPlata")
+        assert False, "tenía que rechazarse"
+    except ErrorDeEntrada as e:
+        assert "ningún canal" in str(e)
+
+
+def test_input2_un_canal_repetido_se_detecta_como_lo_cruza_el_motor():
+    """"Córdoba" y "cordoba " son el mismo canal para el cruce: acá también."""
+    canales, problemas = leer_input2("Canal\tKilos\tPlata\nCórdoba\t10\t1\ncordoba \t20\t2")
+    assert list(canales) == ["Córdoba"]
+    assert any("repetido" in p.mensaje for p in problemas)
+
+
+def test_input2_sin_ningun_peso_reparte_solo_los_kilos():
+    """Al armarlos desde el mes anterior los pesos arrancan vacíos: no son ceros."""
+    canales, problemas = leer_input2("Canal\tKilos\tPlata\nCatering\t10\t\nCórdoba\t20\t")
+    assert all(t.plata is None for t in canales.values())
+    assert [p.mensaje for p in problemas] == ["Los totales por canal no tienen pesos: se reparten solo los kilos."]
+
+
+def _excel_solo_encabezado(*encabezado):
+    wb = Workbook()
+    wb.active.append(list(encabezado))
+    salida = BytesIO()
+    wb.save(salida)
+    salida.seek(0)
+    return salida
+
+
+def test_un_objetivo_o_un_mes_anterior_sin_filas_se_rechazan():
+    for lector, encabezado in ((leer_input1, ("Categoría", "Descripción", "Código SKU", "NNS", "Kilos")),
+                               (leer_base, ("SKU", "Catering"))):
+        try:
+            lector(_excel_solo_encabezado(*encabezado))
+            assert False, f"{lector.__name__} tenía que rechazarlo"
+        except ErrorDeEntrada as e:
+            assert "ningún SKU" in str(e)

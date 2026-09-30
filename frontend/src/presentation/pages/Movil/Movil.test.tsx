@@ -209,6 +209,60 @@ describe('MovilPage', { timeout: 15000 }, () => {
     });
   });
 
+  it('sin Excel, los totales por canal se arman en la pantalla desde los kilos del mes anterior', async () => {
+    const base = { archivo: 'reparto_agosto.xlsx', celdas: 3, aperturas: 1,
+      canales: [{ canal: 'Catering', kilos: '900.000' }, { canal: 'Córdoba', kilos: '400.000' }] };
+    server.use(http.get('*/api/movil', () => HttpResponse.json(estado({
+      faltan: ['totales por canal'], entradas: { ...estado().entradas, input2: null, base } }))));
+    const user = userEvent.setup({ delay: null });
+    render(<MovilPage />);
+    await user.click(await screen.findByRole('button', { name: 'Armar totales por canal en la pantalla' }));
+    const dialogo = screen.getByRole('dialog', { name: 'Armar totales por canal' });
+    expect(dialogo).toHaveTextContent(/mes anterior/);
+    expect(within(dialogo).getByLabelText('Kilos de Catering')).toHaveValue('900,000');
+    await user.type(within(dialogo).getByLabelText('Pesos de Catering'), '60');
+    await user.type(within(dialogo).getByLabelText('Pesos de Córdoba'), '40');
+    await user.click(within(dialogo).getByRole('button', { name: 'Guardar' }));
+    await waitFor(() => expect(pedidos).toEqual([{ metodo: 'PUT', url: '/api/movil/input2',
+      cuerpo: { texto: 'Canal\tKilos\tPlata\nCatering\t900,000\t60\nCórdoba\t400,000\t40' } }]));
+  });
+
+  it('se pueden agregar y sacar canales al armar los totales, aun sin mes anterior', async () => {
+    server.use(http.get('*/api/movil', () => HttpResponse.json(estado({
+      faltan: ['totales por canal', 'mes anterior'], entradas: { ...estado().entradas, input2: null, base: null } }))));
+    const user = userEvent.setup({ delay: null });
+    render(<MovilPage />);
+    await user.click(await screen.findByRole('button', { name: 'Armar totales por canal en la pantalla' }));
+    const dialogo = screen.getByRole('dialog', { name: 'Armar totales por canal' });
+    await user.type(within(dialogo).getByLabelText('Canal 1'), 'Vending');
+    await user.type(within(dialogo).getByLabelText('Kilos de Vending'), '100');
+    await user.click(within(dialogo).getByRole('button', { name: 'Agregar canal' }));
+    await user.type(within(dialogo).getByLabelText('Canal 2'), 'Borrar');
+    await user.click(within(dialogo).getByRole('button', { name: 'Sacar Borrar' }));
+    await user.click(within(dialogo).getByRole('button', { name: 'Guardar' }));
+    await waitFor(() => expect(pedidos).toEqual([{ metodo: 'PUT', url: '/api/movil/input2',
+      cuerpo: { texto: 'Canal\tKilos\tPlata\nVending\t100\t' } }]));
+  });
+
+  it('al armar o editar los totales, el diálogo avisa lo que va a pasar antes de guardar', async () => {
+    const user = userEvent.setup({ delay: null });
+    render(<MovilPage />);
+    await user.click(await screen.findByRole('button', { name: /^Entradas/ }));
+    await user.click(screen.getByRole('button', { name: 'Editar totales por canal' }));
+    const dialogo = screen.getByRole('dialog', { name: 'Editar totales por canal' });
+    await user.clear(within(dialogo).getByLabelText('Pesos de Catering'));
+    expect(within(dialogo).getByText(/Falta el peso de 1 canal/)).toBeInTheDocument();
+    await user.click(within(dialogo).getByRole('button', { name: 'Sacar Directa (BA)' }));
+    expect(within(dialogo).getByText(/Vas a sacar Directa \(BA\)/)).toBeInTheDocument();
+    await user.click(within(dialogo).getByRole('button', { name: 'Agregar canal' }));
+    await user.type(within(dialogo).getByLabelText('Canal 2'), ' catering ');
+    expect(within(dialogo).getByText('Ya está en la tabla')).toBeInTheDocument();
+    expect(within(dialogo).getByRole('button', { name: 'Guardar' })).toBeDisabled();
+    await user.click(within(dialogo).getByRole('button', { name: 'Sacar catering' }));
+    await user.click(within(dialogo).getByRole('button', { name: 'Sacar Catering' }));
+    expect(within(dialogo).getByRole('button', { name: 'Guardar' })).toBeDisabled();  // sin ningún canal
+  });
+
   it('la tabla dice en qué unidad están los números', async () => {
     render(<MovilPage />);
     expect(await screen.findByRole('columnheader', { name: 'Objetivo (kg)' })).toBeInTheDocument();

@@ -32,8 +32,9 @@ export const AYUDA = {
           (facturación neta). Es la meta de arriba: no se discute acá.
         </P>
         <P>
-          <b>Totales por canal</b>: el Excel con cuánto tiene que vender cada canal, en kilos y en pesos. Lo define el
-          planner. Si hay que corregir un número, se edita con el botón Editar.
+          <b>Totales por canal</b>: cuánto tiene que vender cada canal, en kilos y en pesos. Lo define el planner. Se
+          sube en Excel o se arma en la pantalla («Armar en pantalla»): si ya cargaste el mes anterior, arranca con sus
+          canales y sus kilos, y completás los pesos. Después se corrige con el botón Editar.
         </P>
         <P>
           <b>Mes anterior</b>: cómo se repartió el mes pasado, SKU por canal, y cómo se abrió cada canal entre
