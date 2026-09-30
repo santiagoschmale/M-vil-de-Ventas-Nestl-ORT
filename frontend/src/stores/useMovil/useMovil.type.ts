@@ -81,6 +81,7 @@ export type Estado = {
   aprobado: Ajuste | null; // quién aprobó y cuándo; mientras no sea null, es de solo lectura
   porcentajes: (Ajuste & { canal: string; entidad: string; porcentaje: string })[]; // base de cálculo manual
   entidades_nuevas: (Ajuste & { canal: string; entidad: string })[]; // altas hechas en la herramienta
+  porcentaje_asignado: Record<string, string>; // canal -> % manual asignado en total
 };
 
 export type Celda = { monto: Monto; fijada: boolean };

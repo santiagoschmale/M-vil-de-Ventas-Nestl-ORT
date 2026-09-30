@@ -6,7 +6,7 @@ import {
 } from '@mui/material';
 import AddRoundedIcon from '@mui/icons-material/AddRounded';
 import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded';
-import { useMovil } from '../../../stores/useMovil';
+import { useMovil, useSoloLectura } from '../../../stores/useMovil';
 import { Apertura, Celda } from '../../../stores/useMovil/useMovil.type';
 import { formatear, UNIDADES } from './formato';
 import { APAGADO, TINTA, numeros } from './estilo';
@@ -17,10 +17,12 @@ import { AYUDA } from './ayudas';
 type Props = { sku: string; descripcion: string; canal: string; celda: Celda; onCerrar: () => void };
 
 /** Base de cálculo de una entidad en el canal: por histórico o con un % manual (MUST). */
-const BaseDialog = ({ canal, entidad, porcentaje, onCerrar }: {
-  canal: string; entidad: string; porcentaje: string | null; onCerrar: () => void;
+const BaseDialog = ({ canal, entidad, porcentaje, nueva, onCerrar }: {
+  canal: string; entidad: string; porcentaje: string | null; nueva: boolean; onCerrar: () => void;
 }) => {
-  const { asignarPorcentaje, ocupado } = useMovil();
+  const { asignarPorcentaje, ocupado, estado } = useMovil();
+  const soloLectura = useSoloLectura();
+  const asignado = estado?.porcentaje_asignado[canal];  // lo suma el backend: el front no calcula
   const [manual, setManual] = useState(porcentaje != null);
   const [valor, setValor] = useState(porcentaje ? formatear(porcentaje) : '');
   const [motivo, setMotivo] = useState('');
@@ -38,13 +40,18 @@ const BaseDialog = ({ canal, entidad, porcentaje, onCerrar }: {
       <DialogTitle id="titulo-base">Base de cálculo de {entidad}</DialogTitle>
       <DialogContent>
         <DialogContentText sx={{ mb: 1 }}>
-          Vale para todos los SKUs de {canal}, en kilos y en pesos. Con % manual se lleva ese % de cada celda y el
-          resto se reparte por histórico entre los demás.
+          Vale para todos los SKUs de {canal}, en kilos y en pesos. Con % manual se lleva ese % de lo que hay para
+          repartir en cada celda (lo fijado a mano queda aparte) y el resto se reparte por histórico entre los demás.
+          {asignado && ` Hoy en ${canal} hay ${formatear(asignado)}% asignado a mano; no puede pasar de 100.`}
         </DialogContentText>
-        <RadioGroup value={manual ? 'manual' : 'historico'} onChange={e => setManual(e.target.value === 'manual')}>
-          <FormControlLabel value="historico" control={<Radio />} label="Por histórico (lo que vendió el mes anterior)" />
-          <FormControlLabel value="manual" control={<Radio />} label="% manual" />
-        </RadioGroup>
+        {nueva ? (
+          <DialogContentText sx={{ mb: 1 }}>Es nueva y no tiene historia: siempre va con %.</DialogContentText>
+        ) : (
+          <RadioGroup value={manual ? 'manual' : 'historico'} onChange={e => setManual(e.target.value === 'manual')}>
+            <FormControlLabel value="historico" control={<Radio />} label="Por histórico (lo que vendió el mes anterior)" />
+            <FormControlLabel value="manual" control={<Radio />} label="% manual" />
+          </RadioGroup>
+        )}
         {manual && (
           <TextField label="%" value={valor} onChange={e => { setValor(e.target.value); setError(null); }}
             inputProps={{ inputMode: 'decimal', style: numeros }} sx={{ width: 120, mt: 1 }} />
@@ -55,7 +62,7 @@ const BaseDialog = ({ canal, entidad, porcentaje, onCerrar }: {
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2 }}>
         <Button onClick={onCerrar}>Cancelar</Button>
-        <Button type="submit" variant="contained" disabled={!motivo.trim() || (manual && !valor.trim()) || ocupado}>
+        <Button type="submit" variant="contained" disabled={!motivo.trim() || (manual && !valor.trim()) || ocupado || soloLectura}>
           Guardar
         </Button>
       </DialogActions>
@@ -84,8 +91,8 @@ const AltaDialog = ({ canal, onCerrar }: { canal: string; onCerrar: () => void }
       <DialogContent>
         <DialogContentText sx={{ mb: 2 }}>
           Un distribuidor o vendedor que no estaba el mes anterior. Como no tiene historia, entra con un % fijo:
-          recibe ese % de cada celda de {canal}, en kilos y en pesos, y los demás se reparten el resto. Después se
-          puede cambiar el %, apagarlo o eliminarlo.
+          recibe ese % de cada celda de {canal} que se abre entre distribuidores o vendedores, en kilos y en pesos, y
+          los demás se reparten el resto. Después se puede cambiar el %, apagarlo o eliminarlo.
         </DialogContentText>
         <TextField fullWidth autoFocus label="Nombre" value={nombre} onChange={e => { setNombre(e.target.value); setError(null); }} />
         <TextField label="%" value={valor} onChange={e => { setValor(e.target.value); setError(null); }}
@@ -106,12 +113,13 @@ const AltaDialog = ({ canal, onCerrar }: { canal: string; onCerrar: () => void }
 
 export const CeldaDialog = ({ sku, descripcion, canal, celda, onCerrar }: Props) => {
   const { unidad, estado, fijar, desfijar, cambiarEntidad, eliminarEntidad, apertura: traerApertura, ocupado } = useMovil();
+  const soloLectura = useSoloLectura();
   const [monto, setMonto] = useState(formatear(celda.monto));
   const [motivo, setMotivo] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [apertura, setApertura] = useState<Apertura | null>(null);
   const [entidad, setEntidad] = useState<{ nombre: string; activo: boolean }>();
-  const [base, setBase] = useState<{ nombre: string; porcentaje: string | null }>();
+  const [base, setBase] = useState<{ nombre: string; porcentaje: string | null; nueva: boolean }>();
   const [alta, setAlta] = useState(false);
   const [eliminar, setEliminar] = useState<string>();
   const fijada = estado?.fijas[unidad].find(f => f.sku === sku && f.canal === canal);
@@ -180,7 +188,7 @@ export const CeldaDialog = ({ sku, descripcion, canal, celda, onCerrar }: Props)
                   <TableRow key={e.nombre} sx={{ color: e.activo ? undefined : APAGADO }}>
                     <TableCell padding="checkbox">
                       <Switch
-                        size="small" checked={e.activo} disabled={ocupado}
+                        size="small" checked={e.activo} disabled={ocupado || soloLectura}
                         inputProps={{ 'aria-label': `${e.activo ? 'Apagar' : 'Prender'} ${e.nombre}` }}
                         onChange={() => setEntidad(e)}
                       />
@@ -190,7 +198,7 @@ export const CeldaDialog = ({ sku, descripcion, canal, celda, onCerrar }: Props)
                       {e.nueva && (
                         <>
                           <Chip size="small" label="Nueva" variant="outlined" sx={{ ml: 1 }} />
-                          <IconButton size="small" aria-label={`Eliminar ${e.nombre}`} disabled={ocupado}
+                          <IconButton size="small" aria-label={`Eliminar ${e.nombre}`} disabled={ocupado || soloLectura}
                             onClick={() => setEliminar(e.nombre)}>
                             <DeleteOutlineRoundedIcon fontSize="small" />
                           </IconButton>
@@ -198,7 +206,7 @@ export const CeldaDialog = ({ sku, descripcion, canal, celda, onCerrar }: Props)
                       )}
                     </TableCell>
                     <TableCell>
-                      <Button size="small" color="inherit" disabled={ocupado} onClick={() => setBase(e)}
+                      <Button size="small" color="inherit" disabled={ocupado || soloLectura} onClick={() => setBase(e)}
                         aria-label={`Base de ${e.nombre}: ${e.porcentaje ? `${formatear(e.porcentaje)}%` : 'histórico'}`}
                         sx={{ fontWeight: e.porcentaje ? 700 : 400, textTransform: 'none', minWidth: 0 }}>
                         {e.porcentaje ? `${formatear(e.porcentaje)}%` : 'Histórico'}
@@ -210,7 +218,7 @@ export const CeldaDialog = ({ sku, descripcion, canal, celda, onCerrar }: Props)
                 ))}
               </TableBody>
             </Table>
-            <Button size="small" startIcon={<AddRoundedIcon />} sx={{ mt: 1 }} disabled={ocupado} onClick={() => setAlta(true)}>
+            <Button size="small" startIcon={<AddRoundedIcon />} sx={{ mt: 1 }} disabled={ocupado || soloLectura} onClick={() => setAlta(true)}>
               Agregar distribuidor o vendedor
             </Button>
           </>
@@ -218,12 +226,12 @@ export const CeldaDialog = ({ sku, descripcion, canal, celda, onCerrar }: Props)
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2 }}>
         {celda.fijada && (
-          <Button onClick={alDesfijar} disabled={!motivo.trim() || ocupado} sx={{ mr: 'auto' }}>
+          <Button onClick={alDesfijar} disabled={!motivo.trim() || ocupado || soloLectura} sx={{ mr: 'auto' }}>
             Volver a calculado
           </Button>
         )}
         <Button onClick={onCerrar}>Cancelar</Button>
-        <Button type="submit" variant="contained" disabled={!motivo.trim() || !monto.trim() || ocupado}>
+        <Button type="submit" variant="contained" disabled={!motivo.trim() || !monto.trim() || ocupado || soloLectura}>
           Fijar
         </Button>
       </DialogActions>
@@ -238,7 +246,7 @@ export const CeldaDialog = ({ sku, descripcion, canal, celda, onCerrar }: Props)
           onCerrar={() => setEliminar(undefined)}
         />
       )}
-      {base && <BaseDialog canal={canal} entidad={base.nombre} porcentaje={base.porcentaje} onCerrar={() => setBase(undefined)} />}
+      {base && <BaseDialog canal={canal} entidad={base.nombre} porcentaje={base.porcentaje} nueva={base.nueva} onCerrar={() => setBase(undefined)} />}
       {entidad && (
         <MotivoDialog
           titulo={`${entidad.activo ? 'Apagar' : 'Prender'} ${entidad.nombre}`}

@@ -77,3 +77,24 @@ def test_se_deshace_como_cualquier_ajuste():
     s.asignar_porcentaje(CANAL, VENDEDOR, "30", P, DESPUES, "m")
     s.deshacer(P, DESPUES)
     assert s.porcentajes == {}
+
+
+def test_el_canal_se_guarda_con_el_nombre_de_los_totales():
+    s = _cerrado()
+    s.asignar_porcentaje("cordoba", VENDEDOR, "30", P, DESPUES, "m")
+    assert list(s.porcentajes) == [(CANAL, VENDEDOR)]
+    assert _falla(s.asignar_porcentaje, "Tucumán", VENDEDOR, "30", P, DESPUES, "m")
+
+
+def test_volver_a_historico_si_ya_va_por_historico_no_ensucia_el_historial():
+    s = _cerrado()
+    assert _falla(s.asignar_porcentaje, CANAL, VENDEDOR, None, P, DESPUES, "m")
+
+
+def test_un_porcentaje_que_queda_sin_canal_se_avisa_y_no_se_aplica():
+    from tests.movil.test_sesion import MUESTRA
+    s = _cerrado()
+    s.asignar_porcentaje(CANAL, VENDEDOR, "30", P, DESPUES, "m")
+    texto = (MUESTRA / "input2_sin_sku_nuevo.tsv").read_text(encoding="utf-8").replace("Córdoba", "Córdoba Centro")
+    s.cargar_input2(texto, P, DESPUES)
+    assert any("30% de Nicolás Paz en Córdoba no se aplica" in p.mensaje for p in s.recorrido.problemas)

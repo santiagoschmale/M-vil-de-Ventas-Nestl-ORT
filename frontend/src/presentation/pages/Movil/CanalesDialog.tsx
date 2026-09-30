@@ -3,7 +3,7 @@ import {
   Alert, Button, Checkbox, Dialog, DialogActions, DialogContent, DialogTitle, FormControlLabel, FormGroup,
   TextField, Typography,
 } from '@mui/material';
-import { useMovil } from '../../../stores/useMovil';
+import { useMovil, useSoloLectura } from '../../../stores/useMovil';
 import { Estado } from '../../../stores/useMovil/useMovil.type';
 
 type Props = { sku: string; estado: Estado; onCerrar: () => void };
@@ -14,6 +14,7 @@ type Props = { sku: string; estado: Estado; onCerrar: () => void };
  */
 export const CanalesDialog = ({ sku, estado, onCerrar }: Props) => {
   const { elegirCanales, ocupado } = useMovil();
+  const soloLectura = useSoloLectura();
   const actuales = estado.canales_sku.find(c => c.sku === sku)?.canales ?? [];
   const [canales, setCanales] = useState<string[]>(actuales);
   const [motivo, setMotivo] = useState('');
@@ -47,7 +48,7 @@ export const CanalesDialog = ({ sku, estado, onCerrar }: Props) => {
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2 }}>
         <Button onClick={onCerrar}>Cancelar</Button>
-        <Button type="submit" variant="contained" disabled={!canales.length || !motivo.trim() || ocupado}>Guardar</Button>
+        <Button type="submit" variant="contained" disabled={!canales.length || !motivo.trim() || ocupado || soloLectura}>Guardar</Button>
       </DialogActions>
     </Dialog>
   );

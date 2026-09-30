@@ -76,3 +76,33 @@ def test_se_deshace_como_cualquier_ajuste():
     s.agregar_entidad(CANAL, NUEVA, "20", P, DESPUES, "m")
     s.deshacer(P, DESPUES)
     assert s.entidades_nuevas == {} and s.porcentajes == {}
+
+
+def test_no_se_da_de_alta_un_nombre_que_ya_existe_en_otro_canal():
+    """El ON/OFF es por nombre: dos con el mismo nombre se apagarían y prenderían juntos."""
+    s = _cerrado()
+    assert _falla(s.agregar_entidad, CANAL, "Federico Luna", "20", P, DESPUES, "m")  # está en Rosario
+    assert _falla(s.agregar_entidad, CANAL, "nicolas paz", "20", P, DESPUES, "m")    # mismo nombre, otra grafía
+
+
+def test_el_canal_se_guarda_con_el_nombre_de_los_totales():
+    s = _cerrado()
+    s.agregar_entidad("cordoba", NUEVA, "20", P, DESPUES, "m")
+    assert list(s.entidades_nuevas) == [(CANAL, NUEVA)]
+    assert all(m is not None and m > 0 for m in _suyo(s))
+    s.eliminar_entidad("CORDOBA", NUEVA, P, DESPUES, "m")
+    assert s.entidades_nuevas == {}
+
+
+def test_una_nueva_no_queda_como_porcentaje_huerfano():
+    s = _cerrado()
+    s.agregar_entidad(CANAL, NUEVA, "20", P, DESPUES, "m")
+    assert not any("no se aplica" in p.mensaje for p in s.recorrido.problemas)
+
+
+def test_deshacer_eliminar_la_devuelve_con_su_porcentaje():
+    s = _cerrado()
+    s.agregar_entidad(CANAL, NUEVA, "20", P, DESPUES, "m")
+    s.eliminar_entidad(CANAL, NUEVA, P, DESPUES, "m")
+    s.deshacer(P, DESPUES)
+    assert (CANAL, NUEVA) in s.entidades_nuevas and s.porcentajes[(CANAL, NUEVA)][0] == D("20")

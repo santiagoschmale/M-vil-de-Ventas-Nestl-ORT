@@ -40,6 +40,9 @@ type Opciones = {
 // El aviso dura unos segundos: corto e informativo. Si cierra o no ya se ve en el encabezado.
 const RECALCULADO = 'Reparto recalculado.';
 
+/** Aprobado es de solo lectura: lo que edita se deshabilita (el backend igual lo rechaza). */
+export const useSoloLectura = () => useMovil(s => !!s.estado?.aprobado);
+
 export const useMovil = create<TUseMovil>((set, get) => {
   const traerCruce = async (estado: Estado) => {
     if (estado.faltan.length) return set({ cruce: undefined });
@@ -62,6 +65,10 @@ export const useMovil = create<TUseMovil>((set, get) => {
     } catch (e) {
       const mensaje = mensajeDeError(e);
       if (!opciones.errorEnDialogo) avisar(mensaje, 'error');
+      // Un rechazo puede ser porque otro planner cambió el móvil (p. ej. lo aprobó): traer el estado real.
+      if (respuesta(e)?.status === 422) {
+        api.get<Estado>('/movil').then(r => set({ estado: r.data })).catch(() => undefined);
+      }
       return mensaje;
     } finally {
       set({ ocupado: false });

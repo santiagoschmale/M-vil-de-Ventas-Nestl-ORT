@@ -203,6 +203,9 @@ def _estado(s: Sesion) -> dict:
                         for (c, e), (p, a) in sorted(s.porcentajes.items())],
         # Altas: distribuidores o vendedores sumados en la herramienta, sin historia.
         "entidades_nuevas": [{"canal": c, "entidad": e, **_ajuste(a)} for (c, e), a in sorted(s.entidades_nuevas.items())],
+        # Cuánto % manual hay asignado en cada canal (para mostrar cuánto queda hasta 100).
+        "porcentaje_asignado": {c: _porcentaje(sum(p for (x, _), (p, _) in s.porcentajes.items() if x == c))
+                                for c in sorted({c for c, _ in s.porcentajes})},
     }
 
 

@@ -57,6 +57,7 @@ export const estadoFactory = Factory.define<Estado>(() => ({
   aprobado: null,
   porcentajes: [],
   entidades_nuevas: [],
+  porcentaje_asignado: {},
 }));
 
 export const cruceFactory = Factory.define<Cruce>((): Cruce => ({

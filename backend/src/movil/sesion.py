@@ -188,11 +188,14 @@ class Sesion:
         del canal, en kilos y en pesos) o, con `porcentaje` vacío, el histórico.
         """
         motivo = _motivo(motivo)
+        canal = self._canal(canal)
         if entidad not in self._en_el_canal(canal):
             raise ErrorDeAjuste(f"{entidad} no está en la apertura de {canal}.")
         valor = self._validar_porcentaje(canal, entidad, porcentaje)
         if valor is None and (canal, entidad) in self.entidades_nuevas:
             raise ErrorDeAjuste(f"{entidad} es nueva y no tiene historia: necesita un %. Para sacarla, eliminala.")
+        if valor is None and (canal, entidad) not in self.porcentajes:
+            raise ErrorDeAjuste(f"{entidad} ya va por histórico en {canal}.")
 
         def cambio():
             detalle = f"{entidad} en {canal}: " + (f"{a_texto(valor)}%" if valor is not None else "por histórico")
@@ -208,19 +211,24 @@ class Sesion:
                         motivo: str) -> None:
         """
         Alta de un vendedor o distribuidor en un canal que se abre (supuesto B2). No tiene
-        historia: entra con un % manual, en todas las celdas del canal.
+        historia: entra con un % manual, en todas las celdas del canal que se abren.
         """
         motivo = _motivo(motivo)
+        canal = self._canal(canal)
         entidad = " ".join((entidad or "").split())
         if not entidad:
             raise ErrorDeAjuste("Falta el nombre del distribuidor o vendedor.")
         if not self._se_abre(canal):
             raise ErrorDeAjuste(f"{canal} no se abre debajo del canal: no tiene distribuidores ni vendedores.")
-        if entidad in self._en_el_canal(canal):
-            raise ErrorDeAjuste(f"{entidad} ya está en {canal}.")
+        # El ON/OFF es por nombre en todos los canales: dos con el mismo nombre se apagarían juntos.
+        donde = sorted({c for c, e in self._todas_las_entidades() if normalizar(e) == normalizar(entidad)})
+        if donde:
+            raise ErrorDeAjuste(f"Ya hay un distribuidor o vendedor llamado {entidad} (en {', '.join(donde)}). "
+                                f"Usá otro nombre para distinguirlos.")
+        valor = _porcentaje(porcentaje, "la entidad")
+        if valor is None or valor == 0:
+            raise ErrorDeAjuste(f"{entidad} es nueva y no tiene historia: necesita un % mayor que 0 para recibir algo.")
         valor = self._validar_porcentaje(canal, entidad, porcentaje)
-        if valor is None:
-            raise ErrorDeAjuste(f"{entidad} es nueva y no tiene historia: necesita un % para recibir algo.")
 
         def cambio():
             ajuste = Ajuste("agregar_entidad", f"{entidad} en {canal}: {a_texto(valor)}%", autor, cuando, motivo)
@@ -232,23 +240,27 @@ class Sesion:
     def eliminar_entidad(self, canal: str, entidad: str, autor: str, cuando: datetime, motivo: str) -> None:
         """Saca una entidad dada de alta en la herramienta. Las del archivo se apagan, no se eliminan."""
         motivo = _motivo(motivo)
+        canal = self._canal(canal)
         if (canal, entidad) not in self.entidades_nuevas:
             raise ErrorDeAjuste(f"{entidad} viene del mes anterior: no se elimina, se apaga.")
 
         def cambio():
             del self.entidades_nuevas[(canal, entidad)]
             self.porcentajes.pop((canal, entidad), None)
-            self.entidades_apagadas.pop(entidad, None)
+            self.entidades_apagadas.pop(entidad, None)  # el nombre es único: no prende a nadie más
             return Ajuste("eliminar_entidad", f"{entidad} en {canal}", autor, cuando, motivo)
         self._aplicar(cambio)
 
     def _se_abre(self, canal: str) -> bool:
         return any(normalizar(c) == normalizar(canal) for _, c in self._e.apertura)
 
+    def _todas_las_entidades(self) -> set[tuple[str, str]]:
+        """(canal, entidad) de la apertura del mes anterior y de las altas."""
+        return {(c, e) for (_, c), pesos in self._e.apertura.items() for e in pesos} | set(self.entidades_nuevas)
+
     def _en_el_canal(self, canal: str) -> set[str]:
         """Las entidades del canal: las de la apertura del mes anterior y las dadas de alta."""
-        return ({e for (_, c), pesos in self._e.apertura.items() if normalizar(c) == normalizar(canal) for e in pesos}
-                | {e for c, e in self.entidades_nuevas if c == canal})
+        return {e for c, e in self._todas_las_entidades() if normalizar(c) == normalizar(canal)}
 
     def _validar_porcentaje(self, canal: str, entidad: str, porcentaje: str | None) -> Decimal | None:
         valor = _porcentaje(porcentaje, "la entidad")
@@ -260,6 +272,28 @@ class Sesion:
         if otros + valor > 100:
             raise ErrorDeAjuste(f"Los % de {canal} sumarían {a_texto(otros + valor)}%: no pueden pasar de 100.")
         return valor
+
+    def _canal(self, canal: str) -> str:
+        """El canal con el nombre de los totales por canal: "cordoba" es "Córdoba"."""
+        por_nombre = {normalizar(c): c for c in (self._e.canales or {})}
+        if normalizar(canal) not in por_nombre:
+            raise ErrorDeAjuste(f"{canal} no está en los totales por canal.")
+        return por_nombre[normalizar(canal)]
+
+    def _porcentajes_vigentes(self) -> tuple[dict[tuple[str, str], Decimal], list[Problema]]:
+        """
+        Los % que aplican con las entradas actuales. Uno cuyo canal o entidad ya no está
+        (se volvió a cargar el input 2 o la base) no se aplica y se avisa, no se pierde en silencio.
+        """
+        vigentes, avisos = {}, []
+        for (canal, entidad), (valor, _) in sorted(self.porcentajes.items()):
+            if canal in (self._e.canales or {}) and self._se_abre(canal) and entidad in self._en_el_canal(canal):
+                vigentes[(canal, entidad)] = valor
+            else:
+                avisos.append(Problema("aviso", f"El {a_texto(valor)}% de {entidad} en {canal} no se aplica: ya no está en "
+                                                f"los totales por canal o en el mes anterior. Revisalo en la apertura.",
+                                       bloque="apertura", canal=canal))
+        return vigentes, avisos
 
     def fijas(self, unidad: str) -> dict[Celda, Fijada]:
         return dict(self._fijas[unidad])
@@ -503,6 +537,7 @@ class Sesion:
             # Un repetido ya resuelto no se vuelve a informar: la decisión quedó en el historial.
             problemas1 = [p for p in self._e.problemas1
                           if not (p.tipo == "sku_repetido" and p.sku in self.filas_elegidas)]
+            porcentajes, avisos_porcentaje = self._porcentajes_vigentes()
             return armar(
                 self.objetivos_vigentes(),
                 self._e.canales,
@@ -510,12 +545,12 @@ class Sesion:
                 apagados=set(self.apagados_skus),
                 fijas_kilos=self._fijas_vigentes("kilos"),
                 fijas_plata=self._fijas_vigentes("plata"),
-                problemas=problemas1 + self._e.problemas2 + self._e.problemas_base,
+                problemas=problemas1 + self._e.problemas2 + self._e.problemas_base + avisos_porcentaje,
                 apertura=self._e.apertura,
                 entidades_apagadas=set(self.entidades_apagadas),
                 reglas=[r.regla for r in self.reglas.values()],
                 canales_sku={k: c for k, (c, _) in self.canales_sku.items()},
-                porcentajes={k: p for k, (p, _) in self.porcentajes.items()},
+                porcentajes=porcentajes,
             )
         except ErrorDeCruce as e:
             raise ErrorDeAjuste(str(e)) from e
