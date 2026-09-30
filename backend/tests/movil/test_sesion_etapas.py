@@ -67,5 +67,19 @@ def test_deshacer_tambien_borra_lo_que_recalcula():
     assert set(s.revisadas) == {"canal"}
 
 
+def test_revisar_dos_veces_no_duplica_el_historial():
+    s = _cerrado()
+    s.revisar_etapa("canal", P, DESPUES)
+    assert _falla(s.revisar_etapa, "canal", P, DESPUES)
+    assert [a.accion for a in s.historial].count("revisar_etapa") == 1
+
+
+def test_volver_a_cargar_un_archivo_borra_las_dos():
+    from tests.movil.test_sesion import MUESTRA
+    s = _revisado(_cerrado())
+    s.cargar_input2((MUESTRA / "input2_sin_sku_nuevo.tsv").read_text(encoding="utf-8"), P, DESPUES)
+    assert s.revisadas == {}
+
+
 def test_una_etapa_que_no_existe_se_rechaza():
     assert _falla(_cerrado().revisar_etapa, "vendedor", P, DESPUES)

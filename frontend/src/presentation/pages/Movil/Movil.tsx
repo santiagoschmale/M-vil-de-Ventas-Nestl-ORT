@@ -357,10 +357,9 @@ const Seccion = ({ titulo, resumen, abierta = false, pedido, ayuda, children }: 
 const NOMBRE_ETAPA = { canal: 'por canal', apertura: 'debajo del canal' } as const;
 
 /** Las etapas en orden: cada una se da por revisada después de la anterior. */
-const Etapas = ({ estado }: { estado: Estado }) => {
+const Etapas = ({ estado, cierra }: { estado: Estado; cierra: boolean }) => {
   const { revisarEtapa, ocupado } = useMovil();
   const soloLectura = useSoloLectura();
-  const cierra = estado.cierra.kilos && estado.cierra.plata;
   return (
     <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1.5 }}>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
@@ -534,7 +533,7 @@ export const MovilPage = () => {
             </span>
           </Tooltip>
         </Box>
-        {estado.faltan.length === 0 && <Etapas estado={estado} />}
+        {estado.faltan.length === 0 && <Etapas estado={estado} cierra={cierraTodo} />}
         {estado.aprobado && (
           <Alert severity="success" icon={<TaskAltRoundedIcon />}>
             Aprobado por {estado.aprobado.autor} el {new Date(estado.aprobado.cuando).toLocaleString('es-AR')}. Es de

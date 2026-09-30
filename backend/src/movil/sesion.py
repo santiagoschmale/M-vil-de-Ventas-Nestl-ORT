@@ -43,6 +43,7 @@ UNIDADES = {"kilos": KILOS, "plata": PLATA}
 
 # Revisión por etapa, en orden. Un cambio en una etapa borra el OK de esa y de las siguientes.
 ETAPAS = ("canal", "apertura")
+_NOMBRE_ETAPA = {"canal": "por canal", "apertura": "debajo del canal"}
 # Los ajustes que solo tocan debajo del canal; todos los demás cambian el reparto por canal.
 _DEBAJO_DEL_CANAL = {"apagar_entidad", "prender_entidad", "porcentaje", "agregar_entidad", "eliminar_entidad"}
 
@@ -462,11 +463,11 @@ class Sesion:
             raise ErrorDeAjuste(f"No hay una etapa {etapa} para revisar.")
         if not self._cierra():
             raise ErrorDeAjuste("Para dar por revisada una etapa, kilos y pesos tienen que cerrar.")
-        anterior = ETAPAS[:ETAPAS.index(etapa)]
-        if any(e not in self.revisadas for e in anterior):
+        if etapa in self.revisadas:
+            raise ErrorDeAjuste(f"La etapa {_NOMBRE_ETAPA[etapa]} ya está revisada.")
+        if etapa == "apertura" and "canal" not in self.revisadas:
             raise ErrorDeAjuste("Primero revisá la etapa por canal: lo de abajo sale de ahí.")
-        nombre = {"canal": "por canal", "apertura": "debajo del canal"}[etapa]
-        self.revisadas[etapa] = Ajuste("revisar_etapa", f"Revisó la etapa {nombre}", autor, cuando)
+        self.revisadas[etapa] = Ajuste("revisar_etapa", f"Revisó la etapa {_NOMBRE_ETAPA[etapa]}", autor, cuando)
         self.historial.append(self.revisadas[etapa])
 
     def _invalidar_etapas(self, accion: str) -> None:
@@ -487,8 +488,7 @@ class Sesion:
             raise ErrorDeAjuste("Para aprobar, kilos y pesos tienen que cerrar.")
         faltan = [e for e in self.etapas() if e not in self.revisadas]
         if faltan:
-            nombres = {"canal": "por canal", "apertura": "debajo del canal"}
-            raise ErrorDeAjuste(f"Falta revisar la etapa {' y la '.join(nombres[e] for e in faltan)}.")
+            raise ErrorDeAjuste(f"Falta revisar la etapa {' y la '.join(_NOMBRE_ETAPA[e] for e in faltan)}.")
         self.aprobado = Ajuste("aprobar", "Aprobó el móvil", autor, cuando)
         self.historial.append(self.aprobado)
         self._antes_del_ultimo = self.ultimo_cambio = None  # aprobar no se deshace
