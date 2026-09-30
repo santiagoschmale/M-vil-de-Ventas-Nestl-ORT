@@ -151,7 +151,8 @@ export const AYUDA = {
           canal</b> (cómo se abre cada canal entre distribuidores o vendedores, al tocar una celda).
         </P>
         <P>
-          Cuando revisaste una etapa, marcala como revisada. Si después cambiás algo, el OK de esa etapa y de las
+          Cuando revisaste una etapa, marcala como revisada con los botones de arriba de la tabla; en el encabezado se ve
+          cuáles faltan. Marcarla no bloquea nada. Si después cambiás algo, el OK de esa etapa y de las
           siguientes se borra, porque se recalculan. Para aprobar, las dos tienen que estar revisadas.
         </P>
       </>
