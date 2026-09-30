@@ -125,6 +125,9 @@ celda. El cruce no cambia al apagar un distribuidor.
   fijado), igual en kilos y pesos y en todos los SKUs del canal. El resto va por
   histórico. La entidad con % entra en todas las celdas del canal aunque no tenga
   historia ahí. `domain/apertura.py::_por_base`, `movil/recorrido.py::_con_porcentaje`.
+- **B2 · alta de entidades**: un distribuidor o vendedor nuevo se da de alta en la
+  herramienta, en un canal que se abre, siempre con %: sin historia no recibiría nada.
+  Entra por el mismo camino que el % manual. `Sesion.agregar_entidad`.
 - **A2**: el input 2 cierra exacto. Si admite margen (±500 kg), es un parámetro
   nuevo del cruce: las columnas pasan a ser rangos.
 - **B6**: formato de la apertura (hoy formato largo en una hoja de la base; el real viene en bloques).

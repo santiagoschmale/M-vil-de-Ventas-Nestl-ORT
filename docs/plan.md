@@ -30,8 +30,8 @@ Todo vive en memoria y hay un solo móvil.
 Además, el móvil se aprueba y queda de solo lectura (M1).
 
 Y cada vendedor o distribuidor puede ir por histórico o con un % manual (M2, con el
-supuesto B1). De los MUST quedan el alta de entidades nuevas (M3) y, si hace falta, la
-revisión por etapa (M4).
+supuesto B1), y se dan de alta distribuidores o vendedores nuevos con un % (M3, supuesto
+B2). De los MUST queda la revisión por etapa (M4), si el viernes dicen que hace falta.
 
 La persistencia no figura en los MUST del cliente, pero la aprobación y el
 histórico la necesitan para tener sentido.
@@ -48,7 +48,7 @@ histórico la necesitan para tener sentido.
 | Excepciones ON/OFF de SKUs, vendedores y distribuidores | ✅ | Criterio al apagar: proporcional como supuesto (A1) |
 | Ajuste manual con valor fijado y motivo | ✅ | — |
 | Base de cálculo histórico / % manual por entidad | ✅ | **M2**, con el supuesto B1 |
-| Alta de vendedor o distribuidor nuevo | ⬜ | **M3**, depende de B2 |
+| Alta de vendedor o distribuidor nuevo | ✅ | **M3**, con el supuesto B2 |
 | Aprobación del móvil | ✅ | **M1**: aprobar si cierra, solo lectura, reabrir con motivo. En memoria hasta la persistencia |
 | Revisión por etapa | 🟡 | Cada etapa se ve (matriz, apertura por celda), pero no se aprueba por separado. **M4**, depende de B3 |
 | Exportación a Excel | ✅ | Formato de salida a confirmar (A15) |
@@ -137,9 +137,10 @@ nadie más tiene historia, se lleva todo.
 Hecho cuando a un vendedor se le pone 30% en Córdoba, recibe el 30% de cada celda de
 Córdoba, el resto se reparte por histórico y todo cuadra.
 
-### M3 · Alta de vendedor o distribuidor nuevo
+### M3 · Alta de vendedor o distribuidor nuevo ✅
 
-Depende de B2 y se apoya en M2.
+Hecho el 29/09 con el supuesto B2: se da de alta en la herramienta. Una nueva se puede
+eliminar; las del mes anterior no, se apagan.
 
 - **Se agrega a un canal** con nombre y un %. No tiene historia, así que sin % no
   recibe nada.

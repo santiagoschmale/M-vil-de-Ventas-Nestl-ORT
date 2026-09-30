@@ -133,6 +133,10 @@ export const AYUDA = {
           cartera. El % vale para todos los SKUs del canal, en kilos y en pesos; el resto se reparte por histórico
           entre los demás.
         </P>
+        <P>
+          <b>Distribuidor o vendedor nuevo</b>: con «Agregar» se suma a un canal. Como no tiene historia, entra con un
+          %. Se puede apagar como cualquiera, o eliminar si se cargó por error.
+        </P>
       </>
     ),
   },

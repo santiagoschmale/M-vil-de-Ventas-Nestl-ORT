@@ -74,6 +74,19 @@ class MotivoIn(BaseModel):
     motivo: str
 
 
+class EntidadNuevaIn(BaseModel):
+    canal: str
+    entidad: str
+    porcentaje: str | None = Field(description="% manual como texto: una entidad nueva no tiene historia")
+    motivo: str
+
+
+class EntidadIn(BaseModel):
+    canal: str
+    entidad: str
+    motivo: str
+
+
 class PorcentajeIn(BaseModel):
     canal: str
     entidad: str
@@ -188,6 +201,8 @@ def _estado(s: Sesion) -> dict:
         # Base de cálculo: las entidades con % manual. Las demás van por histórico.
         "porcentajes": [{"canal": c, "entidad": e, "porcentaje": _porcentaje(p), **_ajuste(a)}
                         for (c, e), (p, a) in sorted(s.porcentajes.items())],
+        # Altas: distribuidores o vendedores sumados en la herramienta, sin historia.
+        "entidades_nuevas": [{"canal": c, "entidad": e, **_ajuste(a)} for (c, e), a in sorted(s.entidades_nuevas.items())],
     }
 
 
@@ -297,6 +312,7 @@ def obtener_apertura(sku: str, canal: str, s: Sesion = Depends(sesion)):
         "aviso": por_que_no_abre(canal, raiz.aviso) if raiz.aviso["kilos"] or raiz.aviso["nns"] else None,
         "entidades": [
             {"nombre": h.entidad, "activo": h.activo, "peso": str(h.peso), "porcentaje": _porcentaje(h.porcentaje),
+             "nueva": (canal, h.entidad) in s.entidades_nuevas,
              "kilos": _texto(h.valores["kilos"].monto, "kilos"), "plata": _texto(h.valores["nns"].monto, "plata")}
             for h in raiz.hijos
         ],
@@ -410,4 +426,17 @@ def reabrir(cuerpo: MotivoIn, s: Sesion = Depends(sesion), quien: str = Depends(
 def asignar_porcentaje(cuerpo: PorcentajeIn, s: Sesion = Depends(sesion), quien: str = Depends(autor)):
     _aplicar(s.asignar_porcentaje, cuerpo.canal, cuerpo.entidad, cuerpo.porcentaje, autor=quien, cuando=_ahora(),
              motivo=cuerpo.motivo)
+    return _estado(s)
+
+
+@router.post("/entidades", summary="Alta de un distribuidor o vendedor en un canal que se abre, con un % manual")
+def agregar_entidad(cuerpo: EntidadNuevaIn, s: Sesion = Depends(sesion), quien: str = Depends(autor)):
+    _aplicar(s.agregar_entidad, cuerpo.canal, cuerpo.entidad, cuerpo.porcentaje, autor=quien, cuando=_ahora(),
+             motivo=cuerpo.motivo)
+    return _estado(s)
+
+
+@router.delete("/entidades", summary="Sacar un distribuidor o vendedor dado de alta en la herramienta")
+def eliminar_entidad(cuerpo: EntidadIn, s: Sesion = Depends(sesion), quien: str = Depends(autor)):
+    _aplicar(s.eliminar_entidad, cuerpo.canal, cuerpo.entidad, autor=quien, cuando=_ahora(), motivo=cuerpo.motivo)
     return _estado(s)

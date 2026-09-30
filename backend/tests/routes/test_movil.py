@@ -251,3 +251,18 @@ def test_porcentaje_manual_de_una_entidad():
     assert c.put("/api/movil/porcentajes", json={**cuerpo, "porcentaje": "150"}).status_code == 422
     r = c.put("/api/movil/porcentajes", json={**cuerpo, "porcentaje": None, "motivo": "vuelve"})
     assert r.json()["porcentajes"] == []
+
+
+def test_alta_y_baja_de_una_entidad_nueva():
+    c = _cerrado()
+    cuerpo = {"canal": "Córdoba", "entidad": "Vendedora Nueva", "porcentaje": "20", "motivo": "entró en octubre"}
+    r = c.post("/api/movil/entidades", json=cuerpo)
+    assert r.status_code == 200
+    assert [(e["canal"], e["entidad"]) for e in r.json()["entidades_nuevas"]] == [("Córdoba", "Vendedora Nueva")]
+    sku = next(f["codigo"] for f in c.get("/api/movil/cruce/kilos").json()["skus"]
+               if D(f["celdas"].get("Córdoba", {}).get("monto", "0")) > 0)
+    nueva = next(e for e in c.get(f"/api/movil/apertura/{sku}/Córdoba").json()["entidades"] if e["nombre"] == "Vendedora Nueva")
+    assert nueva["nueva"] and nueva["porcentaje"] == "20"
+    assert c.post("/api/movil/entidades", json=cuerpo).status_code == 422  # ya está
+    r = c.request("DELETE", "/api/movil/entidades", json={"canal": "Córdoba", "entidad": "Vendedora Nueva", "motivo": "error"})
+    assert r.status_code == 200 and r.json()["entidades_nuevas"] == []

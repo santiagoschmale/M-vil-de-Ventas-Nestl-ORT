@@ -34,6 +34,7 @@ const ACCIONES: Record<string, string> = {
   elegir_fila: 'Eligió qué fila vale de un SKU repetido',
   elegir_canales: 'Eligió dónde se vende un SKU', quitar_canales: 'Volvió un SKU a sus canales del mes anterior',
   porcentaje: 'Cambió la base de cálculo',
+  agregar_entidad: 'Agregó un distribuidor o vendedor', eliminar_entidad: 'Eliminó un distribuidor o vendedor',
 };
 
 const Subir = ({ cargado, etiqueta, alElegir }: { cargado: boolean; etiqueta: string; alElegir: (f: File) => void }) => {
