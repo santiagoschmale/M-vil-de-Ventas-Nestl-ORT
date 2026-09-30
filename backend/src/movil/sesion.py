@@ -143,6 +143,13 @@ class Sesion:
             return Ajuste("cargar_input2", detalle, autor, cuando)
         self._aplicar(cambio)
 
+    def quitar_input2(self, autor: str, cuando: datetime) -> None:
+        """Saca los totales por canal: para volver a armarlos en la pantalla desde el mes anterior."""
+        def cambio():
+            self._e.canales, self._e.problemas2, self._e.archivo2 = None, [], None
+            return Ajuste("quitar_input2", "Sacó los totales por canal", autor, cuando)
+        self._aplicar(cambio)
+
     def cargar_base(self, origen, nombre: str, autor: str, cuando: datetime) -> None:
         base, problemas = _leer(leer_base, origen)
         if hasattr(origen, "seek"):

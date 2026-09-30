@@ -283,3 +283,12 @@ def test_el_estado_trae_los_kilos_por_canal_del_mes_anterior():
     canales = c.get("/api/movil").json()["entradas"]["base"]["canales"]
     assert len(canales) > 1 and len({x["canal"] for x in canales}) == len(canales)
     assert all(D(x["kilos"]) > 0 and D(x["kilos"]).as_tuple().exponent == -3 for x in canales)
+
+
+def test_la_muestra_sin_totales_deja_armarlos_en_la_pantalla():
+    """Para la demo: objetivo y mes anterior cargados, totales por canal vacíos, aunque antes hubiera."""
+    c = _cargado()
+    r = c.post("/api/movil/muestra?totales=false").json()
+    assert r["faltan"] == ["totales por canal"]
+    assert r["entradas"]["input2"] is None and r["entradas"]["base"]["canales"]
+    assert "quitar_input2" in [a["accion"] for a in r["historial"]]

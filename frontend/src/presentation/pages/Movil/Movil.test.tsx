@@ -507,6 +507,18 @@ describe('MovilPage', { timeout: 15000 }, () => {
       cuerpo: { canal: 'Catering', entidad: 'Nuevo', motivo: 'error' } }]));
   });
 
+  it('la muestra se puede cargar sin totales por canal, para armarlos en la pantalla', async () => {
+    const user = userEvent.setup({ delay: null });
+    let url = '';
+    server.use(
+      http.get('*/api/movil', () => HttpResponse.json(estado({ faltan: ['totales por canal'] }))),
+      http.post('*/api/movil/muestra', ({ request }) => { url = request.url; return HttpResponse.json(estado()); }),
+    );
+    render(<MovilPage />);
+    await user.click(await screen.findByRole('button', { name: 'sin totales por canal' }));
+    await waitFor(() => expect(new URL(url).searchParams.get('totales')).toBe('false'));
+  });
+
   it('exportar se habilita solo cuando kilos y pesos cierran', async () => {
     server.use(http.get('*/api/movil', () => HttpResponse.json(estado({ cierra: { kilos: true, plata: false } }))));
     render(<MovilPage />);

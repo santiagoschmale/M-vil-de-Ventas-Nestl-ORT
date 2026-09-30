@@ -35,7 +35,7 @@ const ACCIONES: Record<string, string> = {
   aprobar: 'Aprobó el móvil', reabrir: 'Volvió el móvil a borrador', revisar_etapa: 'Revisó una etapa',
   elegir_fila: 'Eligió qué fila vale de un SKU repetido',
   elegir_canales: 'Eligió dónde se vende un SKU', quitar_canales: 'Volvió un SKU a sus canales del mes anterior',
-  porcentaje: 'Cambió la base de cálculo',
+  porcentaje: 'Cambió la base de cálculo', quitar_input2: 'Sacó los totales por canal',
   agregar_entidad: 'Agregó un distribuidor o vendedor', eliminar_entidad: 'Eliminó un distribuidor o vendedor',
 };
 
@@ -264,6 +264,12 @@ const Entradas = ({ estado }: { estado: Estado }) => {
           <Link component="button" variant="body2" disabled={ocupado || soloLectura} onClick={() => cargarMuestra()}>
             Cargar datos de muestra (solo en desarrollo)
           </Link>
+          {' · '}
+          <Tooltip describeChild title="Carga el objetivo y el mes anterior, y deja los totales por canal para armarlos en la pantalla">
+            <Link component="button" variant="body2" disabled={ocupado || soloLectura} onClick={() => cargarMuestra(false)}>
+              sin totales por canal
+            </Link>
+          </Tooltip>
         </Box>
       )}
       {editar && (
