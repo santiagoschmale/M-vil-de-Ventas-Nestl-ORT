@@ -121,6 +121,10 @@ celda. El cruce no cambia al apagar un distribuidor.
   el canal entero el mes anterior. `movil/recorrido.py::_donde_se_vende`.
 
 - **A1**: al apagar una entidad, su parte se reparte proporcional al histórico.
+- **B1 · % manual**: el % es de lo que hay para repartir en la celda (total menos lo
+  fijado), igual en kilos y pesos y en todos los SKUs del canal. El resto va por
+  histórico. La entidad con % entra en todas las celdas del canal aunque no tenga
+  historia ahí. `domain/apertura.py::_por_base`, `movil/recorrido.py::_con_porcentaje`.
 - **A2**: el input 2 cierra exacto. Si admite margen (±500 kg), es un parámetro
   nuevo del cruce: las columnas pasan a ser rangos.
 - **B6**: formato de la apertura (hoy formato largo en una hoja de la base; el real viene en bloques).

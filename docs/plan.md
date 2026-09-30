@@ -29,8 +29,9 @@ Todo vive en memoria y hay un solo móvil.
 
 Además, el móvil se aprueba y queda de solo lectura (M1).
 
-De los MUST del cliente falta una cosa grande: la **base de cálculo con % manual
-por entidad** (M2).
+Y cada vendedor o distribuidor puede ir por histórico o con un % manual (M2, con el
+supuesto B1). De los MUST quedan el alta de entidades nuevas (M3) y, si hace falta, la
+revisión por etapa (M4).
 
 La persistencia no figura en los MUST del cliente, pero la aprobación y el
 histórico la necesitan para tener sentido.
@@ -46,7 +47,7 @@ histórico la necesitan para tener sentido.
 | Distribución en cascada con recálculo | ✅ | Cruce SKU × canal y apertura debajo del canal; cada cambio recalcula todo. Confirmar que un nivel debajo del canal alcanza (A10) |
 | Excepciones ON/OFF de SKUs, vendedores y distribuidores | ✅ | Criterio al apagar: proporcional como supuesto (A1) |
 | Ajuste manual con valor fijado y motivo | ✅ | — |
-| Base de cálculo histórico / % manual por entidad | ⬜ | **M2** |
+| Base de cálculo histórico / % manual por entidad | ✅ | **M2**, con el supuesto B1 |
 | Alta de vendedor o distribuidor nuevo | ⬜ | **M3**, depende de B2 |
 | Aprobación del móvil | ✅ | **M1**: aprobar si cierra, solo lectura, reabrir con motivo. En memoria hasta la persistencia |
 | Revisión por etapa | 🟡 | Cada etapa se ve (matriz, apertura por celda), pero no se aprueba por separado. **M4**, depende de B3 |
@@ -109,10 +110,13 @@ persistencia. Exportar no exige aprobar: se puede exportar un borrador para revi
 Hecho cuando se puede aprobar un móvil que cierra, no se lo puede tocar aprobado, se
 puede reabrir con motivo y todo queda en el historial.
 
-### M2 · Base de cálculo: histórico o % manual por entidad
+### M2 · Base de cálculo: histórico o % manual por entidad ✅
 
-Depende de B1. Se puede construir con un supuesto y mostrarlo el viernes, como se
-hizo con A4.
+Hecho el 29/09 con el supuesto B1, para mostrarlo el viernes. Una decisión que salió
+al hacerlo: la entidad con % entra en **todas** las celdas del canal, aunque el mes
+anterior no haya vendido ese SKU (su historia ya no la representa). Si en una celda
+nadie más tiene historia, se lleva todo. Un % cuyo canal o entidad desaparece al recargar las entradas
+no se aplica y se avisa en amarillo.
 
 - **Qué es**: en un canal que se abre, a un vendedor o distribuidor se le puede
   asignar un % en vez de su histórico. Caso típico: le cambiaron la cartera.

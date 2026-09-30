@@ -74,6 +74,13 @@ class MotivoIn(BaseModel):
     motivo: str
 
 
+class PorcentajeIn(BaseModel):
+    canal: str
+    entidad: str
+    porcentaje: str | None = Field(description="% manual como texto; vacío o null = volver a histórico")
+    motivo: str
+
+
 class CanalesIn(BaseModel):
     canales: list[str] = Field(description="Canales donde se vende el SKU, como figuran en los totales por canal")
     motivo: str
@@ -178,6 +185,12 @@ def _estado(s: Sesion) -> dict:
         "deshacer": _ajuste(s.ultimo_cambio) if s.ultimo_cambio else None,
         # Quién aprobó y cuándo, o None si está en borrador.
         "aprobado": _ajuste(s.aprobado) if s.aprobado else None,
+        # Base de cálculo: las entidades con % manual. Las demás van por histórico.
+        "porcentajes": [{"canal": c, "entidad": e, "porcentaje": _porcentaje(p), **_ajuste(a)}
+                        for (c, e), (p, a) in sorted(s.porcentajes.items())],
+        # Cuánto % manual hay asignado en cada canal (para mostrar cuánto queda hasta 100).
+        "porcentaje_asignado": {c: _porcentaje(sum(p for (x, _), (p, _) in s.porcentajes.items() if x == c))
+                                for c in sorted({c for c, _ in s.porcentajes})},
     }
 
 
@@ -286,7 +299,7 @@ def obtener_apertura(sku: str, canal: str, s: Sesion = Depends(sesion)):
         "cuadra": {"kilos": raiz.cuadra["kilos"], "plata": raiz.cuadra["nns"]},
         "aviso": por_que_no_abre(canal, raiz.aviso) if raiz.aviso["kilos"] or raiz.aviso["nns"] else None,
         "entidades": [
-            {"nombre": h.entidad, "activo": h.activo, "peso": str(h.peso),
+            {"nombre": h.entidad, "activo": h.activo, "peso": str(h.peso), "porcentaje": _porcentaje(h.porcentaje),
              "kilos": _texto(h.valores["kilos"].monto, "kilos"), "plata": _texto(h.valores["nns"].monto, "plata")}
             for h in raiz.hijos
         ],
@@ -393,4 +406,11 @@ def aprobar(s: Sesion = Depends(sesion), quien: str = Depends(autor)):
 @router.post("/reabrir", summary="Volver el móvil aprobado a borrador, con motivo")
 def reabrir(cuerpo: MotivoIn, s: Sesion = Depends(sesion), quien: str = Depends(autor)):
     _aplicar(s.reabrir, autor=quien, cuando=_ahora(), motivo=cuerpo.motivo)
+    return _estado(s)
+
+
+@router.put("/porcentajes", summary="Base de cálculo de una entidad en un canal: % manual o, vacío, histórico")
+def asignar_porcentaje(cuerpo: PorcentajeIn, s: Sesion = Depends(sesion), quien: str = Depends(autor)):
+    _aplicar(s.asignar_porcentaje, cuerpo.canal, cuerpo.entidad, cuerpo.porcentaje, autor=quien, cuando=_ahora(),
+             motivo=cuerpo.motivo)
     return _estado(s)

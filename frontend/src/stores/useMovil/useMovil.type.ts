@@ -79,6 +79,8 @@ export type Estado = {
   historial: Ajuste[];
   deshacer: Ajuste | null; // el último cambio, si se puede deshacer (una sola vez)
   aprobado: Ajuste | null; // quién aprobó y cuándo; mientras no sea null, es de solo lectura
+  porcentajes: (Ajuste & { canal: string; entidad: string; porcentaje: string })[]; // base de cálculo manual
+  porcentaje_asignado: Record<string, string>; // canal -> % manual asignado en total
 };
 
 export type Celda = { monto: Monto; fijada: boolean };
@@ -103,7 +105,8 @@ export type Apertura = {
   plata: Monto;
   cuadra: Record<Unidad, boolean>;
   aviso: string | null;
-  entidades: { nombre: string; activo: boolean; peso: string; kilos: Monto; plata: Monto }[];
+  // porcentaje: % manual (base de cálculo) o null si va por histórico.
+  entidades: { nombre: string; activo: boolean; peso: string; porcentaje: string | null; kilos: Monto; plata: Monto }[];
 };
 
 /** null si salió bien; si no, el mensaje de error para mostrar. */
@@ -142,4 +145,5 @@ export type TUseMovil = {
   deshacer: () => Resultado;
   aprobar: () => Resultado;
   reabrir: (motivo: string) => Resultado;
+  asignarPorcentaje: (canal: string, entidad: string, porcentaje: string | null, motivo: string) => Resultado;
 };

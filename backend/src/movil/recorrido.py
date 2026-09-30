@@ -82,6 +82,7 @@ def armar(
     entidades_apagadas: set[str] | frozenset[str] = frozenset(),
     reglas: list[Regla] | tuple[Regla, ...] = (),
     canales_sku: dict[str, set[str] | frozenset[str]] | None = None,
+    porcentajes: dict[tuple[str, str], Decimal] | None = None,
 ) -> Recorrido:
     """
     `apagados`: SKUs que el planner saca del mes (ON/OFF). No se reparten; si su
@@ -98,6 +99,9 @@ def armar(
 
     `canales_sku`: dónde se vende cada SKU según el planner ("Dónde se vende"). Ver
     `_donde_se_vende`.
+
+    `porcentajes`: base de cálculo, {(canal, entidad): % manual}. Esa entidad se lleva
+    ese % de cada celda del canal que se abre; el resto va por histórico (supuesto B1).
     """
     problemas = list(problemas or [])
     apagados = frozenset(apagados)
@@ -136,7 +140,7 @@ def armar(
             grupos=grupos_plata,
         )
     entidades_apagadas = frozenset(entidades_apagadas)
-    aperturas = _abrir(kilos, plata, apertura or {}, entidades_apagadas, problemas, por_nombre)
+    aperturas = _abrir(kilos, plata, apertura or {}, entidades_apagadas, problemas, por_nombre, porcentajes or {})
     return Recorrido(objetivos=objetivos, canales=canales, kilos=kilos, plata=plata, problemas=problemas,
                      aperturas=aperturas, entidades_apagadas=entidades_apagadas)
 
@@ -209,7 +213,7 @@ def _grupos(reglas, activos, por_nombre, problemas) -> tuple[list[Grupo], list[G
     return kilos, plata
 
 
-def _abrir(kilos, plata, apertura, apagadas, problemas, por_nombre) -> dict[Celda, Nodo]:
+def _abrir(kilos, plata, apertura, apagadas, problemas, por_nombre, porcentajes) -> dict[Celda, Nodo]:
     """Una raíz por celda del cruce con apertura: el valor del cruce se reparte entre sus entidades."""
     if kilos.celdas is None:
         return {}
@@ -223,7 +227,8 @@ def _abrir(kilos, plata, apertura, apagadas, problemas, por_nombre) -> dict[Celd
         if valor_kilos == 0 and valor_plata == 0:
             continue
         raiz = Nodo(entidad=f"{sku}|{canal}", nombre=canal, peso=Decimal(1),
-                    hijos=[Nodo(entidad=e, nombre=e, peso=w) for e, w in sorted(pesos.items())])
+                    hijos=[Nodo(entidad=e, nombre=e, peso=w, porcentaje=porcentajes.get((canal, e)))
+                           for e, w in sorted(_con_porcentaje(pesos, canal, porcentajes).items())])
         raiz.valores["kilos"].monto = valor_kilos
         raiz.valores["nns"].monto = valor_plata
         recalcular(raiz, inactivas)
@@ -232,6 +237,14 @@ def _abrir(kilos, plata, apertura, apagadas, problemas, por_nombre) -> dict[Celd
                                       canal=canal))
         aperturas[k] = raiz
     return aperturas
+
+
+def _con_porcentaje(pesos: dict[str, Decimal], canal: str, porcentajes) -> dict[str, Decimal]:
+    """
+    Una entidad con % manual en el canal entra en todas sus celdas, aunque el mes anterior
+    no haya vendido ese SKU (peso 0): su historia ya no la representa (supuesto B1).
+    """
+    return pesos | {e: Decimal(0) for (c, e) in porcentajes if c == canal and e not in pesos}
 
 
 def por_que_no_abre(canal: str, avisos: dict[str, str | None]) -> str:

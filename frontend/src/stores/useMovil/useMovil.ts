@@ -142,6 +142,8 @@ export const useMovil = create<TUseMovil>((set, get) => {
       cambiar(() => api.delete(`/movil/skus/${ruta(sku)}/canales`, { data: { motivo } }), enDialogo),
     deshacer: () => cambiar(() => api.post('/movil/deshacer', {})),
     aprobar: () => cambiar(() => api.post('/movil/aprobar', {}), { errorEnDialogo: true, aviso: 'Móvil aprobado.' }),
+    asignarPorcentaje: (canal, entidad, porcentaje, motivo) =>
+      cambiar(() => api.put('/movil/porcentajes', { canal, entidad, porcentaje, motivo }), enDialogo),
     reabrir: motivo =>
       cambiar(() => api.post('/movil/reabrir', { motivo }), { errorEnDialogo: true, aviso: 'El móvil volvió a borrador.' }),
 

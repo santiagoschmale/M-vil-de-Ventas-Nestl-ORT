@@ -55,6 +55,9 @@ class Nodo:
     entidad: str  # id de la entidad; único dentro del árbol de un SKU
     nombre: str
     peso: Decimal  # participación histórica, relativa a los hermanos
+    # Base de cálculo: None = por histórico (`peso`); si no, un % fijo de lo que hay para
+    # repartir entre los hermanos, el mismo en todas las unidades (supuesto B1).
+    porcentaje: Decimal | None = None
     hijos: list[Nodo] = field(default_factory=list)
     # Problema de datos detectado al importar que impide repartir automáticamente
     # entre los hijos. Se reporta, no se esconde con un default.
@@ -69,6 +72,30 @@ class Nodo:
 # ---------------------------------------------------------------------------
 # Recálculo
 # ---------------------------------------------------------------------------
+
+_HISTORICO = "\0por histórico"  # la parte del grupo que va por histórico; no choca con una entidad
+
+
+def _por_base(disponible: Decimal, libres: list[Nodo], decimales: int) -> dict[str, Decimal]:
+    """
+    Los que tienen % se llevan ese % de `disponible`; lo que queda se reparte entre los
+    que van por histórico, según su peso. Dos repartos con mayores restos: cierra exacto.
+    Si nadie va por histórico, los % se usan como pesos (si falta uno apagado, se reescalan).
+    """
+    manuales = {h.entidad: h.porcentaje for h in libres if h.porcentaje is not None}
+    if not manuales:
+        return repartir(disponible, {h.entidad: h.peso for h in libres}, decimales)
+    # Solo cuenta como "por histórico" quien tiene historia: con peso 0 no se le puede dar
+    # el resto, y si nadie tiene, los % se usan como pesos (no se cae la celda).
+    historicos = {h.entidad: h.peso for h in libres if h.porcentaje is None and h.peso > 0}
+    cero = Decimal(f"0E-{decimales}")
+    sin_historia = {h.entidad: cero for h in libres if h.porcentaje is None and h.peso == 0}
+    resto = 100 - sum(manuales.values())
+    partes = repartir(disponible, {**manuales, **({_HISTORICO: resto} if historicos and resto > 0 else {})},
+                      decimales)
+    grupo = partes.pop(_HISTORICO, Decimal(0))
+    ceros = {e: cero for e in historicos}
+    return partes | sin_historia | (repartir(grupo, historicos, decimales) if grupo > 0 else ceros)
 
 def recalcular(raiz: Nodo, inactivas) -> None:
     """Recalcula el árbol entero de arriba hacia abajo. La raíz no se toca."""
@@ -111,7 +138,7 @@ def _repartir_hijos(nodo: Nodo, unidad: str, decimales: int) -> None:
         aviso = "Lo fijado supera el total de este nodo: no queda nada para los calculados."
     elif libres and disponible > 0:
         try:
-            reparto = repartir(disponible, {h.entidad: h.peso for h in libres}, decimales)
+            reparto = _por_base(disponible, libres, decimales)
         except ErrorDeReparto as e:
             aviso = str(e)
     # disponible == 0: los calculados reciben cero, sin necesidad de pesos.
