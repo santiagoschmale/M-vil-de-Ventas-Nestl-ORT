@@ -159,8 +159,9 @@ es por nombre). En las celdas del canal que no se abren (A14), la nueva no entra
 Hecho el 30/09 con el supuesto B3 (aprobar exige las etapas revisadas). Un cambio por
 canal borra el OK de las dos etapas; uno debajo del canal (ON/OFF de entidades, %,
 altas), solo el de esa. Si el cliente dice que alcanza con aprobar al final, se saca.
+Los botones van arriba de la tabla SKU × canal y el encabezado muestra solo el estado.
 Pendiente de UX: la etapa 2 se revisa celda por celda; una vista por canal (vendedores
-× SKU) la haría revisable de una vez.
+× SKU) la haría revisable de una vez, y ahí iría su botón.
 
 - **Marcar cada etapa como revisada**: primero el canal, después la apertura.
 - **Un cambio en una etapa** desmarca las siguientes, porque las recalcula.

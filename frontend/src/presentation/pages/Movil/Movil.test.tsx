@@ -431,6 +431,7 @@ describe('MovilPage', { timeout: 15000 }, () => {
     render(<MovilPage />);
     expect(await screen.findByRole('button', { name: 'Aprobar' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Marcar revisada la etapa debajo del canal' })).toBeDisabled();
+    expect(screen.getByLabelText('Etapa por canal: sin revisar')).toBeInTheDocument();  // el estado, en el encabezado
     await user.click(screen.getByRole('button', { name: 'Marcar revisada la etapa por canal' }));
     await waitFor(() => expect(pedidos).toEqual([{ metodo: 'POST', url: '/api/movil/etapas/canal', cuerpo: {} }]));
   });

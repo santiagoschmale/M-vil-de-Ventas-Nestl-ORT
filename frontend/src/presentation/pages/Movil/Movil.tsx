@@ -440,7 +440,22 @@ const Seccion = ({ titulo, resumen, abierta = false, pedido, ayuda, children }: 
 
 const NOMBRE_ETAPA = { canal: 'por canal', apertura: 'debajo del canal' } as const;
 
-/** Las etapas en orden: cada una se da por revisada después de la anterior. */
+/** En el encabezado, solo el estado de cada etapa: se marcan junto a la tabla, donde se revisan. */
+const ResumenEtapas = ({ estado }: { estado: Estado }) => (
+  <Box sx={{ display: 'flex', gap: 0.5 }} aria-label="Revisión por etapa">
+    {estado.etapas.map(({ etapa, revisada }, n) => (
+      <Tooltip key={etapa} title={revisada
+        ? `Etapa ${NOMBRE_ETAPA[etapa]}: revisada por ${revisada.autor}`
+        : `Etapa ${NOMBRE_ETAPA[etapa]}: sin revisar. Se marca arriba de la tabla SKU × canal`}>
+        <Chip size="small" variant="outlined" label={`${n + 1} ${revisada ? '✓' : '·'}`}
+          aria-label={`Etapa ${NOMBRE_ETAPA[etapa]}: ${revisada ? 'revisada' : 'sin revisar'}`}
+          sx={revisada ? { borderColor: CIERRA, color: CIERRA, fontWeight: 700 } : undefined} />
+      </Tooltip>
+    ))}
+  </Box>
+);
+
+/** Las etapas en orden, arriba de la tabla: cada una se da por revisada después de la anterior. */
 const Etapas = ({ estado, cierra }: { estado: Estado; cierra: boolean }) => {
   const { revisarEtapa, ocupado } = useMovil();
   const soloLectura = useSoloLectura();
@@ -450,6 +465,9 @@ const Etapas = ({ estado, cierra }: { estado: Estado; cierra: boolean }) => {
         <Typography variant="subtitle2" fontWeight={700}>Revisión por etapa</Typography>
         <Ayuda ayuda={AYUDA.etapas} />
       </Box>
+      <Typography variant="body2" color="text.secondary" sx={{ flexBasis: '100%', order: 9 }}>
+        La 1 es esta tabla. La 2 es cómo se abre cada canal: se revisa tocando las celdas.
+      </Typography>
       {estado.etapas.map(({ etapa, revisada }, n) => {
         const anteriorOk = estado.etapas.slice(0, n).every(e => e.revisada);
         const nombre = NOMBRE_ETAPA[etapa];
@@ -587,6 +605,7 @@ export const MovilPage = () => {
             <ToggleButton value="kilos">{UNIDADES.kilos.nombre}</ToggleButton>
             <ToggleButton value="plata">{UNIDADES.plata.nombre}</ToggleButton>
           </ToggleButtonGroup>
+          {estado.faltan.length === 0 && !estado.aprobado && <ResumenEtapas estado={estado} />}
           {estado.aprobado ? (
             <Button size="small" color="inherit" onClick={() => setReabriendo(true)} disabled={ocupado}>Reabrir</Button>
           ) : (
@@ -617,7 +636,6 @@ export const MovilPage = () => {
             </span>
           </Tooltip>
         </Box>
-        {estado.faltan.length === 0 && <Etapas estado={estado} cierra={cierraTodo} />}
         {estado.aprobado && (
           <Alert severity="success" icon={<TaskAltRoundedIcon />}>
             Aprobado por {estado.aprobado.autor} el {new Date(estado.aprobado.cuando).toLocaleString('es-AR')}. Es de
@@ -678,6 +696,7 @@ export const MovilPage = () => {
           <Seccion titulo={`SKU × canal en ${UNIDADES[unidad].nombre.toLowerCase()} (${UNIDADES[unidad].simbolo})`}
             abierta ayuda={AYUDA.matriz}
             pedido={foco?.tipo === 'sku' || foco?.tipo === 'celda' ? foco.vez : undefined}>
+            <Box sx={{ mb: 2 }}><Etapas estado={estado} cierra={cierraTodo} /></Box>
             <Matriz cruce={cruce} />
           </Seccion>
         )}
