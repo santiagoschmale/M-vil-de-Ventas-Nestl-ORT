@@ -80,6 +80,7 @@ export type Estado = {
   deshacer: Ajuste | null; // el último cambio, si se puede deshacer (una sola vez)
   aprobado: Ajuste | null; // quién aprobó y cuándo; mientras no sea null, es de solo lectura
   porcentajes: (Ajuste & { canal: string; entidad: string; porcentaje: string })[]; // base de cálculo manual
+  entidades_nuevas: (Ajuste & { canal: string; entidad: string })[]; // altas hechas en la herramienta
   porcentaje_asignado: Record<string, string>; // canal -> % manual asignado en total
 };
 
@@ -106,7 +107,10 @@ export type Apertura = {
   cuadra: Record<Unidad, boolean>;
   aviso: string | null;
   // porcentaje: % manual (base de cálculo) o null si va por histórico.
-  entidades: { nombre: string; activo: boolean; peso: string; porcentaje: string | null; kilos: Monto; plata: Monto }[];
+  // nueva: dada de alta en la herramienta (sin historia); se puede eliminar.
+  entidades: {
+    nombre: string; activo: boolean; peso: string; porcentaje: string | null; nueva: boolean; kilos: Monto; plata: Monto;
+  }[];
 };
 
 /** null si salió bien; si no, el mensaje de error para mostrar. */
@@ -146,4 +150,6 @@ export type TUseMovil = {
   aprobar: () => Resultado;
   reabrir: (motivo: string) => Resultado;
   asignarPorcentaje: (canal: string, entidad: string, porcentaje: string | null, motivo: string) => Resultado;
+  agregarEntidad: (canal: string, entidad: string, porcentaje: string, motivo: string) => Resultado;
+  eliminarEntidad: (canal: string, entidad: string, motivo: string) => Resultado;
 };

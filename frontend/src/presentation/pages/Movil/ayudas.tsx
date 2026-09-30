@@ -134,6 +134,10 @@ export const AYUDA = {
           fijado a mano; el resto se reparte por histórico entre los demás. Si en una celda nadie más tiene historia,
           los que tienen % se reparten todo entre ellos, en proporción a su %.
         </P>
+        <P>
+          <b>Distribuidor o vendedor nuevo</b>: con «Agregar» se suma a un canal. Como no tiene historia, entra con un
+          %. Se puede apagar como cualquiera, o eliminar si se cargó por error.
+        </P>
       </>
     ),
   },

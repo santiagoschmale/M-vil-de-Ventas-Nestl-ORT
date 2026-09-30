@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useId, useState } from 'react';
 import {
   Alert, Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, TextField,
 } from '@mui/material';
@@ -13,6 +13,7 @@ type Props = {
 
 /** Todo ajuste del planner pide un motivo: queda en el historial con quién y cuándo. */
 export const MotivoDialog = ({ titulo, descripcion, confirmar, onConfirmar, onCerrar }: Props) => {
+  const titulo_id = useId();
   const [motivo, setMotivo] = useState('');
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -28,8 +29,9 @@ export const MotivoDialog = ({ titulo, descripcion, confirmar, onConfirmar, onCe
   };
 
   return (
-    <Dialog open onClose={onCerrar} maxWidth="xs" fullWidth PaperProps={{ component: 'form', onSubmit: enviar }}>
-      <DialogTitle>{titulo}</DialogTitle>
+    <Dialog open onClose={onCerrar} maxWidth="xs" fullWidth aria-labelledby={titulo_id}
+      PaperProps={{ component: 'form', onSubmit: enviar }}>
+      <DialogTitle id={titulo_id}>{titulo}</DialogTitle>
       <DialogContent>
         <DialogContentText sx={{ mb: 2 }}>{descripcion}</DialogContentText>
         <TextField

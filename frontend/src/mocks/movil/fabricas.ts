@@ -56,6 +56,7 @@ export const estadoFactory = Factory.define<Estado>(() => ({
   deshacer: null,
   aprobado: null,
   porcentajes: [],
+  entidades_nuevas: [],
   porcentaje_asignado: {},
 }));
 

@@ -38,6 +38,8 @@ beforeEach(() => {
     http.post('*/api/movil/aprobar', anotar),
     http.post('*/api/movil/reabrir', anotar),
     http.put('*/api/movil/porcentajes', anotar),
+    http.post('*/api/movil/entidades', anotar),
+    http.delete('*/api/movil/entidades', anotar),
   );
 });
 
@@ -407,6 +409,36 @@ describe('MovilPage', { timeout: 15000 }, () => {
     await user.click(within(dialogo).getByRole('button', { name: 'Guardar' }));
     await waitFor(() => expect(pedidos).toEqual([{ metodo: 'PUT', url: '/api/movil/porcentajes',
       cuerpo: { canal: 'Catering', entidad: 'Ana', porcentaje: '25', motivo: 'cartera nueva' } }]));
+  });
+
+  it('en la apertura se da de alta un vendedor nuevo con su % y se lo puede sacar', async () => {
+    const apertura = {
+      sku: '100', canal: 'Catering', kilos: '1000.000', plata: '500.00', cuadra: { kilos: true, plata: true }, aviso: null,
+      entidades: [
+        { nombre: 'Ana', activo: true, peso: '1', porcentaje: null, nueva: false, kilos: '800.000', plata: '400.00' },
+        { nombre: 'Nuevo', activo: true, peso: '0', porcentaje: '20', nueva: true, kilos: '200.000', plata: '100.00' },
+      ],
+    };
+    server.use(http.get('*/api/movil/apertura/*', () => HttpResponse.json(apertura)));
+    const user = userEvent.setup({ delay: null });
+    render(<MovilPage />);
+    await user.click(await screen.findByRole('button', { name: '100 en Catering: 1.000,000' }));
+    await user.click(await screen.findByRole('button', { name: 'Agregar distribuidor o vendedor' }));
+    const alta = screen.getByRole('dialog', { name: 'Agregar a Catering' });
+    expect(within(alta).getByText(/no tiene historia/)).toBeInTheDocument();
+    await user.type(within(alta).getByRole('textbox', { name: 'Nombre' }), 'Carla');
+    await user.type(within(alta).getByRole('textbox', { name: '%' }), '15');
+    await user.type(within(alta).getByRole('textbox', { name: /Motivo/ }), 'entró en octubre');
+    await user.click(within(alta).getByRole('button', { name: 'Agregar' }));
+    await waitFor(() => expect(pedidos).toEqual([{ metodo: 'POST', url: '/api/movil/entidades',
+      cuerpo: { canal: 'Catering', entidad: 'Carla', porcentaje: '15', motivo: 'entró en octubre' } }]));
+
+    pedidos.length = 0;
+    await user.click(screen.getByRole('button', { name: 'Eliminar Nuevo' }));
+    await user.type(screen.getByRole('textbox', { name: /Motivo/ }), 'error');
+    await user.click(within(screen.getByRole('dialog', { name: 'Eliminar Nuevo' })).getByRole('button', { name: 'Eliminar' }));
+    await waitFor(() => expect(pedidos).toEqual([{ metodo: 'DELETE', url: '/api/movil/entidades',
+      cuerpo: { canal: 'Catering', entidad: 'Nuevo', motivo: 'error' } }]));
   });
 
   it('exportar se habilita solo cuando kilos y pesos cierran', async () => {

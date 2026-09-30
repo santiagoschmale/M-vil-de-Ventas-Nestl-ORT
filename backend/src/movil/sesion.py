@@ -95,6 +95,8 @@ class Sesion:
         self.canales_sku: dict[str, tuple[frozenset[str], Ajuste]] = {}
         # Base de cálculo: (canal, entidad) -> (% manual, quién lo decidió). Sin entrada = histórico.
         self.porcentajes: dict[tuple[str, str], tuple[Decimal, Ajuste]] = {}
+        # Altas: (canal, entidad) que no está en la apertura del mes anterior -> quién la sumó.
+        self.entidades_nuevas: dict[tuple[str, str], Ajuste] = {}
         self._proxima_regla = 1  # los ids no se reusan: el historial los nombra
         self.historial: list[Ajuste] = []
         self.recorrido: Recorrido | None = None
@@ -167,7 +169,7 @@ class Sesion:
 
     def cambiar_entidad(self, entidad: str, activo: bool, autor: str, cuando: datetime, motivo: str) -> None:
         motivo = _motivo(motivo)
-        existentes = {e for pesos in self._e.apertura.values() for e in pesos}
+        existentes = {e for pesos in self._e.apertura.values() for e in pesos} | {e for _, e in self.entidades_nuevas}
         if entidad not in existentes:
             raise ErrorDeAjuste(f"No hay ninguna entidad {entidad} en la apertura del mes anterior.")
         def cambio():
@@ -187,19 +189,13 @@ class Sesion:
         """
         motivo = _motivo(motivo)
         canal = self._canal(canal)
-        en_el_canal = {e for (_, c), pesos in self._e.apertura.items() if normalizar(c) == normalizar(canal)
-                       for e in pesos}
-        if entidad not in en_el_canal:
+        if entidad not in self._en_el_canal(canal):
             raise ErrorDeAjuste(f"{entidad} no está en la apertura de {canal}.")
-        valor = _porcentaje(porcentaje, "la entidad")
+        valor = self._validar_porcentaje(canal, entidad, porcentaje)
+        if valor is None and (canal, entidad) in self.entidades_nuevas:
+            raise ErrorDeAjuste(f"{entidad} es nueva y no tiene historia: necesita un %. Para sacarla, eliminala.")
         if valor is None and (canal, entidad) not in self.porcentajes:
             raise ErrorDeAjuste(f"{entidad} ya va por histórico en {canal}.")
-        if valor is not None and valor == 0:
-            raise ErrorDeAjuste("El % tiene que ser mayor que 0. Para que no reciba nada, apagala.")
-        if valor is not None:
-            otros = sum((p for (c, e), (p, _) in self.porcentajes.items() if c == canal and e != entidad), Decimal(0))
-            if otros + valor > 100:
-                raise ErrorDeAjuste(f"Los % de {canal} sumarían {a_texto(otros + valor)}%: no pueden pasar de 100.")
 
         def cambio():
             detalle = f"{entidad} en {canal}: " + (f"{a_texto(valor)}%" if valor is not None else "por histórico")
@@ -210,6 +206,72 @@ class Sesion:
                 self.porcentajes[(canal, entidad)] = (valor, ajuste)
             return ajuste
         self._aplicar(cambio)
+
+    def agregar_entidad(self, canal: str, entidad: str, porcentaje: str | None, autor: str, cuando: datetime,
+                        motivo: str) -> None:
+        """
+        Alta de un vendedor o distribuidor en un canal que se abre (supuesto B2). No tiene
+        historia: entra con un % manual, en todas las celdas del canal que se abren.
+        """
+        motivo = _motivo(motivo)
+        canal = self._canal(canal)
+        entidad = " ".join((entidad or "").split())
+        if not entidad:
+            raise ErrorDeAjuste("Falta el nombre del distribuidor o vendedor.")
+        if not self._se_abre(canal):
+            raise ErrorDeAjuste(f"{canal} no se abre debajo del canal: no tiene distribuidores ni vendedores.")
+        # El ON/OFF es por nombre en todos los canales: dos con el mismo nombre se apagarían juntos.
+        donde = sorted({c for c, e in self._todas_las_entidades() if normalizar(e) == normalizar(entidad)})
+        if donde:
+            raise ErrorDeAjuste(f"Ya hay un distribuidor o vendedor llamado {entidad} (en {', '.join(donde)}). "
+                                f"Usá otro nombre para distinguirlos.")
+        valor = _porcentaje(porcentaje, "la entidad")
+        if valor is None or valor == 0:
+            raise ErrorDeAjuste(f"{entidad} es nueva y no tiene historia: necesita un % mayor que 0 para recibir algo.")
+        valor = self._validar_porcentaje(canal, entidad, porcentaje)
+
+        def cambio():
+            ajuste = Ajuste("agregar_entidad", f"{entidad} en {canal}: {a_texto(valor)}%", autor, cuando, motivo)
+            self.entidades_nuevas[(canal, entidad)] = ajuste
+            self.porcentajes[(canal, entidad)] = (valor, ajuste)
+            return ajuste
+        self._aplicar(cambio)
+
+    def eliminar_entidad(self, canal: str, entidad: str, autor: str, cuando: datetime, motivo: str) -> None:
+        """Saca una entidad dada de alta en la herramienta. Las del archivo se apagan, no se eliminan."""
+        motivo = _motivo(motivo)
+        canal = self._canal(canal)
+        if (canal, entidad) not in self.entidades_nuevas:
+            raise ErrorDeAjuste(f"{entidad} viene del mes anterior: no se elimina, se apaga.")
+
+        def cambio():
+            del self.entidades_nuevas[(canal, entidad)]
+            self.porcentajes.pop((canal, entidad), None)
+            self.entidades_apagadas.pop(entidad, None)  # el nombre es único: no prende a nadie más
+            return Ajuste("eliminar_entidad", f"{entidad} en {canal}", autor, cuando, motivo)
+        self._aplicar(cambio)
+
+    def _se_abre(self, canal: str) -> bool:
+        return any(normalizar(c) == normalizar(canal) for _, c in self._e.apertura)
+
+    def _todas_las_entidades(self) -> set[tuple[str, str]]:
+        """(canal, entidad) de la apertura del mes anterior y de las altas."""
+        return {(c, e) for (_, c), pesos in self._e.apertura.items() for e in pesos} | set(self.entidades_nuevas)
+
+    def _en_el_canal(self, canal: str) -> set[str]:
+        """Las entidades del canal: las de la apertura del mes anterior y las dadas de alta."""
+        return {e for c, e in self._todas_las_entidades() if normalizar(c) == normalizar(canal)}
+
+    def _validar_porcentaje(self, canal: str, entidad: str, porcentaje: str | None) -> Decimal | None:
+        valor = _porcentaje(porcentaje, "la entidad")
+        if valor is None:
+            return None
+        if valor == 0:
+            raise ErrorDeAjuste("El % tiene que ser mayor que 0. Para que no reciba nada, apagala.")
+        otros = sum((p for (c, e), (p, _) in self.porcentajes.items() if c == canal and e != entidad), Decimal(0))
+        if otros + valor > 100:
+            raise ErrorDeAjuste(f"Los % de {canal} sumarían {a_texto(otros + valor)}%: no pueden pasar de 100.")
+        return valor
 
     def _canal(self, canal: str) -> str:
         """El canal con el nombre de los totales por canal: "cordoba" es "Córdoba"."""
@@ -225,9 +287,7 @@ class Sesion:
         """
         vigentes, avisos = {}, []
         for (canal, entidad), (valor, _) in sorted(self.porcentajes.items()):
-            en_el_canal = {e for (_, c), pesos in self._e.apertura.items() if normalizar(c) == normalizar(canal)
-                           for e in pesos}
-            if canal in (self._e.canales or {}) and entidad in en_el_canal:
+            if canal in (self._e.canales or {}) and self._se_abre(canal) and entidad in self._en_el_canal(canal):
                 vigentes[(canal, entidad)] = valor
             else:
                 avisos.append(Problema("aviso", f"El {a_texto(valor)}% de {entidad} en {canal} no se aplica: ya no está en "
@@ -426,11 +486,11 @@ class Sesion:
     def _respaldo(self) -> tuple:
         return (copy.copy(self._e), dict(self.apagados_skus), dict(self.entidades_apagadas),
                 {u: dict(f) for u, f in self._fijas.items()}, dict(self.reglas), self._proxima_regla,
-                dict(self.filas_elegidas), dict(self.canales_sku), dict(self.porcentajes), self.recorrido)
+                dict(self.filas_elegidas), dict(self.canales_sku), dict(self.porcentajes), dict(self.entidades_nuevas), self.recorrido)
 
     def _restaurar(self, respaldo: tuple) -> None:
         (self._e, self.apagados_skus, self.entidades_apagadas, self._fijas, self.reglas,
-         self._proxima_regla, self.filas_elegidas, self.canales_sku, self.porcentajes, self.recorrido) = respaldo
+         self._proxima_regla, self.filas_elegidas, self.canales_sku, self.porcentajes, self.entidades_nuevas, self.recorrido) = respaldo
 
     def _unidad(self, unidad: str) -> int:
         if unidad not in UNIDADES:

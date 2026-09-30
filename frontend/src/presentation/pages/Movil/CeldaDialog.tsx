@@ -1,8 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import {
-  Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Divider,
-  FormControlLabel, Radio, RadioGroup, Switch, Table, TableBody, TableCell, TableHead, TableRow, TextField, Typography,
+  Alert, Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Divider,
+  FormControlLabel, IconButton, Radio, RadioGroup, Switch, Table, TableBody, TableCell, TableHead, TableRow, TextField,
+  Typography,
 } from '@mui/material';
+import AddRoundedIcon from '@mui/icons-material/AddRounded';
+import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded';
 import { useMovil, useSoloLectura } from '../../../stores/useMovil';
 import { Apertura, Celda } from '../../../stores/useMovil/useMovil.type';
 import { formatear, UNIDADES } from './formato';
@@ -14,8 +17,8 @@ import { AYUDA } from './ayudas';
 type Props = { sku: string; descripcion: string; canal: string; celda: Celda; onCerrar: () => void };
 
 /** Base de cálculo de una entidad en el canal: por histórico o con un % manual (MUST). */
-const BaseDialog = ({ canal, entidad, porcentaje, onCerrar }: {
-  canal: string; entidad: string; porcentaje: string | null; onCerrar: () => void;
+const BaseDialog = ({ canal, entidad, porcentaje, nueva, onCerrar }: {
+  canal: string; entidad: string; porcentaje: string | null; nueva: boolean; onCerrar: () => void;
 }) => {
   const { asignarPorcentaje, ocupado, estado } = useMovil();
   const soloLectura = useSoloLectura();
@@ -41,10 +44,14 @@ const BaseDialog = ({ canal, entidad, porcentaje, onCerrar }: {
           repartir en cada celda (lo fijado a mano queda aparte) y el resto se reparte por histórico entre los demás.
           {asignado && ` Hoy en ${canal} hay ${formatear(asignado)}% asignado a mano; no puede pasar de 100.`}
         </DialogContentText>
-        <RadioGroup value={manual ? 'manual' : 'historico'} onChange={e => setManual(e.target.value === 'manual')}>
-          <FormControlLabel value="historico" control={<Radio />} label="Por histórico (lo que vendió el mes anterior)" />
-          <FormControlLabel value="manual" control={<Radio />} label="% manual" />
-        </RadioGroup>
+        {nueva ? (
+          <DialogContentText sx={{ mb: 1 }}>Es nueva y no tiene historia: siempre va con %.</DialogContentText>
+        ) : (
+          <RadioGroup value={manual ? 'manual' : 'historico'} onChange={e => setManual(e.target.value === 'manual')}>
+            <FormControlLabel value="historico" control={<Radio />} label="Por histórico (lo que vendió el mes anterior)" />
+            <FormControlLabel value="manual" control={<Radio />} label="% manual" />
+          </RadioGroup>
+        )}
         {manual && (
           <TextField label="%" value={valor} onChange={e => { setValor(e.target.value); setError(null); }}
             inputProps={{ inputMode: 'decimal', style: numeros }} sx={{ width: 120, mt: 1 }} />
@@ -63,15 +70,58 @@ const BaseDialog = ({ canal, entidad, porcentaje, onCerrar }: {
   );
 };
 
+/** Alta de un distribuidor o vendedor nuevo: sin historia, entra con un % (MUST). */
+const AltaDialog = ({ canal, onCerrar }: { canal: string; onCerrar: () => void }) => {
+  const { agregarEntidad, ocupado } = useMovil();
+  const [nombre, setNombre] = useState('');
+  const [valor, setValor] = useState('');
+  const [motivo, setMotivo] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const enviar = async (e: React.FormEvent) => {
+    e.preventDefault();
+    e.stopPropagation(); // el submit sube por el portal hasta el diálogo de la celda
+    const falla = await agregarEntidad(canal, nombre.trim(), valor.trim(), motivo.trim());
+    if (falla) setError(falla);
+    else onCerrar();
+  };
+  return (
+    <Dialog open onClose={onCerrar} maxWidth="xs" fullWidth aria-labelledby="titulo-alta"
+      PaperProps={{ component: 'form', onSubmit: enviar }}>
+      <DialogTitle id="titulo-alta">Agregar a {canal}</DialogTitle>
+      <DialogContent>
+        <DialogContentText sx={{ mb: 2 }}>
+          Un distribuidor o vendedor que no estaba el mes anterior. Como no tiene historia, entra con un % fijo:
+          recibe ese % de cada celda de {canal} que se abre entre distribuidores o vendedores, en kilos y en pesos, y
+          los demás se reparten el resto. Después se puede cambiar el %, apagarlo o eliminarlo.
+        </DialogContentText>
+        <TextField fullWidth autoFocus label="Nombre" value={nombre} onChange={e => { setNombre(e.target.value); setError(null); }} />
+        <TextField label="%" value={valor} onChange={e => { setValor(e.target.value); setError(null); }}
+          inputProps={{ inputMode: 'decimal', style: numeros }} sx={{ width: 120, mt: 2 }} />
+        <TextField fullWidth required label="Motivo" value={motivo} onChange={e => setMotivo(e.target.value)}
+          sx={{ mt: 2 }} helperText="Queda en el historial, con tu nombre y la hora." />
+        {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
+      </DialogContent>
+      <DialogActions sx={{ px: 3, pb: 2 }}>
+        <Button onClick={onCerrar}>Cancelar</Button>
+        <Button type="submit" variant="contained" disabled={!nombre.trim() || !valor.trim() || !motivo.trim() || ocupado}>
+          Agregar
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+};
+
 export const CeldaDialog = ({ sku, descripcion, canal, celda, onCerrar }: Props) => {
-  const { unidad, estado, fijar, desfijar, cambiarEntidad, apertura: traerApertura, ocupado } = useMovil();
+  const { unidad, estado, fijar, desfijar, cambiarEntidad, eliminarEntidad, apertura: traerApertura, ocupado } = useMovil();
   const soloLectura = useSoloLectura();
   const [monto, setMonto] = useState(formatear(celda.monto));
   const [motivo, setMotivo] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [apertura, setApertura] = useState<Apertura | null>(null);
   const [entidad, setEntidad] = useState<{ nombre: string; activo: boolean }>();
-  const [base, setBase] = useState<{ nombre: string; porcentaje: string | null }>();
+  const [base, setBase] = useState<{ nombre: string; porcentaje: string | null; nueva: boolean }>();
+  const [alta, setAlta] = useState(false);
+  const [eliminar, setEliminar] = useState<string>();
   const fijada = estado?.fijas[unidad].find(f => f.sku === sku && f.canal === canal);
   const { simbolo, decimales } = UNIDADES[unidad];
 
@@ -143,7 +193,18 @@ export const CeldaDialog = ({ sku, descripcion, canal, celda, onCerrar }: Props)
                         onChange={() => setEntidad(e)}
                       />
                     </TableCell>
-                    <TableCell sx={{ color: 'inherit' }}>{e.nombre}</TableCell>
+                    <TableCell sx={{ color: 'inherit' }}>
+                      {e.nombre}
+                      {e.nueva && (
+                        <>
+                          <Chip size="small" label="Nueva" variant="outlined" sx={{ ml: 1 }} />
+                          <IconButton size="small" aria-label={`Eliminar ${e.nombre}`} disabled={ocupado || soloLectura}
+                            onClick={() => setEliminar(e.nombre)}>
+                            <DeleteOutlineRoundedIcon fontSize="small" />
+                          </IconButton>
+                        </>
+                      )}
+                    </TableCell>
                     <TableCell>
                       <Button size="small" color="inherit" disabled={ocupado || soloLectura} onClick={() => setBase(e)}
                         aria-label={`Base de ${e.nombre}: ${e.porcentaje ? `${formatear(e.porcentaje)}%` : 'histórico'}`}
@@ -157,6 +218,9 @@ export const CeldaDialog = ({ sku, descripcion, canal, celda, onCerrar }: Props)
                 ))}
               </TableBody>
             </Table>
+            <Button size="small" startIcon={<AddRoundedIcon />} sx={{ mt: 1 }} disabled={ocupado || soloLectura} onClick={() => setAlta(true)}>
+              Agregar distribuidor o vendedor
+            </Button>
           </>
         )}
       </DialogContent>
@@ -172,13 +236,23 @@ export const CeldaDialog = ({ sku, descripcion, canal, celda, onCerrar }: Props)
         </Button>
       </DialogActions>
 
-      {base && <BaseDialog canal={canal} entidad={base.nombre} porcentaje={base.porcentaje} onCerrar={() => setBase(undefined)} />}
+      {alta && <AltaDialog canal={canal} onCerrar={() => setAlta(false)} />}
+      {eliminar && (
+        <MotivoDialog
+          titulo={`Eliminar ${eliminar}`}
+          descripcion={`Sale de ${canal}: su parte vuelve a repartirse entre los demás. El historial lo conserva.`}
+          confirmar="Eliminar"
+          onConfirmar={m => eliminarEntidad(canal, eliminar, m)}
+          onCerrar={() => setEliminar(undefined)}
+        />
+      )}
+      {base && <BaseDialog canal={canal} entidad={base.nombre} porcentaje={base.porcentaje} nueva={base.nueva} onCerrar={() => setBase(undefined)} />}
       {entidad && (
         <MotivoDialog
           titulo={`${entidad.activo ? 'Apagar' : 'Prender'} ${entidad.nombre}`}
           descripcion={entidad.activo
             ? 'Deja de recibir en todos los SKUs y canales. Lo suyo pasa a los que siguen prendidos, según lo que vendió cada uno el mes anterior.'
-            : 'Vuelve a recibir según su peso del mes anterior.'}
+            : 'Vuelve a recibir su parte: por histórico o con su %, según su base.'}
           confirmar={entidad.activo ? 'Apagar' : 'Prender'}
           onConfirmar={m => cambiarEntidad(entidad.nombre, !entidad.activo, m)}
           onCerrar={() => setEntidad(undefined)}
