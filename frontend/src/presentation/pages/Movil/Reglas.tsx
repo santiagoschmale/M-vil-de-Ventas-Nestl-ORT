@@ -7,7 +7,7 @@ import {
 import AddRoundedIcon from '@mui/icons-material/AddRounded';
 import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded';
 import EditRoundedIcon from '@mui/icons-material/EditRounded';
-import { useMovil } from '../../../stores/useMovil';
+import { useMovil, useSoloLectura } from '../../../stores/useMovil';
 import { DatosRegla, Estado, Limite, Regla } from '../../../stores/useMovil/useMovil.type';
 import { formatear, UNIDADES } from './formato';
 import { ENFOCADA, NO_CIERRA, numeros } from './estilo';
@@ -32,6 +32,7 @@ type Formulario = { regla?: Regla };
 
 const ReglaDialog = ({ regla, estado, onCerrar }: Formulario & { estado: Estado; onCerrar: () => void }) => {
   const { agregarRegla, editarRegla, ocupado } = useMovil();
+  const soloLectura = useSoloLectura();
   const [canal, setCanal] = useState(regla?.canal ?? '');
   const [categorias, setCategorias] = useState<string[]>(regla?.categorias ?? []);
   const [limite, setLimite] = useState<Limite>(regla?.limite ?? 'tope');
@@ -113,7 +114,7 @@ const ReglaDialog = ({ regla, estado, onCerrar }: Formulario & { estado: Estado;
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2 }}>
         <Button onClick={onCerrar}>Cancelar</Button>
-        <Button type="submit" variant="contained" disabled={!completo || ocupado}>
+        <Button type="submit" variant="contained" disabled={!completo || ocupado || soloLectura}>
           {regla ? 'Guardar cambios' : 'Agregar'}
         </Button>
       </DialogActions>
@@ -123,6 +124,7 @@ const ReglaDialog = ({ regla, estado, onCerrar }: Formulario & { estado: Estado;
 
 export const Reglas = ({ estado }: { estado: Estado }) => {
   const { eliminarRegla, quitarCanales, foco } = useMovil();
+  const soloLectura = useSoloLectura();
   const [canalesDe, setCanalesDe] = useState<string>();
   const [quitarDe, setQuitarDe] = useState<string>();
   const [formulario, setFormulario] = useState<Formulario>();
@@ -169,10 +171,10 @@ export const Reglas = ({ estado }: { estado: Estado }) => {
                   )}
                 </TableCell>
                 <TableCell sx={{ whiteSpace: 'nowrap', textAlign: 'right' }}>
-                  <IconButton size="small" aria-label={`Editar ${r.id}`} onClick={() => setFormulario({ regla: r })}>
+                  <IconButton size="small" disabled={soloLectura} aria-label={`Editar ${r.id}`} onClick={() => setFormulario({ regla: r })}>
                     <EditRoundedIcon fontSize="small" />
                   </IconButton>
-                  <IconButton size="small" aria-label={`Eliminar ${r.id}`} onClick={() => setEliminar(r)}>
+                  <IconButton size="small" disabled={soloLectura} aria-label={`Eliminar ${r.id}`} onClick={() => setEliminar(r)}>
                     <DeleteOutlineRoundedIcon fontSize="small" />
                   </IconButton>
                 </TableCell>
@@ -181,7 +183,7 @@ export const Reglas = ({ estado }: { estado: Estado }) => {
           </TableBody>
         </Table>
       )}
-      <Button size="small" variant="outlined" startIcon={<AddRoundedIcon />} onClick={() => setFormulario({})}>
+      <Button size="small" variant="outlined" startIcon={<AddRoundedIcon />} disabled={soloLectura} onClick={() => setFormulario({})}>
         Agregar regla
       </Button>
 
@@ -191,10 +193,10 @@ export const Reglas = ({ estado }: { estado: Estado }) => {
           {estado.canales_sku.map(c => (
             <Box key={c.sku} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <Typography variant="body2">SKU {c.sku} se vende en {c.canales.join(', ')}</Typography>
-              <IconButton size="small" aria-label={`Editar dónde se vende SKU ${c.sku}`} onClick={() => setCanalesDe(c.sku)}>
+              <IconButton size="small" disabled={soloLectura} aria-label={`Editar dónde se vende SKU ${c.sku}`} onClick={() => setCanalesDe(c.sku)}>
                 <EditRoundedIcon fontSize="small" />
               </IconButton>
-              <IconButton size="small" aria-label={`Quitar dónde se vende SKU ${c.sku}`} onClick={() => setQuitarDe(c.sku)}>
+              <IconButton size="small" disabled={soloLectura} aria-label={`Quitar dónde se vende SKU ${c.sku}`} onClick={() => setQuitarDe(c.sku)}>
                 <DeleteOutlineRoundedIcon fontSize="small" />
               </IconButton>
             </Box>

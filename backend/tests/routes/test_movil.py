@@ -224,3 +224,14 @@ def test_deshacer_el_ultimo_cambio_una_sola_vez():
     assert r.json()["apagados"]["skus"] == [] and r.json()["deshacer"] is None
     assert r.json()["historial"][-1]["accion"] == "deshacer"
     assert c.post("/api/movil/deshacer").status_code == 422
+
+
+def test_aprobar_y_reabrir():
+    c = _cargado()
+    assert c.post("/api/movil/aprobar").status_code == 422  # no cierra
+    c = _cerrado()
+    r = c.post("/api/movil/aprobar").json()
+    assert r["aprobado"]["accion"] == "aprobar"
+    assert c.put(f"/api/movil/skus/{NUEVO}", json={"activo": True, "motivo": "m"}).status_code == 422
+    r = c.post("/api/movil/reabrir", json={"motivo": "faltó un acuerdo"}).json()
+    assert r["aprobado"] is None and r["historial"][-1]["motivo"] == "faltó un acuerdo"

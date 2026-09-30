@@ -21,9 +21,17 @@ Proyecto final de la Universidad ORT para Nestlé DIL Región Plata, sep-nov 202
 
 ## Correrlo
 
-Se necesita Python 3.13 o 3.14, Node con npm y `make` (en Mac viene con
-`xcode-select --install`). No hace falta Docker ni base de datos: por ahora todo
-vive en memoria.
+Se necesita Python 3.13 o 3.14 y Node con npm. No hace falta Docker ni base de
+datos: por ahora todo vive en memoria.
+
+**No correr `npm install` a secas en `frontend/`**: el `.npmrc` apunta al registro
+privado de Nestlé, sin acceso desde acá. Los pasos de abajo usan el registro
+público, y para las librerías internas del backend, los reemplazos de
+`backend/local_shims/`.
+
+### Mac y Linux
+
+Con `make` (en Mac viene con `xcode-select --install`), desde la raíz:
 
 ```bash
 make instalar
@@ -33,15 +41,45 @@ make instalar
 make dev
 ```
 
-Abrir http://localhost:5175 y tocar "Cargar datos de muestra".
+Otra versión de Python: `make instalar PYTHON=python3.14`. Tests: `make test`.
 
-- **Otra versión de Python**: `make instalar PYTHON=python3.14`.
-- **Windows**: no hay `make`. Los pasos a mano están en
-  [`backend/src/domain/NOTES.md`](backend/src/domain/NOTES.md#correrlo).
-- **No correr `npm install` a secas en `frontend/`**: el `.npmrc` apunta al registro
-  privado de Nestlé, sin acceso desde acá. `make instalar` usa el registro público, y
-  para las librerías internas del backend, los reemplazos de `backend/local_shims/`.
-- **Tests**: `make test` corre backend y front.
+### Windows (PowerShell)
+
+Instalar, una vez, desde la raíz:
+
+```powershell
+cd backend
+py -3.14 -m venv .venv
+Get-Content requirements.txt | Where-Object { $_ -notmatch '^nbra-' } | Set-Content -Encoding ascii .requirements.publicas.txt
+.venv\Scripts\pip install -r .requirements.publicas.txt -r requirements.dev.txt .\local_shims\nbra_logger .\local_shims\nbra_envs_python
+cd ..\frontend
+npm ci --registry https://registry.npmjs.org
+```
+
+Levantarlo, en dos terminales:
+
+```powershell
+cd backend; $env:IS_LOCAL="true"; .venv\Scripts\python app.py
+```
+
+```powershell
+cd frontend; npx vite --port 5175 --strictPort
+```
+
+Tests:
+
+```powershell
+cd backend; $env:IS_LOCAL="false"; .venv\Scripts\python -m nose2
+```
+
+```powershell
+cd frontend; npx vitest --watch=false
+```
+
+### Después
+
+Abrir http://localhost:5175 y tocar "Cargar datos de muestra". Si la pantalla dice
+"Contestó otra aplicación", otro programa está usando el puerto 3000.
 
 ## Estructura
 

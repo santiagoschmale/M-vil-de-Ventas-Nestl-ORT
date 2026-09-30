@@ -27,10 +27,10 @@ El recorrido completo funciona sobre datos de prueba:
 
 Todo vive en memoria y hay un solo móvil.
 
-De los MUST del cliente faltan dos cosas grandes:
+Además, el móvil se aprueba y queda de solo lectura (M1).
 
-- la **base de cálculo con % manual por entidad**;
-- la **aprobación**.
+De los MUST del cliente falta una cosa grande: la **base de cálculo con % manual
+por entidad** (M2).
 
 La persistencia no figura en los MUST del cliente, pero la aprobación y el
 histórico la necesitan para tener sentido.
@@ -48,7 +48,7 @@ histórico la necesitan para tener sentido.
 | Ajuste manual con valor fijado y motivo | ✅ | — |
 | Base de cálculo histórico / % manual por entidad | ⬜ | **M2** |
 | Alta de vendedor o distribuidor nuevo | ⬜ | **M3**, depende de B2 |
-| Aprobación del móvil | ⬜ | **M1** |
+| Aprobación del móvil | ✅ | **M1**: aprobar si cierra, solo lectura, reabrir con motivo. En memoria hasta la persistencia |
 | Revisión por etapa | 🟡 | Cada etapa se ve (matriz, apertura por celda), pero no se aprueba por separado. **M4**, depende de B3 |
 | Exportación a Excel | ✅ | Formato de salida a confirmar (A15) |
 | Trazabilidad (quién, qué, cuándo, por qué) | ✅ | En memoria; se pierde al reiniciar |
@@ -88,9 +88,12 @@ durante el mes, versión mobile, IA.
 
 En este orden. Cada uno con tests primero y verificación en la pantalla.
 
-### M1 · Aprobación del móvil
+### M1 · Aprobación del móvil ✅
 
-No depende de preguntas abiertas, salvo el detalle de A16 y B3.
+Hecho el 29/09, en memoria. Aprobado, la pantalla deshabilita todo lo que edita. Al
+reabrir no se guarda la versión aprobada: las versiones (A16) llegan con la
+persistencia. Exportar no exige aprobar: se puede exportar un borrador para revisarlo
+(decisión a confirmar; el Excel no dice si está aprobado).
 
 - **Botón "Aprobar"**. Pide que kilos y pesos cierren y que no haya nada en rojo. Si
   queda algo en amarillo, se muestra y se pide confirmar, igual que al exportar.
