@@ -65,3 +65,11 @@ def test_aprobar_o_reabrir_no_se_deshace():
     s.aprobar(P, DESPUES)
     s.reabrir(P, DESPUES, "m")
     assert s.ultimo_cambio is None
+
+
+def test_despues_de_reabrir_deshacer_no_revierte_lo_de_antes_de_aprobar():
+    s = _cerrado()  # el último ajuste es apagar el SKU nuevo
+    s.aprobar(P, DESPUES)
+    s.reabrir(P, DESPUES, "m")
+    assert _falla(s.deshacer, P, DESPUES)
+    assert NUEVO in s.apagados_skus

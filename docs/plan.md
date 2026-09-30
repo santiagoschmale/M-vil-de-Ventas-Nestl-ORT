@@ -90,7 +90,10 @@ En este orden. Cada uno con tests primero y verificación en la pantalla.
 
 ### M1 · Aprobación del móvil ✅
 
-Hecho el 29/09, en memoria.
+Hecho el 29/09, en memoria. Aprobado, la pantalla deshabilita todo lo que edita. Al
+reabrir no se guarda la versión aprobada: las versiones (A16) llegan con la
+persistencia. Exportar no exige aprobar: se puede exportar un borrador para revisarlo
+(decisión a confirmar; el Excel no dice si está aprobado).
 
 - **Botón "Aprobar"**. Pide que kilos y pesos cierren y que no haya nada en rojo. Si
   queda algo en amarillo, se muestra y se pide confirmar, igual que al exportar.
