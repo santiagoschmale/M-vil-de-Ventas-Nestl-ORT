@@ -82,10 +82,13 @@ para lo puntual. [confirmado]
 - En el input 2, la plata por canal la da el planner: **cada canal tiene su propio
   precio**. La herramienta no valoriza ni necesita lista de precios. [confirmado]
 - **La base de partida del reparto es la distribución del mes anterior**, editable.
-  [confirmado en reunión] El documento funcional dice que el histórico se arma con
-  cada móvil aprobado, con la opción de importar 2025 como base inicial, y el
-  archivo de mayo trae la venta de enero a diciembre de 2025. Con qué se arranca y
-  qué se usa después está a confirmar (B4).
+  [confirmado, 07/10] **No se importa el histórico 2025.** Se arranca con la carga
+  inicial del mes anterior y la herramienta arma su propio histórico con cada móvil
+  aprobado: el aprobado de un mes es la base del siguiente. La distribución se puede
+  modificar a medida que avanza el proceso.
+- **Template de entrada** [a confirmar con Finanzas, B6]: proponen estandarizar el
+  objetivo del mes en `SKU | Descripción | kg | NNS / KG | NNS`. No trae NNS c/IIBB (no
+  se usa) ni Categoría, que hace falta para las reglas (B8).
 
 El archivo de mayo compartido ya viene con la distribución hecha: la hoja
 "Participaciones" es el trabajo del planner, no lo que manda Contraloría.
@@ -186,6 +189,19 @@ Ingredientes. Cierran a nivel canal. [confirmado]
 stick, vajilla). [datos] En el input 2 se abre en Distribuidores, Directa (KAS / BA),
 Córdoba, Rosario y KAM Sol. [confirmado]
 
+**Apertura validada** [confirmado, 07/10]:
+
+| Canal | Debajo del canal |
+|---|---|
+| Mayoristas, Catering, Vending, KAM Ingredientes | Cierran en el canal |
+| KAM Sol | Cierra en el canal, una sola línea, sin vendedores |
+| Distribuidores | Se abre por distribuidor |
+| Directa (KAS / BA), Córdoba, Rosario | Se abren por vendedor |
+
+No hay un nivel de clientes debajo. La profundidad tiene que poder configurarse por
+canal, por si cambia la estructura comercial: hoy cada canal se abre hasta donde diga
+el archivo; configurarla desde la herramienta queda como pendiente.
+
 ```
 MÓVIL
 ├── Ingredientes
@@ -204,8 +220,7 @@ MÓVIL
 - Los cinco componentes de Soluciones son canales del input 2. [confirmado]
 - Distribuidores se abre en 5 distribuidores. [datos]
 - Los vendedores cuelgan de la venta directa y los territorios, no de los
-  distribuidores: la proporción directa contra distribuidores (78 / 22) coincide con
-  el histórico de Call Center contra Distribuidores (77 / 23). [a confirmar]
+  distribuidores. [confirmado, 07/10]
 
 La **profundidad es variable**: cada rama define hasta dónde se abre. [confirmado]
 
@@ -213,7 +228,7 @@ La **profundidad es variable**: cada rama define hasta dónde se abre. [confirma
 territorio → vendedor → distribuidor igual para todos. Pero él mismo aclara que
 Ingredientes cierra en el canal y que solo Soluciones se abre. Los territorios
 (Buenos Aires, Córdoba, Rosario) son canales del input 2. La cascada real queda
-así [a confirmar, A10]:
+así [confirmado, 07/10]:
 
 - canal → distribuidores, en Distribuidores;
 - canal → vendedores, en Directa y en cada territorio.
@@ -395,8 +410,10 @@ Siglas y nombres a confirmar: **KAS** y dos nombres propios del archivo (ver not
   facturación.
 - **Identidades**: en el bloque de vendedores, 15 columnas corresponden a 12 personas
   (A5).
-- **NNS c/IIBB**: viene en todas las hojas (B7).
-- **Un solo archivo `.xlsb`** con bloques apilados, no tres archivos (B6).
+- **NNS c/IIBB**: viene en todas las hojas, pero no se usa (no está en el template
+  propuesto).
+- **Un solo archivo `.xlsb`** con bloques apilados, no tres archivos. Los archivos
+  pueden variar de formato: por eso proponen un template estándar (B6).
 - **Nombres reales** de vendedores, distribuidores y clientes: no entra al repo.
 
 ## 16. Estado del proyecto
