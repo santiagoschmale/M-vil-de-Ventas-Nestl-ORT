@@ -36,7 +36,7 @@ como confirmada, de datos o a confirmar).
   - **Ingredientes**: Catering, Vending, Mayoristas, KAM Ingredientes. Cierran
     en el canal.
   - **Soluciones**: Distribuidores (→ 5 distribuidores), Directa (BA), Córdoba,
-    Rosario (→ vendedores, a confirmar A10) y KAM Sol. Los territorios existen y
+    Rosario (→ vendedores) y KAM Sol (cierra en el canal). Validado por el cliente. Los territorios existen y
     en el input 2 figuran como canales.
 - **Reglas**: catálogo de tipos (total por canal, dónde se vende un SKU, tope o
   mínimo en %, valor fijo en kilos). El planner crea las reglas concretas; se
@@ -142,12 +142,13 @@ Mapa del código, supuestos en uso y gotchas: `backend/src/domain/NOTES.md`.
 Todo lo abierto, con qué hacemos hoy en cada caso: `docs/preguntas.md`. Los que
 más pesan ahora:
 
-- **B1 a B4**: cómo se aplica el % manual, alta de entidades, aprobación por etapa,
-  base de cálculo (mes anterior o 2025). Definen los MUST que faltan.
+- **B6, A15** formato de entrada (template propuesto `SKU | Descripción | kg |
+  NNS / KG | NNS`) y de salida a SAP: los está validando Finanzas.
+- **B8** el template no trae Categoría, y las reglas la necesitan.
+- **B1 a B3** % manual, altas y OK por etapa: implementados como supuestos.
 - **A1** criterio al apagar una entidad (hoy proporcional, supuesto).
-- **A10** un nivel debajo de cada canal: vendedores en Directa y territorios,
-  distribuidores en Distribuidores (supuesto).
-- **A15** formato del Excel de salida (va a SAP: no cambiarlo sin confirmar).
+- Ya confirmado: no se importa 2025 (la herramienta arma su histórico) y la apertura
+  por canal (`docs/entendimiento-negocio.md` §7).
 
 ## Estado del entorno
 

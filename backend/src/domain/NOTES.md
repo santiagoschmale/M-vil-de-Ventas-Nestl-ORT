@@ -136,7 +136,8 @@ celda. El cruce no cambia al apagar un distribuidor.
 - **B6**: formato de la apertura (hoy formato largo en una hoja de la base; el real viene en bloques).
 - **A14**: una celda que cae donde ningún vendedor o distribuidor vendió ese SKU el mes
   anterior no se abre: se avisa (amarillo) y queda en el canal. No se inventa.
-- **A10**: los vendedores cuelgan de Directa y de cada territorio.
+- **A10** (confirmado 07/10): los vendedores cuelgan de Directa y de cada territorio; KAM
+  Sol cierra en el canal.
 - **A11** (2 SKUs en los dos segmentos): **lo resuelve el cruce**. Es una fila con
   base en canales de los dos segmentos; el ajuste la parte según los totales de
   cada canal. No hace falta una regla aparte.

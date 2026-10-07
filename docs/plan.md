@@ -32,8 +32,9 @@ Además, el móvil se aprueba y queda de solo lectura (M1).
 Y cada vendedor o distribuidor puede ir por histórico o con un % manual (M2, con el
 supuesto B1), y se dan de alta distribuidores o vendedores nuevos con un % (M3, supuesto
 B2), y cada etapa (por canal, debajo del canal) se da por revisada antes de aprobar (M4,
-supuesto B3). Están todos los MUST, salvo el nivel "cliente" debajo del distribuidor
-(B5): no hay clientes en el modelo ni en la muestra.
+supuesto B3). Están todos los MUST. El 07/10 el cliente validó la apertura (no hay
+nivel de clientes) y que no se importa 2025: la herramienta arma su propio histórico.
+Eso hace de la persistencia el próximo paso.
 
 La persistencia no figura en los MUST del cliente, pero la aprobación y el
 histórico la necesitan para tener sentido.
@@ -46,7 +47,7 @@ histórico la necesitan para tener sentido.
 
 | Funcionalidad | Estado | Qué falta |
 |---|---|---|
-| Distribución en cascada con recálculo | ✅ | Cruce SKU × canal y apertura debajo del canal; cada cambio recalcula todo. Confirmar que un nivel debajo del canal alcanza (A10) |
+| Distribución en cascada con recálculo | ✅ | Cruce SKU × canal y apertura debajo del canal; cada cambio recalcula todo. Apertura validada por el cliente (07/10) |
 | Excepciones ON/OFF de SKUs, vendedores y distribuidores | ✅ | Criterio al apagar: proporcional como supuesto (A1) |
 | Ajuste manual con valor fijado y motivo | ✅ | — |
 | Base de cálculo histórico / % manual por entidad | ✅ | **M2**, con el supuesto B1 |
@@ -72,7 +73,8 @@ histórico la necesitan para tener sentido.
 | Funcionalidad | Estado |
 |---|---|
 | Reglas por back office: tope, mínimo y fijo en % por categorías, "Dónde se vende" | 🟡 Faltan las reglas debajo del canal (R2), las estacionales y la herencia del mes anterior (necesita persistencia) |
-| Histórico con realimentación: el aprobado es la base del mes siguiente; importar 2025 | ⬜ Depende de la persistencia y de B4 |
+| Histórico con realimentación: el aprobado es la base del mes siguiente | ⬜ Confirmado por el cliente (no se importa 2025). Depende de la persistencia |
+| Profundidad de apertura configurable por canal desde la herramienta | ⬜ Pedido del cliente (07/10). Hoy la define el archivo |
 | Simulación de escenarios | ⬜ |
 | Cuadratura automática de totales | ✅ |
 
@@ -258,7 +260,9 @@ Estado: propuesta. Depende de la persistencia y de A6, A15 y A16.
 
 | Dependencia | Riesgo si llega tarde |
 |---|---|
-| Respuestas del viernes (B1 a B4, A10) | **Alto.** Definen M2, M3 y M4 |
+| Formato de entrada y de salida, con Finanzas (B6, A15) | **Alto.** Sin el de entrada no leemos datos reales; sin el de salida no se carga en SAP |
+| Columna Categoría en el template de entrada (B8) | **Alto.** Sin ella no se pueden armar reglas |
+| Supuestos B1 a B3 (% manual, altas, OK por etapa) | Medio. Se validan en la demo |
 | Credenciales del índice privado (`nbra-*`, npm) | **Alto.** El pipeline de Nestlé no instala |
 | Acceso al sandbox | **Alto.** Es el entorno donde prueba el cliente |
 | PostgreSQL: ¿lo proveen o lo desplegamos? | Medio. En local se usa un contenedor |
