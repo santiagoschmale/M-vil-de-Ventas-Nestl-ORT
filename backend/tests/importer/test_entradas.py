@@ -339,3 +339,15 @@ def test_input1_con_el_template_propuesto_por_el_cliente():
     o = objetivos["90020001"]
     assert (o.kilos, o.nns, o.categoria, o.descripcion) == (D("1000.000"), D("1500500.00"), None, "Puré 2x1kg")
     assert problemas == []
+
+
+def test_categorias_desde_un_excel_de_sku_y_categoria():
+    from src.importer.entradas import leer_categorias
+    wb = Workbook()
+    wb.active.append(["Código SKU", "Categoría"])
+    wb.active.append([90020001, " Café "])
+    wb.active.append([90020002, None])  # sin categoría: se ignora
+    salida = BytesIO()
+    wb.save(salida)
+    salida.seek(0)
+    assert leer_categorias(salida) == {"90020001": "Café"}

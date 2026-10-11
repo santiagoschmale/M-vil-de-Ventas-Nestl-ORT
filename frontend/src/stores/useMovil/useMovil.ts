@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { api } from '../../infra/http';
 import { useSnackbarProps } from '../useSnackbarProps';
-import { Apertura, Cruce, Estado, TUseMovil } from './useMovil.type';
+import { Apertura, Cruce, Estado, MesResumen, TUseMovil } from './useMovil.type';
 
 // Los errores del cliente HTTP traen la respuesta del backend: { detail: "..." }.
 const respuesta = (e: unknown) =>
@@ -41,14 +41,19 @@ type Opciones = {
 const RECALCULADO = 'Reparto recalculado.';
 const TOTALES_CARGADOS = 'Totales por canal cargados.';
 
-/** Aprobado es de solo lectura: lo que edita se deshabilita (el backend igual lo rechaza). */
-export const useSoloLectura = () => useMovil(s => !!s.estado?.aprobado);
+/** Aprobado, o un mes anterior, es de solo lectura: lo que edita se deshabilita (el backend igual lo rechaza). */
+export const useSoloLectura = () => useMovil(s => !!s.estado?.aprobado || s.estado?.es_ultimo === false);
 
 export const useMovil = create<TUseMovil>((set, get) => {
+  // Todo pedido va al mes que se está viendo: si otro planner empezó el mes siguiente, lo de acá
+  // no cae en el mes nuevo (el backend rechaza cambios en un mes anterior).
+  const conMes = (url: string) => (get().mes ? `${url}${url.includes('?') ? '&' : '?'}mes=${get().mes}` : url);
+  const traerMeses = async () => set({ meses: (await api.get<MesResumen[]>('/movil/meses')).data });
+
   const traerCruce = async (estado: Estado) => {
     if (estado.faltan.length) return set({ cruce: undefined });
     const { unidad } = get();
-    const cruce = (await api.get<Cruce>(`/movil/cruce/${unidad}`)).data;
+    const cruce = (await api.get<Cruce>(conMes(`/movil/cruce/${unidad}`))).data;
     // Si mientras tanto eligieron la otra unidad, esta respuesta ya no va.
     if (get().unidad === unidad) set({ cruce });
   };
@@ -59,8 +64,8 @@ export const useMovil = create<TUseMovil>((set, get) => {
     set({ ocupado: true });
     try {
       const estado = (await pedido()).data;
-      set({ estado, errorDeCarga: undefined });
-      await traerCruce(estado);
+      set({ estado, mes: estado.mes, errorDeCarga: undefined });
+      await Promise.all([traerCruce(estado), traerMeses().catch(() => undefined)]);
       avisar(opciones.aviso ?? (estado.faltan.length ? opciones.cargado ?? 'Guardado.' : RECALCULADO), 'info');
       return null;
     } catch (e) {
@@ -68,7 +73,8 @@ export const useMovil = create<TUseMovil>((set, get) => {
       if (!opciones.errorEnDialogo) avisar(mensaje, 'error');
       // Un rechazo puede ser porque otro planner cambió el móvil (p. ej. lo aprobó): traer el estado real.
       if (respuesta(e)?.status === 422) {
-        api.get<Estado>('/movil').then(r => set({ estado: r.data })).catch(() => undefined);
+        api.get<Estado>(conMes('/movil')).then(r => set({ estado: r.data, mes: r.data.mes })).catch(() => undefined);
+        traerMeses().catch(() => undefined);
       }
       return mensaje;
     } finally {
@@ -76,10 +82,10 @@ export const useMovil = create<TUseMovil>((set, get) => {
     }
   };
 
-  const subir = (url: string, archivo: File, cargado: string) => {
+  const subir = (url: string, archivo: File, opciones: Opciones) => {
     const datos = new FormData();
     datos.append('archivo', archivo);
-    return cambiar(() => api.upload<Estado>(url, datos), { cargado });
+    return cambiar(() => api.upload<Estado>(conMes(url), datos), opciones);
   };
 
   const enDialogo: Opciones = { errorEnDialogo: true };
@@ -90,6 +96,8 @@ export const useMovil = create<TUseMovil>((set, get) => {
     soltarFoco: () => set({ foco: undefined }),
     estado: undefined,
     cruce: undefined,
+    mes: undefined,
+    meses: [],
     unidad: 'kilos',
     ocupado: false,
     errorDeCarga: undefined,
@@ -97,9 +105,10 @@ export const useMovil = create<TUseMovil>((set, get) => {
     refrescar: async () => {
       set({ ocupado: true });
       try {
-        const estado = (await api.get<Estado>('/movil')).data;
-        set({ estado, errorDeCarga: undefined });
-        await traerCruce(estado);
+        const estado = (await api.get<Estado>(conMes('/movil'))).data;
+        set({ estado, mes: estado.mes, errorDeCarga: undefined });
+        // Si falla la lista de meses, el móvil se ve igual.
+        await Promise.all([traerCruce(estado), traerMeses().catch(() => undefined)]);
       } catch (e) {
         set({ errorDeCarga: mensajeDeError(e) });
       } finally {
@@ -107,58 +116,72 @@ export const useMovil = create<TUseMovil>((set, get) => {
       }
     },
 
+    asignarCategorias: (categorias, motivo) =>
+      cambiar(() => api.put(conMes('/movil/categorias'), { categorias, motivo }), { ...enDialogo, aviso: 'Categorías guardadas.' }),
+    cargarCategorias: archivo => subir('/movil/categorias', archivo, { ...enDialogo, aviso: 'Categorías cargadas.' }),
+
+    cambiarAperturaCanal: (canal, abre, motivo) =>
+      cambiar(() => api.put(conMes(`/movil/aperturas/${ruta(canal)}`), { abre, motivo }), enDialogo),
+
+    verMes: async mes => {
+      set({ mes, cruce: undefined, foco: undefined });
+      await get().refrescar();
+    },
+    empezarSiguiente: () => cambiar(() => api.post('/movil/meses/siguiente', {}),
+      { errorEnDialogo: true, aviso: 'Mes nuevo: cargá el objetivo de Contraloría.' }),
+
     elegirUnidad: async unidad => {
       set({ unidad });
       const { estado } = get();
       if (estado) await traerCruce(estado).catch(e => avisar(mensajeDeError(e), 'error'));
     },
 
-    cargarInput1: archivo => subir('/movil/input1', archivo, 'Objetivo de Contraloría cargado.'),
-    cargarBase: archivo => subir('/movil/base', archivo, 'Mes anterior cargado.'),
-    cargarInput2: archivo => subir('/movil/input2', archivo, TOTALES_CARGADOS),
+    cargarInput1: archivo => subir('/movil/input1', archivo, { cargado: 'Objetivo de Contraloría cargado.' }),
+    cargarBase: archivo => subir('/movil/base', archivo, { cargado: 'Mes anterior cargado.' }),
+    cargarInput2: archivo => subir('/movil/input2', archivo, { cargado: TOTALES_CARGADOS }),
     editarTotales: texto =>
-      cambiar(() => api.put('/movil/input2', { texto }), { ...enDialogo, cargado: TOTALES_CARGADOS }),
+      cambiar(() => api.put(conMes('/movil/input2'), { texto }), { ...enDialogo, cargado: TOTALES_CARGADOS }),
     // Sin totales: objetivo y mes anterior, para armar los totales por canal en la pantalla.
-    cargarMuestra: (totales = true) => cambiar(() => api.post(`/movil/muestra?totales=${totales}`, {}),
+    cargarMuestra: (totales = true) => cambiar(() => api.post(conMes(`/movil/muestra?totales=${totales}`), {}),
       totales ? {} : { cargado: 'Muestra cargada sin totales por canal: armalos en la pantalla.' }),
 
     cambiarSku: (sku, activo, motivo) =>
-      cambiar(() => api.put(`/movil/skus/${ruta(sku)}`, { activo, motivo }), enDialogo),
+      cambiar(() => api.put(conMes(`/movil/skus/${ruta(sku)}`), { activo, motivo }), enDialogo),
     cambiarEntidad: (entidad, activo, motivo) =>
-      cambiar(() => api.put(`/movil/entidades/${ruta(entidad)}`, { activo, motivo }), enDialogo),
+      cambiar(() => api.put(conMes(`/movil/entidades/${ruta(entidad)}`), { activo, motivo }), enDialogo),
     fijar: (sku, canal, monto, motivo) =>
-      cambiar(() => api.put(`/movil/celdas/${ruta(get().unidad, sku, canal)}`, { monto, motivo }), enDialogo),
+      cambiar(() => api.put(conMes(`/movil/celdas/${ruta(get().unidad, sku, canal)}`), { monto, motivo }), enDialogo),
     desfijar: (sku, canal, motivo) =>
-      cambiar(() => api.delete(`/movil/celdas/${ruta(get().unidad, sku, canal)}`, { data: { motivo } }), enDialogo),
+      cambiar(() => api.delete(conMes(`/movil/celdas/${ruta(get().unidad, sku, canal)}`), { data: { motivo } }), enDialogo),
 
-    agregarRegla: (datos, motivo) => cambiar(() => api.post('/movil/reglas', { ...datos, motivo }), enDialogo),
+    agregarRegla: (datos, motivo) => cambiar(() => api.post(conMes('/movil/reglas'), { ...datos, motivo }), enDialogo),
     editarRegla: (id, datos, motivo) =>
-      cambiar(() => api.put(`/movil/reglas/${ruta(id)}`, { ...datos, motivo }), enDialogo),
+      cambiar(() => api.put(conMes(`/movil/reglas/${ruta(id)}`), { ...datos, motivo }), enDialogo),
     eliminarRegla: (id, motivo) =>
-      cambiar(() => api.delete(`/movil/reglas/${ruta(id)}`, { data: { motivo } }), enDialogo),
+      cambiar(() => api.delete(conMes(`/movil/reglas/${ruta(id)}`), { data: { motivo } }), enDialogo),
 
     elegirFila: (sku, fila, motivo) =>
-      cambiar(() => api.put(`/movil/skus/${ruta(sku)}/fila`, { fila, motivo }), enDialogo),
+      cambiar(() => api.put(conMes(`/movil/skus/${ruta(sku)}/fila`), { fila, motivo }), enDialogo),
 
     elegirCanales: (sku, canales, motivo) =>
-      cambiar(() => api.put(`/movil/skus/${ruta(sku)}/canales`, { canales, motivo }), enDialogo),
+      cambiar(() => api.put(conMes(`/movil/skus/${ruta(sku)}/canales`), { canales, motivo }), enDialogo),
     quitarCanales: (sku, motivo) =>
-      cambiar(() => api.delete(`/movil/skus/${ruta(sku)}/canales`, { data: { motivo } }), enDialogo),
-    deshacer: () => cambiar(() => api.post('/movil/deshacer', {})),
-    aprobar: () => cambiar(() => api.post('/movil/aprobar', {}), { errorEnDialogo: true, aviso: 'Móvil aprobado.' }),
+      cambiar(() => api.delete(conMes(`/movil/skus/${ruta(sku)}/canales`), { data: { motivo } }), enDialogo),
+    deshacer: () => cambiar(() => api.post(conMes('/movil/deshacer'), {})),
+    aprobar: () => cambiar(() => api.post(conMes('/movil/aprobar'), {}), { errorEnDialogo: true, aviso: 'Móvil aprobado.' }),
     asignarPorcentaje: (canal, entidad, porcentaje, motivo) =>
-      cambiar(() => api.put('/movil/porcentajes', { canal, entidad, porcentaje, motivo }), enDialogo),
+      cambiar(() => api.put(conMes('/movil/porcentajes'), { canal, entidad, porcentaje, motivo }), enDialogo),
     agregarEntidad: (canal, entidad, porcentaje, motivo) =>
-      cambiar(() => api.post('/movil/entidades', { canal, entidad, porcentaje, motivo }), enDialogo),
+      cambiar(() => api.post(conMes('/movil/entidades'), { canal, entidad, porcentaje, motivo }), enDialogo),
     eliminarEntidad: (canal, entidad, motivo) =>
-      cambiar(() => api.delete('/movil/entidades', { data: { canal, entidad, motivo } }), enDialogo),
-    revisarEtapa: etapa => cambiar(() => api.post(`/movil/etapas/${ruta(etapa)}`, {}), { aviso: 'Etapa revisada.' }),
-    reabrir: motivo =>
-      cambiar(() => api.post('/movil/reabrir', { motivo }), { errorEnDialogo: true, aviso: 'El móvil volvió a borrador.' }),
+      cambiar(() => api.delete(conMes('/movil/entidades'), { data: { canal, entidad, motivo } }), enDialogo),
+    revisarEtapa: etapa => cambiar(() => api.post(conMes(`/movil/etapas/${ruta(etapa)}`), {}), { aviso: 'Etapa revisada.' }),
+    reabrir: motivo => cambiar(() => api.post(conMes('/movil/reabrir'), { motivo }),
+      { errorEnDialogo: true, aviso: 'El móvil volvió a borrador.' }),
 
     apertura: async (sku, canal) => {
       try {
-        return (await api.get<Apertura>(`/movil/apertura/${ruta(sku, canal)}`)).data;
+        return (await api.get<Apertura>(conMes(`/movil/apertura/${ruta(sku, canal)}`))).data;
       } catch (e) {
         if (respuesta(e)?.status !== 404) avisar(mensajeDeError(e), 'error'); // 404: no se abre debajo del canal
         return null;

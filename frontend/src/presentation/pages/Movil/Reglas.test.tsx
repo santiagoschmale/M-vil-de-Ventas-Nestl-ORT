@@ -20,12 +20,30 @@ beforeEach(() => {
     http.post('*/api/movil/reglas', anotar),
     http.put('*/api/movil/reglas/*', anotar),
     http.delete('*/api/movil/reglas/*', anotar),
+    http.put('*/api/movil/aperturas/*', anotar),
     http.get('*/api/movil/cruce/*', () => HttpResponse.json({ unidad: 'kilos', cierra: true, canales: [], skus: [] })),
+    // Ante un rechazo, la pantalla vuelve a pedir el estado y los meses.
+    http.get('*/api/movil', () => HttpResponse.json(estadoFactory.build())),
+    http.get('*/api/movil/meses', () => HttpResponse.json([{ mes: '2026-10', aprobado: false }])),
   );
 });
 
 // Formularios de MUI enteros: con toda la suite en paralelo, 5 s no siempre alcanzan.
 describe('Reglas', { timeout: 15000 }, () => {
+  it('un canal que se abre se puede cerrar en el canal, con motivo', async () => {
+    const estado = estadoFactory.build({
+      aperturas_canal: [{ canal: 'Córdoba', abre: true }, { canal: 'Rosario', abre: false }],
+    });
+    const user = userEvent.setup({ delay: null });
+    render(<Reglas estado={estado} />);
+    expect(screen.getByRole('checkbox', { name: 'Rosario se abre debajo del canal' })).not.toBeChecked();
+    await user.click(screen.getByRole('checkbox', { name: 'Córdoba se abre debajo del canal' }));
+    await user.type(screen.getByRole('textbox', { name: /Motivo/ }), 'cierra en el canal');
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Cerrar en el canal' }));
+    await waitFor(() => expect(pedidos).toEqual([{ metodo: 'PUT', url: '/api/movil/aperturas/C%C3%B3rdoba',
+      cuerpo: { abre: false, motivo: 'cierra en el canal' } }]));
+  });
+
   it('sin reglas explica qué es una y cómo empezar', () => {
     render(<Reglas estado={estadoFactory.build()} />);
     expect(screen.getByText(/Todavía no hay reglas/)).toBeInTheDocument();

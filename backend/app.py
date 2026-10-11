@@ -4,7 +4,8 @@ from logging import getLogger
 from os import environ
 
 from src.auth.proveedor import ProveedorLocal
-from src.movil.repositorio import RepositorioEnMemoria
+from src.movil.almacen import Almacen
+from src.movil.repositorio import Repositorio
 from src.routes import health, movil
 from nbra_envs_python import set_local_variables
 from src.config.logger import logger
@@ -22,16 +23,17 @@ async def lifespan(app: FastAPI):
 
 def crear_app() -> FastAPI:
     """
-    Arma la app. Acá se eligen las implementaciones: sesión en memoria y
-    autenticación local; cambiar a Postgres o a Entra ID es cambiar estas líneas.
-    Los tests arman su propia app con una sesión vacía.
+    Arma la app. Acá se eligen las implementaciones: con DATABASE_URL, cada móvil se
+    guarda en Postgres; sin ella, vive en memoria. La autenticación es local; cambiar a
+    Entra ID es cambiar esa línea. Los tests arman su propia app, en memoria.
     """
     if environ.get("IS_LOCAL", "true").lower() == "false":
         nueva = FastAPI(lifespan=lifespan)
     else:
         nueva = FastAPI()
     nueva.middleware('http')(catch_exceptions)
-    nueva.state.repositorio = RepositorioEnMemoria()
+    url = environ.get("DATABASE_URL")
+    nueva.state.repositorio = Repositorio(Almacen(url) if url else None)
     nueva.state.autenticacion = ProveedorLocal()
     nueva.include_router(health.router)
     nueva.include_router(movil.router)

@@ -21,8 +21,9 @@ Proyecto final de la Universidad ORT para Nestlé DIL Región Plata, sep-nov 202
 
 ## Correrlo
 
-Se necesita Python 3.13 o 3.14 y Node con npm. No hace falta Docker ni base de
-datos: por ahora todo vive en memoria.
+Se necesita Python 3.13 o 3.14 y Node con npm. Sin Docker, todo vive en memoria y se
+pierde al reiniciar. Para que cada móvil quede guardado, con Docker Desktop abierto:
+`make db` (levanta Postgres y aplica las migraciones) y después `make dev-db`.
 
 **No correr `npm install` a secas en `frontend/`**: el `.npmrc` apunta al registro
 privado de Nestlé, sin acceso desde acá. Los pasos de abajo usan el registro

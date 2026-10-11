@@ -63,6 +63,10 @@ export const AYUDA = {
           <b>Dónde se vende</b>: para un SKU nuevo, que el mes anterior no se vendió, elegís en qué canales va. Se
           reparte en proporción al total de cada canal. También sirve para limitar un SKU a ciertos canales.
         </P>
+        <P>
+          <b>Cómo se abre cada canal</b>: un canal que el mes anterior se abrió entre distribuidores o vendedores se
+          puede cerrar en el canal, si cambió la estructura comercial, y volver a abrir.
+        </P>
       </>
     ),
   },

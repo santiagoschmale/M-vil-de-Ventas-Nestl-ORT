@@ -18,7 +18,7 @@ permite y queda marcado: el planner trabaja en pasos y necesita estados intermed
 from __future__ import annotations
 
 import copy
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime
 from decimal import Decimal
 
@@ -27,9 +27,12 @@ from src.domain.formato import a_texto
 from src.importer.entradas import (
     KILOS,
     PLATA,
+    TotalCanal,
+    _codigo,
     ErrorDeEntrada,
     leer_apertura,
     leer_base,
+    leer_categorias,
     leer_input1,
     leer_input2,
     normalizar,
@@ -41,11 +44,15 @@ from src.movil.recorrido import Recorrido, Regla, armar
 
 UNIDADES = {"kilos": KILOS, "plata": PLATA}
 
+# Lo que Deshacer y la vuelta atrás de un cambio fallido no tocan.
+_NO_SE_DESHACE = {"historial", "_antes_del_ultimo", "ultimo_cambio", "aprobado", "diferir", "es_ultimo"}
+
 # Revisión por etapa, en orden. Un cambio en una etapa borra el OK de esa y de las siguientes.
 ETAPAS = ("canal", "apertura")
 _NOMBRE_ETAPA = {"canal": "por canal", "apertura": "debajo del canal"}
 # Los ajustes que solo tocan debajo del canal; todos los demás cambian el reparto por canal.
-_DEBAJO_DEL_CANAL = {"apagar_entidad", "prender_entidad", "porcentaje", "agregar_entidad", "eliminar_entidad"}
+_DEBAJO_DEL_CANAL = {"apagar_entidad", "prender_entidad", "porcentaje", "agregar_entidad", "eliminar_entidad",
+                     "cerrar_canal", "abrir_canal"}
 
 
 class ErrorDeAjuste(ValueError):
@@ -103,9 +110,20 @@ class Sesion:
         self.porcentajes: dict[tuple[str, str], tuple[Decimal, Ajuste]] = {}
         # Altas: (canal, entidad) que no está en la apertura del mes anterior -> quién la sumó.
         self.entidades_nuevas: dict[tuple[str, str], Ajuste] = {}
+        # Categoría de cada SKU asignada en la herramienta, para cuando el objetivo no la trae (B8).
+        # Se hereda de un mes al siguiente.
+        self.categorias: dict[str, str] = {}
+        # Canales que se abren en el archivo pero el planner cierra en el canal (profundidad configurable).
+        self.canales_cerrados: frozenset[str] = frozenset()
         self._proxima_regla = 1  # los ids no se reusan: el historial los nombra
         self.historial: list[Ajuste] = []
-        self.recorrido: Recorrido | None = None
+        self._recorrido: Recorrido | None = None
+        # Al reconstruir un mes guardado se difiere el recálculo: se hace una vez, cuando alguien
+        # pide el resultado (`recorrido`), en vez de en cada acción.
+        self.diferir = False
+        self._sucio = False
+        # Un mes que ya no es el último es de solo lectura: el siguiente arrancó de su aprobado.
+        self.es_ultimo = True
         # El último cambio y el estado de antes, para deshacerlo. Una sola vez: después queda en None.
         self._antes_del_ultimo: tuple | None = None
         self.ultimo_cambio: Ajuste | None = None
@@ -288,9 +306,13 @@ class Sesion:
             raise ErrorDeAjuste(f"Los % de {canal} sumarían {a_texto(otros + valor)}%: no pueden pasar de 100.")
         return valor
 
+    def _nombres_de_canal(self) -> dict[str, str]:
+        """Nombre normalizado -> nombre en los totales por canal."""
+        return {normalizar(c): c for c in (self._e.canales or {})}
+
     def _canal(self, canal: str) -> str:
         """El canal con el nombre de los totales por canal: "cordoba" es "Córdoba"."""
-        por_nombre = {normalizar(c): c for c in (self._e.canales or {})}
+        por_nombre = self._nombres_de_canal()
         if normalizar(canal) not in por_nombre:
             raise ErrorDeAjuste(f"{canal} no está en los totales por canal.")
         return por_nombre[normalizar(canal)]
@@ -317,7 +339,9 @@ class Sesion:
               motivo: str) -> None:
         motivo = _motivo(motivo)
         decimales = self._unidad(unidad)
-        r = self._exigir_recorrido()
+        if self.faltan():
+            raise ErrorDeAjuste(f"Falta cargar: {', '.join(self.faltan())}.")
+        objetivos, canales = self.objetivos_vigentes(), self._e.canales
         valor = numero(monto) if isinstance(monto, str) else None
         if valor is None:
             raise ErrorDeAjuste(f"'{monto}' no es un número.")
@@ -326,14 +350,14 @@ class Sesion:
         paso = Decimal(1).scaleb(-decimales)
         if valor % paso != 0:
             raise ErrorDeAjuste(f"{unidad} admite como máximo {decimales} decimales.")
-        if sku not in r.objetivos or sku in self.apagados_skus:
+        if sku not in objetivos or sku in self.apagados_skus:
             raise ErrorDeAjuste(f"El SKU {sku} no está en el reparto de este mes.")
-        if canal not in r.canales:
+        if canal not in canales:
             raise ErrorDeAjuste(f"El canal {canal} no está en los totales por canal.")
         if not self._se_vende(sku, canal):
             raise ErrorDeAjuste(f"El SKU {sku} no se vende en {canal}: no se puede fijar.")
-        objetivo = r.objetivos[sku].kilos if unidad == "kilos" else r.objetivos[sku].nns
-        total_canal = r.canales[canal].kilos if unidad == "kilos" else r.canales[canal].plata
+        objetivo = objetivos[sku].kilos if unidad == "kilos" else objetivos[sku].nns
+        total_canal = canales[canal].kilos if unidad == "kilos" else canales[canal].plata
         if objetivo is not None and valor > objetivo:
             raise ErrorDeAjuste(f"El valor supera el objetivo del SKU {sku} ({_con_unidad(objetivo, unidad)}).")
         if total_canal is not None and valor > total_canal:
@@ -380,7 +404,7 @@ class Sesion:
         pedidos = [c for c in (canales or []) if c and c.strip()]
         if not pedidos:
             raise ErrorDeAjuste("Elegí al menos un canal.")
-        por_nombre = {normalizar(c): c for c in (self._e.canales or {})}
+        por_nombre = self._nombres_de_canal()
         faltan = [c for c in pedidos if normalizar(c) not in por_nombre]
         if faltan:
             raise ErrorDeAjuste(f"No están en los totales por canal: {', '.join(faltan)}.")
@@ -415,8 +439,60 @@ class Sesion:
         vigentes = {}
         for sku, o in self._e.objetivos.items():
             fila = self.filas_elegidas.get(sku, (o.fila, None))[0]
-            vigentes[sku] = next(x for x in [o, *o.alternativas] if x.fila == fila)
+            elegido = next(x for x in [o, *o.alternativas] if x.fila == fila)
+            # La del archivo manda; si no trae, la asignada en la herramienta.
+            if elegido.categoria is None and sku in self.categorias:
+                elegido = replace(elegido, categoria=self.categorias[sku])
+            vigentes[sku] = elegido
         return vigentes
+
+    def canales_que_se_abren(self) -> dict[str, bool]:
+        """Los canales que tienen apertura en el mes anterior, y si hoy se abren o cierran en el canal."""
+        por_nombre = self._nombres_de_canal()
+        con_apertura = {por_nombre.get(normalizar(c), c) for c in {c for _, c in self._e.apertura}}
+        return {c: c not in self.canales_cerrados for c in sorted(con_apertura)}
+
+    def cambiar_apertura_canal(self, canal: str, abre: bool, autor: str, cuando: datetime, motivo: str) -> None:
+        """Un canal que se abre en el archivo se cierra en el canal, o vuelve a abrirse."""
+        motivo = _motivo(motivo)
+        canal = self._canal(canal)
+        if not self._se_abre(canal):
+            raise ErrorDeAjuste(f"{canal} no se abre debajo del canal en el mes anterior: no hay nada que cerrar.")
+        if abre == (canal not in self.canales_cerrados):
+            raise ErrorDeAjuste(f"{canal} ya {'se abre' if abre else 'cierra en el canal'}.")
+
+        def cambio():
+            self.canales_cerrados = self.canales_cerrados - {canal} if abre else self.canales_cerrados | {canal}
+            texto = "se abre de nuevo" if abre else "cierra en el canal, sin apertura"
+            return Ajuste("abrir_canal" if abre else "cerrar_canal", f"{canal} {texto}", autor, cuando, motivo)
+        self._aplicar(cambio)
+
+    def sin_categoria(self) -> list[str]:
+        """Los SKUs del mes sin categoría (ni en el archivo ni asignada): no entran en ninguna regla."""
+        return sorted(sku for sku, o in (self.objetivos_vigentes() or {}).items()
+                      if o.categoria is None and sku not in self.apagados_skus and o.kilos > 0)
+
+    def asignar_categorias(self, categorias, autor: str, cuando: datetime, motivo: str) -> None:
+        """
+        La categoría de uno o varios SKUs: un dict {sku: categoría} o un Excel con SKU y
+        Categoría. Queda para los meses siguientes.
+        """
+        motivo = _motivo(motivo)
+        if not isinstance(categorias, dict):
+            categorias = _leer(leer_categorias, categorias)
+        nuevas = {_codigo(sku): " ".join(str(c or "").split()) for sku, c in categorias.items() if _codigo(sku)}
+        if not nuevas:
+            raise ErrorDeAjuste("No hay ninguna categoría para asignar.")
+        vacias = sorted(sku for sku, c in nuevas.items() if not c)
+        if vacias:
+            raise ErrorDeAjuste(f"Falta la categoría de {', '.join(vacias)}.")
+
+        def cambio():
+            self.categorias = {**self.categorias, **nuevas}
+            detalle = (f"{len(nuevas)} SKUs" if len(nuevas) > 1 else
+                       f"SKU {next(iter(nuevas))}: {next(iter(nuevas.values()))}")
+            return Ajuste("asignar_categorias", detalle, autor, cuando, motivo)
+        self._aplicar(cambio)
 
     # --- reglas -------------------------------------------------------------
 
@@ -455,6 +531,60 @@ class Sesion:
         def cambio():
             regla = self.reglas.pop(id_).regla
             return Ajuste("eliminar_regla", _describir(regla), autor, cuando, motivo)
+        self._aplicar(cambio)
+
+    # --- de un mes al siguiente ---------------------------------------------
+
+    def foto(self) -> dict:
+        """
+        Lo que un mes aprobado le pasa al siguiente, en JSON: su reparto SKU × canal y cómo se
+        abrió cada canal (la base del mes siguiente), los totales por canal, las reglas, los %
+        manuales y las entidades apagadas. Los montos van como texto, para no pasar por float.
+        """
+        r = self._exigir_recorrido()
+        if self.aprobado is None or r.kilos.celdas is None:
+            raise ErrorDeAjuste("Solo un móvil aprobado pasa al mes siguiente.")
+        return {
+            "base": [[sku, canal, str(v)] for (sku, canal), v in sorted(r.kilos.celdas.items())],
+            "apertura": [[sku, canal, h.entidad, str(h.valores["kilos"].monto)]
+                         for (sku, canal), raiz in sorted(r.aperturas.items()) for h in raiz.hijos],
+            "totales": [[c, str(t.kilos), None if t.plata is None else str(t.plata)]
+                        for c, t in self._e.canales.items()],
+            "reglas": [[x.regla.id, x.regla.canal, sorted(x.regla.categorias), x.regla.limite,
+                        None if x.regla.kilos is None else str(x.regla.kilos),
+                        None if x.regla.nns is None else str(x.regla.nns)] for x in self.reglas.values()],
+            "porcentajes": [[c, e, str(p)] for (c, e), (p, _) in sorted(self.porcentajes.items())],
+            "apagadas": sorted(self.entidades_apagadas),
+            "canales_cerrados": sorted(self.canales_cerrados),
+            # Las asignadas y las que trajo el archivo: el mes siguiente puede venir sin categoría.
+            "categorias": {**self.categorias, **{k: o.categoria for k, o in (self.objetivos_vigentes() or {}).items()
+                                                 if o.categoria}},
+        }
+
+    def heredar(self, foto: dict, de: str, autor: str, cuando: datetime) -> None:
+        """
+        Arranca el mes desde el aprobado de `de`: su reparto es el mes anterior y se heredan
+        totales por canal, reglas, % y entidades apagadas. Falta el objetivo de Contraloría.
+        """
+        base = {(sku, canal): Decimal(v) for sku, canal, v in foto["base"]}
+        apertura: dict[Celda, dict[str, Decimal]] = {}
+        for sku, canal, entidad, v in foto["apertura"]:
+            apertura.setdefault((sku, canal), {})[entidad] = Decimal(v)
+        canales = {c: TotalCanal(Decimal(k), None if p is None else Decimal(p)) for c, k, p in foto["totales"]}
+
+        def cambio():
+            ajuste = Ajuste("heredar", f"Arrancó desde el móvil aprobado de {de}", autor, cuando)
+            self._e.base, self._e.apertura, self._e.problemas_base = base, apertura, []
+            self._e.archivo_base = f"Móvil aprobado de {de}"
+            self._e.canales, self._e.problemas2, self._e.archivo2 = canales, [], f"Totales de {de}"
+            for id_, canal, categorias, limite, kilos, nns in foto["reglas"]:
+                self.reglas[id_] = ReglaCargada(_regla(id_, canal, categorias, limite, kilos, nns), ajuste)
+            self._proxima_regla = 1 + max((int(i[1:]) for i in self.reglas), default=0)
+            self.porcentajes = {(c, e): (Decimal(p), ajuste) for c, e, p in foto["porcentajes"]}
+            self.entidades_apagadas = {e: ajuste for e in foto["apagadas"]}
+            self.categorias = dict(foto["categorias"])
+            self.canales_cerrados = frozenset(foto["canales_cerrados"])
+            return ajuste
         self._aplicar(cambio)
 
     # --- revisión por etapa -------------------------------------------------
@@ -506,12 +636,16 @@ class Sesion:
     def reabrir(self, autor: str, cuando: datetime, motivo: str) -> None:
         """Vuelve a borrador para poder cambiarlo (supuesto, A16: se puede reabrir)."""
         motivo = _motivo(motivo)
+        if not self.es_ultimo:
+            raise ErrorDeAjuste("Solo se puede reabrir el último mes: este ya es la base del siguiente.")
         if self.aprobado is None:
             raise ErrorDeAjuste("El móvil no está aprobado: ya se puede cambiar.")
         self.aprobado = None
         self.historial.append(Ajuste("reabrir", "Volvió el móvil a borrador", autor, cuando, motivo))
 
     def _exigir_borrador(self) -> None:
+        if not self.es_ultimo:
+            raise ErrorDeAjuste("Es un mes anterior: es de solo lectura.")
         if self.aprobado is not None:
             raise ErrorDeAjuste("El móvil está aprobado: para cambiarlo, reabrilo.")
 
@@ -530,16 +664,25 @@ class Sesion:
         self.historial.append(Ajuste("deshacer", f"Deshizo: {self.ultimo_cambio.detalle}", autor, cuando))
         self._antes_del_ultimo = self.ultimo_cambio = None
 
+    @property
+    def recorrido(self) -> Recorrido | None:
+        if self._sucio:
+            self._recorrido, self._sucio = self._recalcular(), False
+        return self._recorrido
+
     # --- interno ------------------------------------------------------------
 
-    def _respaldo(self) -> tuple:
-        return (copy.copy(self._e), dict(self.apagados_skus), dict(self.entidades_apagadas),
-                {u: dict(f) for u, f in self._fijas.items()}, dict(self.reglas), self._proxima_regla,
-                dict(self.filas_elegidas), dict(self.canales_sku), dict(self.porcentajes), dict(self.entidades_nuevas), dict(self.revisadas), self.recorrido)
+    def _respaldo(self) -> dict:
+        """Todo el estado, menos lo que no se deshace: un campo nuevo entra solo."""
+        # Se copian los contenedores que se modifican en el lugar; el resto (el resultado calculado, números,
+        # frozensets) se guarda tal cual.
+        respaldo = {k: copy.copy(v) if isinstance(v, (dict, _Entradas)) else v
+                    for k, v in vars(self).items() if k not in _NO_SE_DESHACE}
+        respaldo["_fijas"] = {u: dict(f) for u, f in self._fijas.items()}
+        return respaldo
 
-    def _restaurar(self, respaldo: tuple) -> None:
-        (self._e, self.apagados_skus, self.entidades_apagadas, self._fijas, self.reglas,
-         self._proxima_regla, self.filas_elegidas, self.canales_sku, self.porcentajes, self.entidades_nuevas, self.revisadas, self.recorrido) = respaldo
+    def _restaurar(self, respaldo: dict) -> None:
+        self.__dict__.update(respaldo)
 
     def _unidad(self, unidad: str) -> int:
         if unidad not in UNIDADES:
@@ -560,7 +703,10 @@ class Sesion:
         respaldo = self._respaldo()
         try:
             ajuste = cambio()
-            self.recorrido = self._recalcular()
+            if self.diferir:
+                self._sucio = True
+            else:
+                self._recorrido, self._sucio = self._recalcular(), False
         except Exception:
             self._restaurar(respaldo)
             raise
@@ -587,7 +733,13 @@ class Sesion:
             # Un repetido ya resuelto no se vuelve a informar: la decisión quedó en el historial.
             problemas1 = [p for p in self._e.problemas1
                           if not (p.tipo == "sku_repetido" and p.sku in self.filas_elegidas)]
-            porcentajes, avisos_porcentaje = self._porcentajes_vigentes()
+            porcentajes, avisos = self._porcentajes_vigentes()
+            cerrados = {normalizar(c) for c in self.canales_cerrados}
+            sin = self.sin_categoria()
+            if sin:  # uno solo para todos: con el template sin categoría, serían decenas
+                avisos.append(Problema(
+                    "aviso", f"{len(sin)} SKUs no tienen categoría: no entran en ninguna regla. Asignales una.",
+                    bloque="input1", tipo="sin_categoria"))
             return armar(
                 self.objetivos_vigentes(),
                 self._e.canales,
@@ -595,8 +747,8 @@ class Sesion:
                 apagados=set(self.apagados_skus),
                 fijas_kilos=self._fijas_vigentes("kilos"),
                 fijas_plata=self._fijas_vigentes("plata"),
-                problemas=problemas1 + self._e.problemas2 + self._e.problemas_base + avisos_porcentaje,
-                apertura=self._e.apertura,
+                problemas=problemas1 + self._e.problemas2 + self._e.problemas_base + avisos,
+                apertura={k: v for k, v in self._e.apertura.items() if normalizar(k[1]) not in cerrados},
                 entidades_apagadas=set(self.entidades_apagadas),
                 reglas=[r.regla for r in self.reglas.values()],
                 canales_sku={k: c for k, (c, _) in self.canales_sku.items()},

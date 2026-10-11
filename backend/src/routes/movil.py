@@ -21,6 +21,7 @@ from pydantic import BaseModel, Field
 from src.domain.cruce import Inconsistencia, ResultadoCruce
 from src.movil.recorrido import exportar, por_que_no_abre
 from src.movil.sesion import UNIDADES as DECIMALES, Ajuste, ErrorDeAjuste, Sesion
+from src.movil.repositorio import MesInexistente, mes_siguiente
 
 router = APIRouter(prefix="/api/movil", tags=["Móvil"])
 # Canales y entidades van al final de la ruta con :path: un nombre real puede tener "/".
@@ -34,8 +35,12 @@ TAMANO_MAXIMO = 20 * 1024 * 1024
 # ---------------------------------------------------------------------------
 
 def sesion(request: Request):
-    with request.app.state.repositorio.usar() as s:
-        yield s
+    """El móvil del mes pedido con ?mes=2026-10; sin mes, el último."""
+    try:
+        with request.app.state.repositorio.usar(request.query_params.get("mes")) as s:
+            yield s
+    except MesInexistente as e:
+        raise HTTPException(404, str(e)) from e
 
 
 def autor(request: Request) -> str:
@@ -85,6 +90,16 @@ class EntidadNuevaIn(BaseModel):
 class EntidadIn(BaseModel):
     canal: str
     entidad: str
+    motivo: str
+
+
+class AperturaCanalIn(BaseModel):
+    abre: bool
+    motivo: str
+
+
+class CategoriasIn(BaseModel):
+    categorias: dict[str, str] = Field(description="SKU -> categoría")
     motivo: str
 
 
@@ -170,6 +185,10 @@ def _estado(s: Sesion) -> dict:
                 "canales": [{"canal": c, "kilos": _texto(k, "kilos")} for c, k in por_canal.items()]}
     cruces = {"kilos": r.kilos if r else None, "plata": r.plata if r else None}
     return {
+        "mes": s.mes,
+        # Un mes anterior es de solo lectura; el siguiente es el que se empieza al aprobar este.
+        "es_ultimo": s.es_ultimo,
+        "siguiente": mes_siguiente(s.mes),
         "faltan": s.faltan(),
         "entradas": {"input1": input1, "input2": input2, "base": base},
         "cierra": {u: _cierra(c) for u, c in cruces.items()},
@@ -194,10 +213,14 @@ def _estado(s: Sesion) -> dict:
                         "nns": _texto(x.nns, "plata")} for x in [o, *o.alternativas]]}
             for k, o in (e.objetivos or {}).items() if o.alternativas
         ],
-        # Para el formulario de reglas: canales del input 2 y categorías del input 1.
+        # SKUs del mes sin categoría (ni en el archivo ni asignada): no entran en ninguna regla.
+        "sin_categoria": [{"sku": k, "descripcion": vigentes[k].descripcion} for k in s.sin_categoria()],
+        # Canales que se abren en el mes anterior y si hoy se abren (profundidad configurable por canal).
+        "aperturas_canal": [{"canal": c, "abre": abre} for c, abre in s.canales_que_se_abren().items()],
+        # Para el formulario de reglas: canales del input 2 y categorías del input 1 (o asignadas).
         "opciones": {
             "canales": list(e.canales or {}),
-            "categorias": sorted({o.categoria for o in (e.objetivos or {}).values() if o.categoria}),
+            "categorias": sorted({o.categoria for o in (vigentes or {}).values() if o.categoria} | set(s.categorias.values())),
         },
         "historial": [_ajuste(a) for a in s.historial],
         # Lo que se puede deshacer (una sola vez), o None.
@@ -344,7 +367,7 @@ def exportar_excel(s: Sesion = Depends(sesion)):
     return StreamingResponse(
         datos,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": 'attachment; filename="movil.xlsx"'},
+        headers={"Content-Disposition": f'attachment; filename="movil-{s.mes}.xlsx"'},
     )
 
 
@@ -461,4 +484,44 @@ def eliminar_entidad(cuerpo: EntidadIn, s: Sesion = Depends(sesion), quien: str 
 @router.post("/etapas/{etapa}", summary="Dar por revisada una etapa (canal o apertura), en orden")
 def revisar_etapa(etapa: str, s: Sesion = Depends(sesion), quien: str = Depends(autor)):
     _aplicar(s.revisar_etapa, etapa, autor=quien, cuando=_ahora())
+    return _estado(s)
+
+
+# ---------------------------------------------------------------------------
+# Meses: un móvil por mes
+# ---------------------------------------------------------------------------
+
+@router.get("/meses", summary="Los móviles de cada mes, del más viejo al más nuevo, con su estado")
+def listar_meses(request: Request):
+    return [{"mes": m["mes"], "aprobado": m["aprobado"] is not None} for m in request.app.state.repositorio.meses()]
+
+
+@router.post("/meses/siguiente", summary="Empezar el mes siguiente desde el último aprobado: hereda su reparto como "
+                                         "base, los totales por canal, las reglas y los ajustes de la apertura")
+def empezar_siguiente(request: Request, quien: str = Depends(autor)):
+    mes = _aplicar(request.app.state.repositorio.empezar_siguiente, quien, _ahora())
+    with request.app.state.repositorio.usar(mes) as s:
+        return _estado(s)
+
+
+# ---------------------------------------------------------------------------
+# Categorías guardadas en la herramienta (B8)
+# ---------------------------------------------------------------------------
+
+@router.post("/categorias", summary="Cargar la categoría de cada SKU desde un Excel con SKU y Categoría")
+def cargar_categorias(archivo: UploadFile = File(...), s: Sesion = Depends(sesion), quien: str = Depends(autor)):
+    _aplicar(s.asignar_categorias, _archivo(archivo), quien, _ahora(), f"Carga desde {archivo.filename}")
+    return _estado(s)
+
+
+@router.put("/categorias", summary="Asignar la categoría de uno o varios SKUs, con motivo")
+def asignar_categorias(cuerpo: CategoriasIn, s: Sesion = Depends(sesion), quien: str = Depends(autor)):
+    _aplicar(s.asignar_categorias, cuerpo.categorias, quien, _ahora(), cuerpo.motivo)
+    return _estado(s)
+
+
+@router.put("/aperturas/{canal:path}", summary="Abrir o cerrar un canal debajo del canal (profundidad configurable)")
+def cambiar_apertura_canal(canal: str, cuerpo: AperturaCanalIn, s: Sesion = Depends(sesion),
+                           quien: str = Depends(autor)):
+    _aplicar(s.cambiar_apertura_canal, canal, cuerpo.abre, quien, _ahora(), cuerpo.motivo)
     return _estado(s)

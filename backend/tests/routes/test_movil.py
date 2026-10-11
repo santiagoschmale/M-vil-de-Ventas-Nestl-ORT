@@ -8,7 +8,7 @@ from io import BytesIO
 from pathlib import Path
 
 from fastapi.testclient import TestClient
-from openpyxl import load_workbook
+from openpyxl import Workbook, load_workbook
 
 from app import crear_app
 
@@ -292,3 +292,48 @@ def test_la_muestra_sin_totales_deja_armarlos_en_la_pantalla():
     assert r["faltan"] == ["totales por canal"]
     assert r["entradas"]["input2"] is None and r["entradas"]["base"]["canales"]
     assert "quitar_input2" in [a["accion"] for a in r["historial"]]
+
+
+def test_un_movil_por_mes_y_el_siguiente_desde_el_aprobado():
+    c = _cerrado()
+    mes = c.get("/api/movil").json()["mes"]
+    assert [m["mes"] for m in c.get("/api/movil/meses").json()] == [mes]
+    assert c.post("/api/movil/meses/siguiente").status_code == 422  # sin aprobar
+    c.post("/api/movil/etapas/canal")
+    c.post("/api/movil/etapas/apertura")
+    c.post("/api/movil/aprobar")
+    r = c.post("/api/movil/meses/siguiente").json()
+    assert r["mes"] > mes and r["faltan"] == ["objetivo de Contraloría"]
+    assert c.get("/api/movil").json()["mes"] == r["mes"]  # sin ?mes, el último
+    viejo = c.get(f"/api/movil?mes={mes}").json()
+    assert viejo["mes"] == mes and viejo["aprobado"]
+    assert c.get("/api/movil?mes=2001-01").status_code == 404
+    assert c.post(f"/api/movil/reabrir?mes={mes}", json={"motivo": "m"}).status_code == 422  # ya es base del siguiente
+
+
+def test_categorias_desde_un_excel_y_a_mano():
+    from tests.movil.test_sesion_categorias import _sin_categorias
+    c = _cargado()
+    c.post("/api/movil/input1", files={"archivo": ("template.xlsx", _sin_categorias())})
+    faltan = [x["sku"] for x in c.get("/api/movil").json()["sin_categoria"]]
+    assert faltan
+    wb = Workbook()
+    wb.active.append(["SKU", "Categoría"])
+    for sku in faltan[1:]:
+        wb.active.append([sku, "Café"])
+    excel = BytesIO()
+    wb.save(excel)
+    r = c.post("/api/movil/categorias", files={"archivo": ("categorias.xlsx", excel.getvalue())}).json()
+    assert [x["sku"] for x in r["sin_categoria"]] == faltan[:1]
+    r = c.put("/api/movil/categorias", json={"categorias": {faltan[0]: "Nesquik"}, "motivo": "faltaba"}).json()
+    assert r["sin_categoria"] == [] and "Nesquik" in r["opciones"]["categorias"]
+
+
+def test_cerrar_y_abrir_la_apertura_de_un_canal():
+    c = _cerrado()
+    assert {"canal": "Córdoba", "abre": True} in c.get("/api/movil").json()["aperturas_canal"]
+    r = c.put("/api/movil/aperturas/Córdoba", json={"abre": False, "motivo": "no se abre más"}).json()
+    assert {"canal": "Córdoba", "abre": False} in r["aperturas_canal"]
+    sku = next(f["codigo"] for f in c.get("/api/movil/cruce/kilos").json()["skus"]
+               if D(f["celdas"].get("Córdoba", {}).get("monto", "0")) > 0)
+    assert c.get(f"/api/movil/apertura/{sku}/Córdoba").status_code == 404  # ya no se abre
