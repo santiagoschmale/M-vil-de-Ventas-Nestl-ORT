@@ -325,3 +325,17 @@ def test_un_objetivo_o_un_mes_anterior_sin_filas_se_rechazan():
             assert False, f"{lector.__name__} tenía que rechazarlo"
         except ErrorDeEntrada as e:
             assert "ningún SKU" in str(e)
+
+
+def test_input1_con_el_template_propuesto_por_el_cliente():
+    """SKU | Descripción | kg | NNS / KG | NNS (B6, a confirmar con Finanzas). Sin categoría: se lee igual."""
+    wb = Workbook()
+    wb.active.append(["SKU", "Descripción", "kg", "NNS / KG", "NNS"])
+    wb.active.append([90020001, "Puré 2x1kg", 1000, 1500.5, 1500500])
+    salida = BytesIO()
+    wb.save(salida)
+    salida.seek(0)
+    objetivos, problemas = leer_input1(salida)
+    o = objetivos["90020001"]
+    assert (o.kilos, o.nns, o.categoria, o.descripcion) == (D("1000.000"), D("1500500.00"), None, "Puré 2x1kg")
+    assert problemas == []
