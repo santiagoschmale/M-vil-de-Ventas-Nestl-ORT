@@ -119,7 +119,8 @@ export const useMovil = create<TUseMovil>((set, get) => {
       try {
         const estado = (await api.get<Estado>(conMes('/movil'))).data;
         set({ estado, errorDeCarga: undefined });
-        await Promise.all([traerCruce(estado), traerMeses()]);
+        // Si falla la lista de meses, el móvil se ve igual.
+        await Promise.all([traerCruce(estado), traerMeses().catch(() => undefined)]);
       } catch (e) {
         set({ errorDeCarga: mensajeDeError(e) });
       } finally {

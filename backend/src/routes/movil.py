@@ -453,9 +453,9 @@ def aprobar(s: Sesion = Depends(sesion), quien: str = Depends(autor)):
 
 
 @router.post("/reabrir", summary="Volver el móvil aprobado a borrador, con motivo")
-def reabrir(request: Request, cuerpo: MotivoIn, s: Sesion = Depends(sesion), quien: str = Depends(autor)):
+def reabrir(cuerpo: MotivoIn, s: Sesion = Depends(sesion), quien: str = Depends(autor)):
     # El mes siguiente arrancó de este aprobado: reabrir uno viejo dejaría a los dos inconsistentes.
-    if s.mes != request.app.state.repositorio.ultimo():
+    if not s.es_ultimo:
         raise HTTPException(422, f"Solo se puede reabrir el último mes; {s.mes} ya es la base del siguiente.")
     _aplicar(s.reabrir, autor=quien, cuando=_ahora(), motivo=cuerpo.motivo)
     return _estado(s)

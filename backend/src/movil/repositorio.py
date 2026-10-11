@@ -44,7 +44,8 @@ class Repositorio:
         self._almacen = almacen
         self._hoy = hoy
         self._sesiones: dict[str, Sesion] = {}
-        self._lock = threading.RLock()  # las rutas consultan los meses con el móvil ya tomado
+        # Lock común, no RLock: FastAPI toma y suelta el móvil (la dependencia) en hilos distintos.
+        self._lock = threading.Lock()
 
     @contextmanager
     def usar(self, mes: str | None = None) -> Iterator[Sesion]:
@@ -57,28 +58,31 @@ class Repositorio:
                     self._crear(mes)
             elif mes not in meses:
                 raise MesInexistente(f"No hay un móvil de {mes}.")
-            yield _Grabadora(self._sesion(mes), self, mes)
-
-    def ultimo(self) -> str | None:
-        with self._lock:
-            meses = self._meses()
-            return meses[-1] if meses else None
+            yield _Grabadora(self._sesion(mes), self, mes, es_ultimo=mes == (meses[-1] if meses else mes))
 
     def meses(self) -> list[dict]:
-        """Cada móvil con su estado, del más viejo al más nuevo."""
+        """
+        Cada móvil con su estado, del más viejo al más nuevo.
+        ponytail: reconstruye cada mes la primera vez después de un reinicio (después quedan en
+        memoria); con muchos meses, guardar el estado de aprobación en la tabla movil.
+        """
         with self._lock:
             return [{"mes": m, "aprobado": self._sesion(m).aprobado} for m in self._meses()]
 
     def empezar_siguiente(self, autor: str, cuando: datetime) -> str:
         """El mes siguiente arranca del último aprobado: su reparto es la base, y se heredan reglas y ajustes."""
         with self._lock:
-            ultimo = self._meses()[-1]
+            meses = self._meses()
+            if not meses:
+                raise ErrorDeAjuste("Todavía no hay ningún móvil: cargá el del mes actual.")
+            ultimo = meses[-1]
             anterior = self._sesion(ultimo)
             if anterior.aprobado is None:
                 raise ErrorDeAjuste(f"Para empezar el mes siguiente, primero aprobá el móvil de {ultimo}.")
-            nuevo = mes_siguiente(ultimo)
+            # La foto antes de crear el mes: si falla, no queda un mes vacío.
+            foto, nuevo = anterior.foto(), mes_siguiente(ultimo)
             self._crear(nuevo)
-            _Grabadora(self._sesion(nuevo), self, nuevo).heredar(anterior.foto(), ultimo, autor, cuando)
+            _Grabadora(self._sesion(nuevo), self, nuevo, es_ultimo=True).heredar(foto, ultimo, autor, cuando)
             return nuevo
 
     # --- interno ------------------------------------------------------------
@@ -122,10 +126,11 @@ class Repositorio:
 class _Grabadora:
     """El móvil, tal cual, salvo que cada acción que sale bien queda guardada."""
 
-    def __init__(self, sesion: Sesion, repositorio: Repositorio, mes: str):
+    def __init__(self, sesion: Sesion, repositorio: Repositorio, mes: str, es_ultimo: bool):
         object.__setattr__(self, "_s", sesion)
         object.__setattr__(self, "_r", repositorio)
         object.__setattr__(self, "mes", mes)
+        object.__setattr__(self, "es_ultimo", es_ultimo)
 
     def __getattr__(self, nombre):
         valor = getattr(self._s, nombre)

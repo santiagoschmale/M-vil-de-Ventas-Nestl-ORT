@@ -60,3 +60,11 @@ def test_se_rechaza_lo_que_no_es_valido():
     assert _falla(s.asignar_categorias, {}, P, DESPUES, "m")
     assert _falla(s.asignar_categorias, {"90020001": "  "}, P, DESPUES, "m")
     assert _falla(s.asignar_categorias, {"90020001": "Café"}, P, DESPUES, "")
+
+
+def test_los_codigos_a_mano_se_normalizan_como_en_el_archivo():
+    s = _sesion()
+    s.cargar_input1(_sin_categorias(), "template.xlsx", P, CUANDO)
+    sku = s.sin_categoria()[0]
+    s.asignar_categorias({f"00{sku}": "Café"}, P, DESPUES, "con ceros adelante")
+    assert sku not in s.sin_categoria()

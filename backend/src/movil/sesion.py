@@ -28,6 +28,7 @@ from src.importer.entradas import (
     KILOS,
     PLATA,
     TotalCanal,
+    _codigo,
     ErrorDeEntrada,
     leer_apertura,
     leer_base,
@@ -471,7 +472,7 @@ class Sesion:
         motivo = _motivo(motivo)
         if not isinstance(categorias, dict):
             categorias = _leer(leer_categorias, categorias)
-        nuevas = {str(sku).strip(): " ".join(str(c or "").split()) for sku, c in categorias.items()}
+        nuevas = {_codigo(sku): " ".join(str(c or "").split()) for sku, c in categorias.items() if _codigo(sku)}
         if not nuevas:
             raise ErrorDeAjuste("No hay ninguna categoría para asignar.")
         vacias = sorted(sku for sku, c in nuevas.items() if not c)

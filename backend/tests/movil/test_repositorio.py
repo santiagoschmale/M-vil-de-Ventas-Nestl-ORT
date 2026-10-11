@@ -117,3 +117,11 @@ def test_las_categorias_pasan_al_mes_siguiente():
     r.empezar_siguiente(P, DESPUES)
     with r.usar() as s:
         assert s.categorias == categorias
+
+
+def test_el_mes_siguiente_sin_ningun_mes_avisa():
+    try:
+        Repositorio(_almacen(), hoy=HOY).empezar_siguiente(P, DESPUES)
+        assert False, "tenía que fallar"
+    except ErrorDeAjuste as e:
+        assert "ningún móvil" in str(e)
