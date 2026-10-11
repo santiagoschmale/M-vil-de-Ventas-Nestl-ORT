@@ -61,7 +61,8 @@ histórico la necesitan para tener sentido.
 
 | Funcionalidad | Estado | Qué falta |
 |---|---|---|
-| Persistencia en Postgres, un móvil por mes | ⬜ | §6. Otra implementación de `repositorio.py` |
+| Persistencia en Postgres, un móvil por mes | ✅ | Cada acción queda guardada; meses anteriores en solo lectura. Falta probarlo en el Postgres del sandbox |
+| Categorías guardadas en la herramienta | ✅ | Si el objetivo no trae categoría, se completa desde lo asignado (B8). Se hereda |
 | Autenticación | 🟡 | Proveedor local detrás de una interfaz. Entra depende de IT (I6) |
 | Entorno de pruebas para el cliente | ⬜ | Depende de IT (I1, I2) |
 | Tests en CI | ✅ | Backend y front |
@@ -73,8 +74,8 @@ histórico la necesitan para tener sentido.
 | Funcionalidad | Estado |
 |---|---|
 | Reglas por back office: tope, mínimo y fijo en % por categorías, "Dónde se vende" | 🟡 Faltan las reglas debajo del canal (R2), las estacionales y la herencia del mes anterior (necesita persistencia) |
-| Histórico con realimentación: el aprobado es la base del mes siguiente | ⬜ Confirmado por el cliente (no se importa 2025). Depende de la persistencia |
-| Profundidad de apertura configurable por canal desde la herramienta | ⬜ Pedido del cliente (07/10). Hoy la define el archivo |
+| Histórico con realimentación: el aprobado es la base del mes siguiente | ✅ "Empezar <mes>": hereda reparto, totales, reglas, % y categorías |
+| Profundidad de apertura configurable por canal desde la herramienta | ✅ En Reglas, "Cómo se abre cada canal" |
 | Simulación de escenarios | ⬜ |
 | Cuadratura automática de totales | ✅ |
 
@@ -235,7 +236,8 @@ El dominio confirmado (inputs, cruce, estructura, reglas) está en
 
 ## 6. Propuesta: historial y un móvil por mes
 
-Estado: propuesta. Depende de la persistencia y de A6, A15 y A16.
+Estado: hecho en lo central (persistencia, meses anteriores en solo lectura, el mes
+siguiente desde el aprobado). Falta: versiones al reabrir (A16) y quién ve qué (A6).
 
 - **Un móvil por mes**, compartido por todos los planners. El historial es del móvil
   y cada entrada dice quién la hizo: "lo que hizo Juan" es un filtro, no otra

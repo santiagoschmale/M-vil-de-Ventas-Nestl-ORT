@@ -32,6 +32,7 @@ export const inconsistenciaFactory = Factory.define<Inconsistencia>(() => ({
 const vacio = () => ({ kilos: [], plata: [] });
 
 export const estadoFactory = Factory.define<Estado>(() => ({
+  mes: '2026-10',
   faltan: [],
   entradas: {
     input1: { archivo: 'objetivo_septiembre.xlsx', skus: 2, kilos: '1500.000', nns: '100.00' },
@@ -63,6 +64,8 @@ export const estadoFactory = Factory.define<Estado>(() => ({
   porcentajes: [],
   entidades_nuevas: [],
   porcentaje_asignado: {},
+  sin_categoria: [],
+  aperturas_canal: [],
 }));
 
 export const cruceFactory = Factory.define<Cruce>((): Cruce => ({

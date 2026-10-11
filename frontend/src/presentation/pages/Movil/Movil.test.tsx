@@ -19,7 +19,7 @@ const cruce = cruceFactory.build();
 const pedidos: { metodo: string; url: string; cuerpo: unknown }[] = [];
 beforeEach(() => {
   pedidos.length = 0;
-  useMovil.setState({ foco: undefined, estado: undefined, cruce: undefined, unidad: 'kilos' });  // el store es global
+  useMovil.setState({ foco: undefined, estado: undefined, cruce: undefined, unidad: 'kilos', mes: undefined, meses: [] });  // el store es global
   const anotar = async ({ request }: { request: Request }) => {
     pedidos.push({ metodo: request.method, url: new URL(request.url).pathname, cuerpo: await request.json() });
     return HttpResponse.json(estado());
@@ -27,6 +27,7 @@ beforeEach(() => {
   server.use(
     http.get('*/api/movil', () => HttpResponse.json(estado())),
     http.get('*/api/movil/cruce/kilos', () => HttpResponse.json(cruce)),
+    http.get('*/api/movil/meses', () => HttpResponse.json([{ mes: '2026-10', aprobado: null }])),
     http.get('*/api/movil/apertura/*', () => HttpResponse.json({ detail: 'no se abre' }, { status: 404 })),
     http.put('*/api/movil/skus/*', anotar),
     http.put('*/api/movil/celdas/*', anotar),
@@ -37,6 +38,7 @@ beforeEach(() => {
     http.post('*/api/movil/deshacer', anotar),
     http.post('*/api/movil/aprobar', anotar),
     http.post('*/api/movil/reabrir', anotar),
+    http.put('*/api/movil/categorias', anotar),
     http.post('*/api/movil/etapas/*', anotar),
     http.put('*/api/movil/porcentajes', anotar),
     http.post('*/api/movil/entidades', anotar),
@@ -350,7 +352,7 @@ describe('MovilPage', { timeout: 15000 }, () => {
     await user.click(await screen.findByRole('button', { name: 'Exportar' }));
     const dialogo = screen.getByRole('dialog');
     expect(dialogo).toHaveTextContent('Rosario no se puede abrir.');
-    expect(within(dialogo).getByRole('link', { name: 'Exportar igual' })).toHaveAttribute('href', '/api/movil/exportar');
+    expect(within(dialogo).getByRole('link', { name: 'Exportar igual' })).toHaveAttribute('href', '/api/movil/exportar?mes=2026-10');
   });
 
   it('un SKU sin historia se resuelve diciendo dónde se vende', async () => {
@@ -518,6 +520,65 @@ describe('MovilPage', { timeout: 15000 }, () => {
     render(<MovilPage />);
     await user.click(await screen.findByRole('button', { name: 'sin totales por canal' }));
     await waitFor(() => expect(new URL(url).searchParams.get('totales')).toBe('false'));
+  });
+
+  it('el título dice de qué mes es el móvil', async () => {
+    render(<MovilPage />);
+    expect(await screen.findByText('octubre 2026')).toBeInTheDocument();
+  });
+
+  it('aprobado el último mes, se empieza el siguiente', async () => {
+    const aprobado = { accion: 'aprobar', detalle: 'Aprobó el móvil', autor: 'planner-local', cuando: '2026-10-24T10:00:00', motivo: null };
+    server.use(
+      http.get('*/api/movil', () => HttpResponse.json(estado({ aprobado }))),
+      http.get('*/api/movil/meses', () => HttpResponse.json([{ mes: '2026-10', aprobado }])),
+      http.post('*/api/movil/meses/siguiente', () => { pedidos.push({ metodo: 'POST', url: '/api/movil/meses/siguiente', cuerpo: {} }); return HttpResponse.json(estado({ mes: '2026-11', faltan: ['objetivo de Contraloría'] })); }),
+    );
+    const user = userEvent.setup({ delay: null });
+    render(<MovilPage />);
+    await user.click(await screen.findByRole('button', { name: 'Empezar noviembre 2026' }));
+    await waitFor(() => expect(pedidos.map(p => p.url)).toEqual(['/api/movil/meses/siguiente']));
+  });
+
+  it('un mes anterior se ve en solo lectura y se vuelve al último', async () => {
+    const aprobado = { accion: 'aprobar', detalle: 'Aprobó el móvil', autor: 'planner-local', cuando: '2026-10-24T10:00:00', motivo: null };
+    const pedidosMes: string[] = [];
+    server.use(
+      http.get('*/api/movil', ({ request }) => {
+        const mes = new URL(request.url).searchParams.get('mes');
+        pedidosMes.push(mes ?? 'último');
+        return HttpResponse.json(mes ? estado({ mes, aprobado }) : estado({ mes: '2026-11' }));
+      }),
+      http.get('*/api/movil/meses', () => HttpResponse.json([{ mes: '2026-10', aprobado }, { mes: '2026-11', aprobado: null }])),
+    );
+    const user = userEvent.setup({ delay: null });
+    render(<MovilPage />);
+    await user.selectOptions(await screen.findByRole('combobox', { name: 'Mes del móvil' }), '2026-10');
+    expect(await screen.findByText(/un mes anterior\. Es de solo lectura/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Reabrir' })).not.toBeInTheDocument();
+    expect(pedidosMes).toContain('2026-10');
+    await user.click(screen.getByRole('button', { name: 'Ir a noviembre 2026' }));
+    await waitFor(() => expect(pedidosMes[pedidosMes.length - 1]).toBe('último'));
+  });
+
+  it('a los SKUs sin categoría se les asigna una desde Para revisar', async () => {
+    const sinCategoria = estado({
+      sin_categoria: [{ sku: '100', descripcion: 'Puré 2x1kg' }, { sku: '200', descripcion: 'Caldo 5kg' }],
+      problemas: [{ severidad: 'aviso', mensaje: '2 SKUs no tienen categoría: no entran en ninguna regla. Asignales una.',
+        sku: null, bloque: 'input1', tipo: 'sin_categoria', canal: null }],
+    });
+    server.use(http.get('*/api/movil', () => HttpResponse.json(sinCategoria)));
+    const user = userEvent.setup({ delay: null });
+    render(<MovilPage />);
+    await user.click(await screen.findByText('Para revisar'));
+    await user.click(await screen.findByRole('button', { name: 'Asignar categorías' }));
+    const dialogo = screen.getByRole('dialog', { name: 'Categorías de los SKUs' });
+    expect(within(dialogo).getByText(/Subir Excel/)).toBeInTheDocument();
+    await user.type(within(dialogo).getByRole('combobox', { name: 'Categoría de 100' }), 'Puré');
+    await user.type(within(dialogo).getByRole('textbox', { name: /Motivo/ }), 'carga inicial');
+    await user.click(within(dialogo).getByRole('button', { name: 'Guardar' }));
+    await waitFor(() => expect(pedidos).toEqual([{ metodo: 'PUT', url: '/api/movil/categorias',
+      cuerpo: { categorias: { 100: 'Puré' }, motivo: 'carga inicial' } }]));
   });
 
   it('exportar se habilita solo cuando kilos y pesos cierran', async () => {

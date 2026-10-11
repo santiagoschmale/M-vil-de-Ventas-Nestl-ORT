@@ -104,6 +104,7 @@ están en `backend/src/domain/NOTES.md`):
 make instalar                  # una vez; otra versión: make instalar PYTHON=python3.14
 make dev                       # API :3000 + pantalla http://localhost:5175
 make test                      # suite completa (backend + front): antes de subir
+make db && make dev-db         # igual que dev, pero guardando cada móvil en Postgres (Docker)
 ```
 
 Un solo archivo de tests, mientras se trabaja:
@@ -144,7 +145,6 @@ más pesan ahora:
 
 - **B6, A15** formato de entrada (template propuesto `SKU | Descripción | kg |
   NNS / KG | NNS`) y de salida a SAP: los está validando Finanzas.
-- **B8** el template no trae Categoría, y las reglas la necesitan.
 - **B1 a B3** % manual, altas y OK por etapa: implementados como supuestos.
 - **A1** criterio al apagar una entidad (hoy proporcional, supuesto).
 - Ya confirmado: no se importa 2025 (la herramienta arma su histórico) y la apertura

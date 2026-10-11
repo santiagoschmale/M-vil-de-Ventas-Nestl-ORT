@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { api } from '../../infra/http';
 import { useSnackbarProps } from '../useSnackbarProps';
-import { Apertura, Cruce, Estado, TUseMovil } from './useMovil.type';
+import { Apertura, Cruce, Estado, MesResumen, TUseMovil } from './useMovil.type';
 
 // Los errores del cliente HTTP traen la respuesta del backend: { detail: "..." }.
 const respuesta = (e: unknown) =>
@@ -41,14 +41,31 @@ type Opciones = {
 const RECALCULADO = 'Reparto recalculado.';
 const TOTALES_CARGADOS = 'Totales por canal cargados.';
 
-/** Aprobado es de solo lectura: lo que edita se deshabilita (el backend igual lo rechaza). */
-export const useSoloLectura = () => useMovil(s => !!s.estado?.aprobado);
+/** Lo que se está viendo del último mes, o un mes anterior. */
+const viendoAnterior = (s: { mes?: string; meses: MesResumen[] }) =>
+  s.mes !== undefined && s.mes !== s.meses[s.meses.length - 1]?.mes;
+
+/**
+ * Aprobado, o un mes anterior, es de solo lectura: lo que edita se deshabilita (el backend
+ * igual lo rechaza). Por eso las acciones van siempre al último mes, sin ?mes.
+ */
+export const useSoloLectura = () => useMovil(s => !!s.estado?.aprobado || viendoAnterior(s));
+
+/** El mes, legible: "2026-10" → "octubre 2026". */
+export const nombreMes = (mes: string) => {
+  const [anio, m] = mes.split('-').map(Number);
+  return `${new Date(anio, m - 1, 1).toLocaleDateString('es-AR', { month: 'long' })} ${anio}`;
+};
 
 export const useMovil = create<TUseMovil>((set, get) => {
+  // Las lecturas van al mes que se está viendo.
+  const conMes = (url: string) => (get().mes ? `${url}${url.includes('?') ? '&' : '?'}mes=${get().mes}` : url);
+  const traerMeses = async () => set({ meses: (await api.get<MesResumen[]>('/movil/meses')).data });
+
   const traerCruce = async (estado: Estado) => {
     if (estado.faltan.length) return set({ cruce: undefined });
     const { unidad } = get();
-    const cruce = (await api.get<Cruce>(`/movil/cruce/${unidad}`)).data;
+    const cruce = (await api.get<Cruce>(conMes(`/movil/cruce/${unidad}`))).data;
     // Si mientras tanto eligieron la otra unidad, esta respuesta ya no va.
     if (get().unidad === unidad) set({ cruce });
   };
@@ -68,7 +85,8 @@ export const useMovil = create<TUseMovil>((set, get) => {
       if (!opciones.errorEnDialogo) avisar(mensaje, 'error');
       // Un rechazo puede ser porque otro planner cambió el móvil (p. ej. lo aprobó): traer el estado real.
       if (respuesta(e)?.status === 422) {
-        api.get<Estado>('/movil').then(r => set({ estado: r.data })).catch(() => undefined);
+        api.get<Estado>(conMes('/movil')).then(r => set({ estado: r.data })).catch(() => undefined);
+        traerMeses().catch(() => undefined);
       }
       return mensaje;
     } finally {
@@ -90,6 +108,8 @@ export const useMovil = create<TUseMovil>((set, get) => {
     soltarFoco: () => set({ foco: undefined }),
     estado: undefined,
     cruce: undefined,
+    mes: undefined,
+    meses: [],
     unidad: 'kilos',
     ocupado: false,
     errorDeCarga: undefined,
@@ -97,14 +117,39 @@ export const useMovil = create<TUseMovil>((set, get) => {
     refrescar: async () => {
       set({ ocupado: true });
       try {
-        const estado = (await api.get<Estado>('/movil')).data;
+        const estado = (await api.get<Estado>(conMes('/movil'))).data;
         set({ estado, errorDeCarga: undefined });
-        await traerCruce(estado);
+        await Promise.all([traerCruce(estado), traerMeses()]);
       } catch (e) {
         set({ errorDeCarga: mensajeDeError(e) });
       } finally {
         set({ ocupado: false });
       }
+    },
+
+    asignarCategorias: (categorias, motivo) =>
+      cambiar(() => api.put('/movil/categorias', { categorias, motivo }), { ...enDialogo, aviso: 'Categorías guardadas.' }),
+    cargarCategorias: archivo => {
+      const datos = new FormData();
+      datos.append('archivo', archivo);
+      return cambiar(() => api.upload<Estado>('/movil/categorias', datos), { ...enDialogo, aviso: 'Categorías cargadas.' });
+    },
+
+    cambiarAperturaCanal: (canal, abre, motivo) =>
+      cambiar(() => api.put(`/movil/aperturas/${ruta(canal)}`, { abre, motivo }), enDialogo),
+
+    verMes: async mes => {
+      set({ mes, cruce: undefined, foco: undefined });
+      await get().refrescar();
+    },
+    empezarSiguiente: async () => {
+      const falla = await cambiar(() => api.post('/movil/meses/siguiente', {}),
+        { errorEnDialogo: true, aviso: 'Mes nuevo: cargá el objetivo de Contraloría.' });
+      if (!falla) {
+        set({ mes: undefined });
+        await traerMeses();
+      }
+      return falla;
     },
 
     elegirUnidad: async unidad => {
@@ -145,7 +190,11 @@ export const useMovil = create<TUseMovil>((set, get) => {
     quitarCanales: (sku, motivo) =>
       cambiar(() => api.delete(`/movil/skus/${ruta(sku)}/canales`, { data: { motivo } }), enDialogo),
     deshacer: () => cambiar(() => api.post('/movil/deshacer', {})),
-    aprobar: () => cambiar(() => api.post('/movil/aprobar', {}), { errorEnDialogo: true, aviso: 'Móvil aprobado.' }),
+    aprobar: async () => {
+      const falla = await cambiar(() => api.post('/movil/aprobar', {}), { errorEnDialogo: true, aviso: 'Móvil aprobado.' });
+      if (!falla) await traerMeses();
+      return falla;
+    },
     asignarPorcentaje: (canal, entidad, porcentaje, motivo) =>
       cambiar(() => api.put('/movil/porcentajes', { canal, entidad, porcentaje, motivo }), enDialogo),
     agregarEntidad: (canal, entidad, porcentaje, motivo) =>
@@ -153,12 +202,16 @@ export const useMovil = create<TUseMovil>((set, get) => {
     eliminarEntidad: (canal, entidad, motivo) =>
       cambiar(() => api.delete('/movil/entidades', { data: { canal, entidad, motivo } }), enDialogo),
     revisarEtapa: etapa => cambiar(() => api.post(`/movil/etapas/${ruta(etapa)}`, {}), { aviso: 'Etapa revisada.' }),
-    reabrir: motivo =>
-      cambiar(() => api.post('/movil/reabrir', { motivo }), { errorEnDialogo: true, aviso: 'El móvil volvió a borrador.' }),
+    reabrir: async motivo => {
+      const falla = await cambiar(() => api.post('/movil/reabrir', { motivo }),
+        { errorEnDialogo: true, aviso: 'El móvil volvió a borrador.' });
+      if (!falla) await traerMeses();
+      return falla;
+    },
 
     apertura: async (sku, canal) => {
       try {
-        return (await api.get<Apertura>(`/movil/apertura/${ruta(sku, canal)}`)).data;
+        return (await api.get<Apertura>(conMes(`/movil/apertura/${ruta(sku, canal)}`))).data;
       } catch (e) {
         if (respuesta(e)?.status !== 404) avisar(mensajeDeError(e), 'error'); // 404: no se abre debajo del canal
         return null;

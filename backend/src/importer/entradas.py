@@ -250,6 +250,24 @@ def leer_input1(origen) -> tuple[dict[str, ObjetivoSku], list[Problema]]:
     return objetivos, todos
 
 
+def leer_categorias(origen) -> dict[str, str]:
+    """
+    La categoría de cada SKU, de un Excel con las columnas SKU y Categoría (los mismos
+    nombres que acepta el objetivo). Para cuando el objetivo del mes no la trae (B8).
+    """
+    filas, n, cols = _encabezado(_hojas_de_excel(origen), "input1", {"sku", "categoria"}, "Categorías")
+    categorias = {}
+    for fila in filas[n + 1:]:
+        if max(cols.values()) >= len(fila):
+            continue
+        codigo, categoria = _codigo(fila[cols["sku"]]), str(fila[cols["categoria"]] or "").strip()
+        if codigo and categoria:
+            categorias[codigo] = categoria
+    if not categorias:
+        raise ErrorDeEntrada("Categorías: no hay ningún SKU con categoría.")
+    return categorias
+
+
 def _y(partes: list[str]) -> str:
     return partes[0] if len(partes) == 1 else f"{', '.join(partes[:-1])} y {partes[-1]}"
 

@@ -15,8 +15,9 @@ domain/apertura.py     debajo del canal: valor y estado, fijado, ON/OFF
 domain/formato.py      montos como se escriben en Argentina (a_texto)
 domain/problema.py     el aviso de un problema en los datos
 movil/recorrido.py     encadena todo y exporta el Excel; también es la línea de comandos
-movil/sesion.py        la sesión del mes: entradas, ON/OFF, celdas fijadas, historial
-movil/repositorio.py   dónde vive la sesión (hoy en memoria, un lock global)
+movil/sesion.py        el móvil del mes: entradas, ON/OFF, celdas fijadas, historial; foto/heredar al mes siguiente
+movil/repositorio.py   un móvil por mes: en memoria, o guardado (graba cada acción y reconstruye)
+movil/almacen.py       las tablas (movil, comando, archivo) en Postgres; migraciones en backend/migrations
 auth/proveedor.py      quién es el usuario (hoy "planner-local"; Entra ID después)
 routes/movil.py        API /api/movil sobre la sesión
 app.py                 crear_app(): elige repositorio y autenticación
@@ -28,6 +29,26 @@ frontend/src/presentation/pages/Movil pantalla central (ruta /)
 El dominio no importa FastAPI, ni la base, ni openpyxl. Se testea sin levantar nada.
 La sesión recalcula el recorrido entero con cada cambio y cada cambio es una
 transacción: si el recálculo falla, vuelve al estado anterior.
+
+## Persistencia: un móvil por mes
+
+- **Se guarda lo que hizo el planner, no el estado.** Cada acción que sale bien
+  (`repositorio.ACCIONES`) va a la tabla `comando` con sus datos; los archivos subidos,
+  tal cual, a `archivo`. Un mes se reconstruye volviendo a ejecutar sus acciones, la
+  primera vez que se lo pide; después queda en memoria.
+- **Al reconstruir se difiere el recálculo** (`Sesion.diferir`): se recalcula una vez,
+  cuando alguien pide `recorrido`. Un ajuste tarda ~0,35 s; cien, sin diferir, serían
+  medio minuto.
+- **El mes siguiente** (`Repositorio.empezar_siguiente`) exige el último aprobado y
+  arranca con `heredar(foto)`: el reparto aprobado es la base, y se heredan totales por
+  canal, reglas, %, entidades apagadas, categorías y canales cerrados. La foto va dentro
+  del comando: el mes nuevo no depende de cómo se recalcule el anterior.
+- **Solo se reabre el último mes**: el siguiente ya arrancó del aprobado.
+- **Una acción nueva** que cambie el móvil tiene que sumarse a `ACCIONES`; si no, se
+  pierde al reiniciar. Sus argumentos tienen que ser JSON, `Path`/`BytesIO` (se guardan
+  como archivo), `datetime` o `Decimal`.
+- **ponytail: un solo proceso.** El repositorio tiene un lock global y una copia en
+  memoria por mes; con varios workers cada uno tendría la suya.
 
 ## Correrlo
 
@@ -56,6 +77,11 @@ npm ci --registry https://registry.npmjs.org
 Para levantarlo, en dos terminales: en `backend`, `$env:IS_LOCAL="true"; .venv\Scripts\python app.py`;
 en `frontend`, `npx vite --port 5175 --strictPort`. Un `npm install` a secas falla:
 el `.npmrc` apunta al registro privado de Nestlé.
+
+**Con base de datos** (Docker Desktop abierto): `make db` levanta Postgres y aplica las
+migraciones; `make dev-db` levanta todo guardando cada móvil ahí. Una tabla nueva o una
+columna nueva necesitan su migración en `backend/migrations/versions/` (un test compara las
+migraciones contra las tablas del código).
 
 `make api` y `make web` levantan cada parte por separado. Sin pantalla, el recorrido
 entero también corre por línea de comandos:
@@ -203,8 +229,9 @@ celda. El cruce no cambia al apagar un distribuidor.
 Lo funcional (MUST, SHOULD, qué depende de qué respuesta) está en `docs/plan.md` §2 y
 §3. Acá, solo lo técnico:
 
-- Persistencia en Postgres: otra implementación de `repositorio.py`. Mientras tanto, la
-  recarga automática de la API borra la sesión con cada cambio al código.
+- Sin `DATABASE_URL` (`make dev`), el móvil vive en memoria y la recarga automática de
+  la API lo borra con cada cambio al código. Con `make dev-db`, queda guardado.
+- Probar la persistencia contra Postgres real en el sandbox (los tests usan SQLite).
 - Entra ID: otro proveedor en `auth/proveedor.py`.
 - Leer el formato real (un `.xlsb` con bloques, B6): `importer/` lee tres `.xlsx`.
 - Buscador de SKUs en la matriz, si la cantidad real lo pide.

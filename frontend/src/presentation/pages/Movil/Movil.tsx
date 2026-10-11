@@ -12,7 +12,7 @@ import AddRoundedIcon from '@mui/icons-material/AddRounded';
 import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded';
 import UndoRoundedIcon from '@mui/icons-material/UndoRounded';
 import TaskAltRoundedIcon from '@mui/icons-material/TaskAltRounded';
-import { useMovil, useSoloLectura } from '../../../stores/useMovil';
+import { nombreMes, useMovil, useSoloLectura } from '../../../stores/useMovil';
 import { Estado, Unidad } from '../../../stores/useMovil/useMovil.type';
 import { conUnidad, formatear, UNIDADES } from './formato';
 import { AVENA, CIERRA, NO_CIERRA, numeros } from './estilo';
@@ -22,6 +22,7 @@ import { Foco, Repetido } from '../../../stores/useMovil/useMovil.type';
 import { Matriz } from './Matriz';
 import { Reglas } from './Reglas';
 import { CanalesDialog } from './CanalesDialog';
+import { CategoriasDialog } from './CategoriasDialog';
 import { MotivoDialog } from './MotivoDialog';
 
 const ACCIONES: Record<string, string> = {
@@ -36,6 +37,7 @@ const ACCIONES: Record<string, string> = {
   elegir_fila: 'Eligió qué fila vale de un SKU repetido',
   elegir_canales: 'Eligió dónde se vende un SKU', quitar_canales: 'Volvió un SKU a sus canales del mes anterior',
   porcentaje: 'Cambió la base de cálculo', quitar_input2: 'Sacó los totales por canal',
+  asignar_categorias: 'Asignó categorías', heredar: 'Arrancó desde el mes anterior aprobado',
   agregar_entidad: 'Agregó un distribuidor o vendedor', eliminar_entidad: 'Eliminó un distribuidor o vendedor',
 };
 
@@ -345,6 +347,7 @@ const Pendientes = ({ estado, unidad, enMatriz }: { estado: Estado; unidad: Unid
   };
   const [eligiendo, setEligiendo] = useState<Repetido>();
   const [canalesDe, setCanalesDe] = useState<string>();
+  const [categorias, setCategorias] = useState(false);
   const repetido = (sku: string | null) => estado.repetidos.find(r => r.sku === sku);
   const { enfocar } = useMovil();
   const acciones = (p: Estado['problemas'][number]) => {
@@ -356,6 +359,11 @@ const Pendientes = ({ estado, unidad, enMatriz }: { estado: Estado; unidad: Unid
           <Button size="small" color="inherit" sx={{ whiteSpace: 'nowrap' }} aria-label={`Ver celda ${celda}`}
             onClick={() => enfocar('celda', `${p.sku}|${p.canal}`)}>
             Ver celda
+          </Button>
+        )}
+        {p.tipo === 'sin_categoria' && (
+          <Button size="small" color="inherit" sx={{ whiteSpace: 'nowrap' }} onClick={() => setCategorias(true)}>
+            Asignar categorías
           </Button>
         )}
         {r && (
@@ -398,6 +406,7 @@ const Pendientes = ({ estado, unidad, enMatriz }: { estado: Estado; unidad: Unid
       {avisos.map((p, n) => <Alert key={`p${n}`} severity="warning" action={acciones(p)}>{conSku(p)}</Alert>)}
       {eligiendo && <FilaDialog repetido={eligiendo} onCerrar={() => setEligiendo(undefined)} />}
       {canalesDe && <CanalesDialog sku={canalesDe} estado={estado} onCerrar={() => setCanalesDe(undefined)} />}
+      {categorias && <CategoriasDialog estado={estado} onCerrar={() => setCategorias(false)} />}
     </Box>
   );
 };
@@ -490,6 +499,12 @@ const Etapas = ({ estado, cierra }: { estado: Estado; cierra: boolean }) => {
   );
 };
 
+/** "2026-12" → "2027-01". */
+const mesSiguiente = (mes: string) => {
+  const [anio, m] = mes.split('-').map(Number);
+  return m === 12 ? `${anio + 1}-01` : `${anio}-${String(m + 1).padStart(2, '0')}`;
+};
+
 /** Aprobar es una decisión de una persona: se confirma, y lo que quede para revisar se ve antes. */
 const AprobarDialog = ({ estado, onCerrar }: { estado: Estado; onCerrar: () => void }) => {
   const { aprobar, ocupado } = useMovil();
@@ -530,7 +545,9 @@ const AprobarDialog = ({ estado, onCerrar }: { estado: Estado; onCerrar: () => v
 };
 
 export const MovilPage = () => {
-  const { estado, cruce, unidad, refrescar, elegirUnidad, ocupado, errorDeCarga, foco, deshacer, reabrir } = useMovil();
+  const { estado, cruce, unidad, refrescar, elegirUnidad, ocupado, errorDeCarga, foco, deshacer, reabrir, meses, verMes,
+    empezarSiguiente } = useMovil();
+  const ultimo = meses[meses.length - 1]?.mes;
   const [confirmarExportar, setConfirmarExportar] = useState(false);
   const [confirmarAprobar, setConfirmarAprobar] = useState(false);
   const [reabriendo, setReabriendo] = useState(false);
@@ -563,6 +580,7 @@ export const MovilPage = () => {
     paraRevisar && `${paraRevisar} para revisar`,
   ].filter(Boolean).join(' · ') || 'Nada';
   const cierraTodo = estado.cierra.kilos && estado.cierra.plata;
+  const anterior = ultimo !== undefined && estado.mes !== ultimo;
   const sinRevisar = estado.etapas.filter(e => !e.revisada).map(e => NOMBRE_ETAPA[e.etapa]);
   const queDeshace = estado.deshacer
     && `Deshacer: ${ACCIONES[estado.deshacer.accion] ?? estado.deshacer.accion} · ${estado.deshacer.detalle}`;
@@ -581,6 +599,15 @@ export const MovilPage = () => {
           {ocupado && <LinearProgress sx={{ position: 'absolute', left: 0, right: 0, bottom: 0 }} aria-label="Recalculando" />}
           <Box sx={{ mr: 'auto', display: 'flex', alignItems: 'center', gap: 0.5 }}>
             <Typography variant="h5" fontWeight={700}>Móvil</Typography>
+            {meses.length > 1 ? (
+              <TextField select size="small" value={estado.mes} SelectProps={{ native: true }}
+                inputProps={{ 'aria-label': 'Mes del móvil' }} sx={{ ml: 1 }}
+                onChange={e => verMes(e.target.value === ultimo ? undefined : e.target.value)}>
+                {meses.map(m => <option key={m.mes} value={m.mes}>{nombreMes(m.mes)}{m.aprobado ? ' · aprobado' : ''}</option>)}
+              </TextField>
+            ) : (
+              <Typography variant="h5" color="text.secondary" sx={{ ml: 1 }}>{nombreMes(estado.mes)}</Typography>
+            )}
             <Ayuda ayuda={AYUDA.movil} />
           </Box>
           {estado.faltan.length === 0 && (
@@ -607,7 +634,7 @@ export const MovilPage = () => {
           </ToggleButtonGroup>
           {estado.faltan.length === 0 && !estado.aprobado && <ResumenEtapas estado={estado} />}
           {estado.aprobado ? (
-            <Button size="small" color="inherit" onClick={() => setReabriendo(true)} disabled={ocupado}>Reabrir</Button>
+            !anterior && <Button size="small" color="inherit" onClick={() => setReabriendo(true)} disabled={ocupado}>Reabrir</Button>
           ) : (
             <Tooltip title={!cierraTodo ? 'Se puede aprobar cuando kilos y pesos cierran'
               : sinRevisar.length ? `Falta revisar la etapa ${sinRevisar.join(' y la ')}`
@@ -629,17 +656,25 @@ export const MovilPage = () => {
                   Exportar
                 </Button>
               ) : (
-                <Button variant="contained" startIcon={<FileDownloadRoundedIcon />} href="/api/movil/exportar" disabled={!cierraTodo}>
+                <Button variant="contained" startIcon={<FileDownloadRoundedIcon />} href={`/api/movil/exportar?mes=${estado.mes}`} disabled={!cierraTodo}>
                   Exportar
                 </Button>
               )}
             </span>
           </Tooltip>
         </Box>
-        {estado.aprobado && (
-          <Alert severity="success" icon={<TaskAltRoundedIcon />}>
+        {anterior ? (
+          <Alert severity="info" action={<Button color="inherit" onClick={() => verMes(undefined)}>Ir a {nombreMes(ultimo!)}</Button>}>
+            Estás viendo {nombreMes(estado.mes)}, un mes anterior. Es de solo lectura.
+          </Alert>
+        ) : estado.aprobado && (
+          <Alert severity="success" icon={<TaskAltRoundedIcon />} action={
+            <Button color="inherit" disabled={ocupado} onClick={() => empezarSiguiente()}>
+              Empezar {nombreMes(mesSiguiente(estado.mes))}
+            </Button>
+          }>
             Aprobado por {estado.aprobado.autor} el {new Date(estado.aprobado.cuando).toLocaleString('es-AR')}. Es de
-            solo lectura: para cambiarlo, reabrilo.
+            solo lectura: para cambiarlo, reabrilo. El mes siguiente arranca de este reparto.
           </Alert>
         )}
         {confirmarAprobar && <AprobarDialog estado={estado} onCerrar={() => setConfirmarAprobar(false)} />}
@@ -667,7 +702,7 @@ export const MovilPage = () => {
             </DialogContent>
             <DialogActions sx={{ px: 3, pb: 2 }}>
               <Button onClick={() => setConfirmarExportar(false)}>Cancelar</Button>
-              <Button variant="contained" href="/api/movil/exportar" onClick={() => setConfirmarExportar(false)}>
+              <Button variant="contained" href={`/api/movil/exportar?mes=${estado.mes}`} onClick={() => setConfirmarExportar(false)}>
                 Exportar igual
               </Button>
             </DialogActions>

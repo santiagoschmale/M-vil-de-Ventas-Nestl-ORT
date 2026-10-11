@@ -52,6 +52,7 @@ export type Repetido = {
 };
 
 export type Estado = {
+  mes: string; // "2026-10"
   faltan: string[];
   entradas: {
     input1: { archivo: string; skus: number; kilos: Monto; nns: Monto } | null;
@@ -85,6 +86,8 @@ export type Estado = {
   porcentajes: (Ajuste & { canal: string; entidad: string; porcentaje: string })[]; // base de cálculo manual
   entidades_nuevas: (Ajuste & { canal: string; entidad: string })[]; // altas hechas en la herramienta
   porcentaje_asignado: Record<string, string>; // canal -> % manual asignado en total
+  sin_categoria: { sku: string; descripcion: string }[]; // SKUs del mes sin categoría: no entran en reglas
+  aperturas_canal: { canal: string; abre: boolean }[]; // canales con apertura en el mes anterior y si hoy se abren
 };
 
 export type Celda = { monto: Monto; fijada: boolean };
@@ -122,7 +125,17 @@ type Resultado = Promise<string | null>;
 /** A qué fila fue a mirar el planner desde "Para revisar". `vez` cambia en cada clic. */
 export type Foco = { tipo: 'regla' | 'sku' | 'celda'; id: string; vez: number }; // celda: "sku|canal"
 
+// Un móvil por mes: "2026-10". aprobado = null si está en borrador.
+export type MesResumen = { mes: string; aprobado: Ajuste | null };
+
 export type TUseMovil = {
+  mes?: string; // el mes que se está viendo; undefined = el último
+  meses: MesResumen[];
+  verMes: (mes?: string) => Promise<void>;
+  empezarSiguiente: () => Resultado;
+  asignarCategorias: (categorias: Record<string, string>, motivo: string) => Resultado;
+  cargarCategorias: (archivo: File) => Resultado;
+  cambiarAperturaCanal: (canal: string, abre: boolean, motivo: string) => Resultado;
   foco?: Foco;
   enfocar: (tipo: Foco['tipo'], id: string) => void;
   soltarFoco: () => void;

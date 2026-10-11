@@ -5,6 +5,9 @@ POC Distribución del Móvil · Nestlé DIL Región Plata · Universidad ORT
 Solo lo que falta definir. Cuando una se responde, la respuesta pasa a
 `entendimiento-negocio.md` (marcada [confirmado]) y se borra de acá.
 
+Decidido por nosotros (B8): el template propuesto no trae Categoría y no la pedimos;
+la herramienta guarda la categoría de cada SKU y la hereda mes a mes.
+
 Respondidas por el referente de negocio (07/10): base de cálculo (B4), apertura de
 canales (A10, B5) y NNS c/IIBB (B7, no viene en el template). Ver
 `entendimiento-negocio.md` §3 y §7. Los ids (A1,
@@ -39,7 +42,6 @@ R1…) se citan en el código: no se renumeran.
 |---|---|---|
 | A15 | **Excel de salida**: ¿la herramienta tiene que generar el archivo de carga a SAP? ¿Con qué template? Lo están validando con Finanzas. | Lo definimos nosotros: Kilos, Plata, Apertura, Problemas |
 | B6 | **Formato de entrada**: proponen un template estándar `SKU \| Descripción \| kg \| NNS / KG \| NNS` para el objetivo del mes. Lo están validando con Finanzas. | El objetivo se lee por nombre de columna: ese template se lee sin cambios |
-| B8 | **Categoría en el template de entrada.** El template propuesto no tiene Categoría, y las reglas se definen por categoría ("en Mayoristas, el café no pasa del 20%"). ¿Se puede sumar la columna? Si no: la herramienta guarda la categoría de cada SKU y se hereda mes a mes (necesita persistencia). | Sin la columna, se lee igual pero no se puede armar ninguna regla |
 | A2 | ¿Los totales por canal admiten margen (se mencionó ±500 kg) o cierran exacto? | Supuesto: exacto |
 | A4 | SKU nuevo sin historia: ¿el planner dice en qué canales va y se reparte en proporción al total de cada uno? | Supuesto: así ("Dónde se vende") |
 | A12 | Editar el mes anterior: ¿qué se edita, cuánto vendió un SKU en un canal o dónde se vende? | No se edita |

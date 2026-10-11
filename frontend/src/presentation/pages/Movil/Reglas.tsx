@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   Alert, Box, Button, Checkbox, Chip, Dialog, DialogActions, DialogContent, DialogTitle, FormControlLabel,
-  FormGroup, FormLabel, IconButton, Table, TableBody, TableCell, TableHead, TableRow, TextField,
+  FormGroup, FormLabel, IconButton, Switch, Table, TableBody, TableCell, TableHead, TableRow, TextField,
   ToggleButton, ToggleButtonGroup, Tooltip, Typography,
 } from '@mui/material';
 import AddRoundedIcon from '@mui/icons-material/AddRounded';
@@ -123,12 +123,13 @@ const ReglaDialog = ({ regla, estado, onCerrar }: Formulario & { estado: Estado;
 };
 
 export const Reglas = ({ estado }: { estado: Estado }) => {
-  const { eliminarRegla, quitarCanales, foco } = useMovil();
+  const { eliminarRegla, quitarCanales, cambiarAperturaCanal, foco, ocupado } = useMovil();
   const soloLectura = useSoloLectura();
   const [canalesDe, setCanalesDe] = useState<string>();
   const [quitarDe, setQuitarDe] = useState<string>();
   const [formulario, setFormulario] = useState<Formulario>();
   const [eliminar, setEliminar] = useState<Regla>();
+  const [apertura, setApertura] = useState<{ canal: string; abre: boolean }>();
   const chocan = enConflicto(estado);
 
   return (
@@ -202,6 +203,35 @@ export const Reglas = ({ estado }: { estado: Estado }) => {
             </Box>
           ))}
         </Box>
+      )}
+      {estado.aperturas_canal.length > 0 && (
+        <Box sx={{ mt: 2 }}>
+          <Typography variant="subtitle2" fontWeight={700}>Cómo se abre cada canal</Typography>
+          <Typography variant="body2" color="text.secondary">
+            Los canales que el mes anterior se abrieron entre distribuidores o vendedores. Apagado, el canal cierra en
+            el canal, sin apertura.
+          </Typography>
+          <FormGroup row>
+            {estado.aperturas_canal.map(a => (
+              <FormControlLabel key={a.canal} label={a.canal} control={
+                <Switch size="small" checked={a.abre} disabled={ocupado || soloLectura}
+                  inputProps={{ 'aria-label': `${a.canal} se abre debajo del canal` }}
+                  onChange={() => setApertura({ canal: a.canal, abre: !a.abre })} />
+              } />
+            ))}
+          </FormGroup>
+        </Box>
+      )}
+      {apertura && (
+        <MotivoDialog
+          titulo={apertura.abre ? `Abrir ${apertura.canal}` : `Cerrar ${apertura.canal} en el canal`}
+          descripcion={apertura.abre
+            ? 'Vuelve a repartirse entre sus distribuidores o vendedores, como el mes anterior.'
+            : 'Deja de abrirse entre distribuidores o vendedores: el canal cierra en el canal, como una sola línea.'}
+          confirmar={apertura.abre ? 'Abrir' : 'Cerrar en el canal'}
+          onConfirmar={m => cambiarAperturaCanal(apertura.canal, apertura.abre, m)}
+          onCerrar={() => setApertura(undefined)}
+        />
       )}
       {canalesDe && <CanalesDialog sku={canalesDe} estado={estado} onCerrar={() => setCanalesDe(undefined)} />}
       {quitarDe && (
