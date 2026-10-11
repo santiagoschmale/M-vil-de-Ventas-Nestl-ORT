@@ -25,7 +25,8 @@ def upgrade() -> None:
     op.create_index("ix_comando_mes", "comando", ["mes"])
     op.create_table(
         "archivo",
-        sa.Column("id", sa.Integer, primary_key=True, autoincrement=True),
+        sa.Column("comando_id", sa.Integer, sa.ForeignKey("comando.id"), primary_key=True),
+        sa.Column("n", sa.Integer, primary_key=True),
         sa.Column("contenido", sa.LargeBinary, nullable=False),
     )
 

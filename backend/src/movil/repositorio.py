@@ -12,23 +12,12 @@ from __future__ import annotations
 import threading
 from contextlib import contextmanager
 from datetime import date, datetime
-from decimal import Decimal
 from io import BytesIO
 from pathlib import Path
 from typing import Callable, Iterator
 
 from src.movil.almacen import Almacen
 from src.movil.sesion import ErrorDeAjuste, Sesion
-
-# Las acciones del planner que cambian el móvil: son las que se guardan.
-ACCIONES = frozenset({
-    "cargar_input1", "cargar_input2", "quitar_input2", "cargar_base", "heredar",
-    "cambiar_sku", "cambiar_entidad", "fijar", "desfijar", "elegir_fila", "elegir_canales", "quitar_canales",
-    "agregar_regla", "editar_regla", "eliminar_regla", "asignar_porcentaje", "agregar_entidad", "eliminar_entidad",
-    "asignar_categorias", "cambiar_apertura_canal",
-    "revisar_etapa", "aprobar", "reabrir", "deshacer",
-})
-
 
 class MesInexistente(LookupError):
     pass
@@ -58,7 +47,9 @@ class Repositorio:
                     self._crear(mes)
             elif mes not in meses:
                 raise MesInexistente(f"No hay un móvil de {mes}.")
-            yield _Grabadora(self._sesion(mes), self, mes, es_ultimo=mes == (meses[-1] if meses else mes))
+            sesion = self._sesion(mes)
+            sesion.es_ultimo = not meses or mes == meses[-1]
+            yield _Grabadora(sesion, self, mes)
 
     def meses(self) -> list[dict]:
         """
@@ -82,7 +73,8 @@ class Repositorio:
             # La foto antes de crear el mes: si falla, no queda un mes vacío.
             foto, nuevo = anterior.foto(), mes_siguiente(ultimo)
             self._crear(nuevo)
-            _Grabadora(self._sesion(nuevo), self, nuevo, es_ultimo=True).heredar(foto, ultimo, autor, cuando)
+            anterior.es_ultimo = False
+            _Grabadora(self._sesion(nuevo), self, nuevo).heredar(foto, ultimo, autor, cuando)
             return nuevo
 
     # --- interno ------------------------------------------------------------
@@ -103,8 +95,8 @@ class Repositorio:
     def _reconstruir(self, mes: str) -> Sesion:
         s = Sesion()
         s.diferir = True  # se recalcula una vez, al final, no en cada acción
-        for metodo, guardado in self._almacen.comandos(mes):
-            args = _decodificar(guardado, self._almacen)
+        for id_, metodo, guardado in self._almacen.comandos(mes):
+            args = _decodificar(guardado, self._almacen.archivos(id_))
             getattr(s, metodo)(*args["args"], **args["kwargs"])
         s.diferir = False
         return s
@@ -124,24 +116,26 @@ class Repositorio:
 
 
 class _Grabadora:
-    """El móvil, tal cual, salvo que cada acción que sale bien queda guardada."""
+    """
+    El móvil, tal cual, salvo que cada acción que sale bien queda guardada. Una acción es
+    lo que deja una entrada en el historial: no hay que mantener una lista.
+    """
 
-    def __init__(self, sesion: Sesion, repositorio: Repositorio, mes: str, es_ultimo: bool):
-        object.__setattr__(self, "_s", sesion)
-        object.__setattr__(self, "_r", repositorio)
-        object.__setattr__(self, "mes", mes)
-        object.__setattr__(self, "es_ultimo", es_ultimo)
+    def __init__(self, sesion: Sesion, repositorio: Repositorio, mes: str):
+        self._s, self._r, self.mes = sesion, repositorio, mes
 
     def __getattr__(self, nombre):
         valor = getattr(self._s, nombre)
-        if nombre not in ACCIONES:
+        if not callable(valor):
             return valor
 
-        def accion(*args, **kwargs):
+        def llamada(*args, **kwargs):
+            antes = len(self._s.historial)
             resultado = valor(*args, **kwargs)
-            self._r._registrar(self.mes, nombre, args, kwargs)
+            if len(self._s.historial) > antes:
+                self._r._registrar(self.mes, nombre, args, kwargs)
             return resultado
-        return accion
+        return llamada
 
 
 def mes_siguiente(mes: str) -> str:
@@ -160,24 +154,20 @@ def _codificar(valor, archivos: list[bytes]):
         return {"__archivo__": len(archivos) - 1}
     if isinstance(valor, datetime):
         return {"__fecha__": valor.isoformat()}
-    if isinstance(valor, Decimal):
-        return {"__decimal__": str(valor)}
     if isinstance(valor, dict):
         return {k: _codificar(v, archivos) for k, v in valor.items()}
-    if isinstance(valor, (list, tuple, set, frozenset)):
+    if isinstance(valor, (list, tuple)):
         return [_codificar(v, archivos) for v in valor]
     return valor
 
 
-def _decodificar(valor, almacen: Almacen):
+def _decodificar(valor, archivos: list[bytes]):
     if isinstance(valor, dict):
         if set(valor) == {"__archivo__"}:
-            return BytesIO(almacen.archivo(valor["__archivo__"]))
+            return BytesIO(archivos[valor["__archivo__"]])
         if set(valor) == {"__fecha__"}:
             return datetime.fromisoformat(valor["__fecha__"])
-        if set(valor) == {"__decimal__"}:
-            return Decimal(valor["__decimal__"])
-        return {k: _decodificar(v, almacen) for k, v in valor.items()}
+        return {k: _decodificar(v, archivos) for k, v in valor.items()}
     if isinstance(valor, list):
-        return [_decodificar(v, almacen) for v in valor]
+        return [_decodificar(v, archivos) for v in valor]
     return valor

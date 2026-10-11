@@ -3,9 +3,9 @@ import {
   Alert, Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Table, TableBody, TableCell,
   TableHead, TableRow, TextField,
 } from '@mui/material';
-import UploadFileRoundedIcon from '@mui/icons-material/UploadFileRounded';
 import { useMovil, useSoloLectura } from '../../../stores/useMovil';
 import { Estado } from '../../../stores/useMovil/useMovil.type';
+import { Subir } from './Movil';
 
 /**
  * Categoría de los SKUs que no la traen en el objetivo del mes. Se sube un Excel (SKU y
@@ -24,11 +24,7 @@ export const CategoriasDialog = ({ estado, onCerrar }: { estado: Estado; onCerra
     e.preventDefault();
     resultado(await asignarCategorias(completas, motivo.trim()));
   };
-  const subir = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const archivo = e.target.files?.[0];
-    e.target.value = '';
-    if (archivo) resultado(await cargarCategorias(archivo));
-  };
+  const subir = async (archivo: File) => resultado(await cargarCategorias(archivo));
 
   return (
     <Dialog open onClose={onCerrar} maxWidth="sm" fullWidth aria-labelledby="titulo-categorias"
@@ -39,11 +35,7 @@ export const CategoriasDialog = ({ estado, onCerrar }: { estado: Estado; onCerra
           Las reglas se arman por categoría (por ejemplo, «en Mayoristas, el café no pasa del 20%»). Estos SKUs no la
           traen en el objetivo del mes. Lo que asignes queda guardado: el mes que viene solo vas a completar los nuevos.
         </DialogContentText>
-        <Button component="label" variant="outlined" size="small" startIcon={<UploadFileRoundedIcon />}
-          disabled={ocupado || soloLectura}>
-          Subir Excel con SKU y Categoría
-          <input type="file" hidden accept=".xlsx,.xlsm" onChange={subir} />
-        </Button>
+        <Subir cargado={false} etiqueta="Excel con SKU y Categoría" texto="Subir Excel con SKU y Categoría" alElegir={subir} />
         <datalist id="categorias-existentes">
           {estado.opciones.categorias.map(c => <option key={c} value={c} />)}
         </datalist>

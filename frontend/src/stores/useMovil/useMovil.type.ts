@@ -53,6 +53,8 @@ export type Repetido = {
 
 export type Estado = {
   mes: string; // "2026-10"
+  es_ultimo: boolean; // un mes anterior es de solo lectura
+  siguiente: string; // el mes que se empieza al aprobar este
   faltan: string[];
   entradas: {
     input1: { archivo: string; skus: number; kilos: Monto; nns: Monto } | null;
@@ -129,7 +131,7 @@ export type Foco = { tipo: 'regla' | 'sku' | 'celda'; id: string; vez: number };
 export type MesResumen = { mes: string; aprobado: Ajuste | null };
 
 export type TUseMovil = {
-  mes?: string; // el mes que se está viendo; undefined = el último
+  mes?: string; // el mes que se está viendo; undefined = el último (hasta que llega el estado)
   meses: MesResumen[];
   verMes: (mes?: string) => Promise<void>;
   empezarSiguiente: () => Resultado;

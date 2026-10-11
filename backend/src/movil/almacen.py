@@ -26,12 +26,13 @@ comando = Table(
     Column("id", Integer, primary_key=True, autoincrement=True),  # el orden en que se hicieron
     Column("mes", String(7), ForeignKey("movil.mes"), nullable=False, index=True),
     Column("metodo", String(40), nullable=False),
-    Column("args", JSON, nullable=False),  # {"args": [...], "kwargs": {...}}, codificados por el repositorio
+    Column("args", JSON, nullable=False),  # {"args": [...], "kwargs": {...}}; un archivo es {"__archivo__": n}
 )
 
 archivo = Table(
     "archivo", metadata,
-    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("comando_id", Integer, ForeignKey("comando.id"), primary_key=True),
+    Column("n", Integer, primary_key=True),  # la posición en los argumentos de la acción
     Column("contenido", LargeBinary, nullable=False),
 )
 
@@ -55,28 +56,20 @@ class Almacen:
         with self.motor.begin() as c:
             c.execute(insert(movil).values(mes=mes))
 
-    def comandos(self, mes: str) -> list[tuple[str, dict]]:
+    def comandos(self, mes: str) -> list[tuple[int, str, dict]]:
         with self.motor.connect() as c:
-            return [(m, a) for m, a in c.execute(
-                select(comando.c.metodo, comando.c.args).where(comando.c.mes == mes).order_by(comando.c.id))]
+            return [tuple(fila) for fila in c.execute(
+                select(comando.c.id, comando.c.metodo, comando.c.args).where(comando.c.mes == mes).order_by(comando.c.id))]
 
     def guardar(self, mes: str, metodo: str, args: dict, archivos: list[bytes]) -> None:
-        """La acción y sus archivos, en una sola transacción. `args` refiere a los archivos por posición."""
+        """La acción y sus archivos, en una sola transacción."""
         with self.motor.begin() as c:
-            ids = [c.execute(insert(archivo).values(contenido=b)).inserted_primary_key[0] for b in archivos]
-            c.execute(insert(comando).values(mes=mes, metodo=metodo, args=_con_ids(args, ids)))
+            id_ = c.execute(insert(comando).values(mes=mes, metodo=metodo, args=args)).inserted_primary_key[0]
+            for n, contenido in enumerate(archivos):
+                c.execute(insert(archivo).values(comando_id=id_, n=n, contenido=contenido))
 
-    def archivo(self, id_: int) -> bytes:
+    def archivos(self, comando_id: int) -> list[bytes]:
         with self.motor.connect() as c:
-            return c.scalar(select(archivo.c.contenido).where(archivo.c.id == id_))
+            return list(c.scalars(select(archivo.c.contenido).where(archivo.c.comando_id == comando_id)
+                                  .order_by(archivo.c.n)))
 
-
-def _con_ids(valor, ids: list[int]):
-    """Reemplaza {"__archivo__": posición} por {"__archivo__": id en la base}."""
-    if isinstance(valor, dict):
-        if set(valor) == {"__archivo__"}:
-            return {"__archivo__": ids[valor["__archivo__"]]}
-        return {k: _con_ids(v, ids) for k, v in valor.items()}
-    if isinstance(valor, list):
-        return [_con_ids(v, ids) for v in valor]
-    return valor

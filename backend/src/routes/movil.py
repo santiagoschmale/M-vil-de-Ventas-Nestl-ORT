@@ -21,7 +21,7 @@ from pydantic import BaseModel, Field
 from src.domain.cruce import Inconsistencia, ResultadoCruce
 from src.movil.recorrido import exportar, por_que_no_abre
 from src.movil.sesion import UNIDADES as DECIMALES, Ajuste, ErrorDeAjuste, Sesion
-from src.movil.repositorio import MesInexistente
+from src.movil.repositorio import MesInexistente, mes_siguiente
 
 router = APIRouter(prefix="/api/movil", tags=["Móvil"])
 # Canales y entidades van al final de la ruta con :path: un nombre real puede tener "/".
@@ -186,6 +186,9 @@ def _estado(s: Sesion) -> dict:
     cruces = {"kilos": r.kilos if r else None, "plata": r.plata if r else None}
     return {
         "mes": s.mes,
+        # Un mes anterior es de solo lectura; el siguiente es el que se empieza al aprobar este.
+        "es_ultimo": s.es_ultimo,
+        "siguiente": mes_siguiente(s.mes),
         "faltan": s.faltan(),
         "entradas": {"input1": input1, "input2": input2, "base": base},
         "cierra": {u: _cierra(c) for u, c in cruces.items()},
@@ -454,9 +457,6 @@ def aprobar(s: Sesion = Depends(sesion), quien: str = Depends(autor)):
 
 @router.post("/reabrir", summary="Volver el móvil aprobado a borrador, con motivo")
 def reabrir(cuerpo: MotivoIn, s: Sesion = Depends(sesion), quien: str = Depends(autor)):
-    # El mes siguiente arrancó de este aprobado: reabrir uno viejo dejaría a los dos inconsistentes.
-    if not s.es_ultimo:
-        raise HTTPException(422, f"Solo se puede reabrir el último mes; {s.mes} ya es la base del siguiente.")
     _aplicar(s.reabrir, autor=quien, cuando=_ahora(), motivo=cuerpo.motivo)
     return _estado(s)
 

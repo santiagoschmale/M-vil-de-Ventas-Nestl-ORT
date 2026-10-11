@@ -57,7 +57,7 @@ def test_una_accion_rechazada_no_se_guarda():
             s.cambiar_sku("no-existe", activo=False, autor=P, cuando=CUANDO, motivo="")
         except ErrorDeAjuste:
             pass
-    assert [m for m, _ in almacen.comandos("2026-10")] == ["cargar_input1"]
+    assert [m for _, m, _ in almacen.comandos("2026-10")] == ["cargar_input1"]
 
 
 def test_pedir_un_mes_que_no_existe_falla():
@@ -125,3 +125,21 @@ def test_el_mes_siguiente_sin_ningun_mes_avisa():
         assert False, "tenía que fallar"
     except ErrorDeAjuste as e:
         assert "ningún móvil" in str(e)
+
+
+def test_un_mes_anterior_no_se_toca():
+    """Quien tenía octubre abierto no puede seguir cambiándolo cuando otro ya empezó noviembre."""
+    r = Repositorio(_almacen(), hoy=HOY)
+    with r.usar() as s:
+        _armar(s)
+    r.empezar_siguiente(P, DESPUES)
+    with r.usar("2026-10") as s:
+        assert not s.es_ultimo
+        for accion in (lambda: s.reabrir(P, DESPUES, "m"),
+                       lambda: s.cambiar_sku(NUEVO, activo=True, autor=P, cuando=DESPUES, motivo="m"),
+                       lambda: s.asignar_categorias({"90020001": "Café"}, P, DESPUES, "m")):
+            try:
+                accion()
+                assert False, "tenía que rechazarse"
+            except ErrorDeAjuste:
+                pass

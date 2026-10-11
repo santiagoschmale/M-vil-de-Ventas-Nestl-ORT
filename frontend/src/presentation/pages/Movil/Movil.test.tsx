@@ -547,7 +547,7 @@ describe('MovilPage', { timeout: 15000 }, () => {
       http.get('*/api/movil', ({ request }) => {
         const mes = new URL(request.url).searchParams.get('mes');
         pedidosMes.push(mes ?? 'último');
-        return HttpResponse.json(mes ? estado({ mes, aprobado }) : estado({ mes: '2026-11' }));
+        return HttpResponse.json(mes === '2026-10' ? estado({ mes, aprobado, es_ultimo: false }) : estado({ mes: '2026-11' }));
       }),
       http.get('*/api/movil/meses', () => HttpResponse.json([{ mes: '2026-10', aprobado }, { mes: '2026-11', aprobado: null }])),
     );
@@ -579,6 +579,17 @@ describe('MovilPage', { timeout: 15000 }, () => {
     await user.click(within(dialogo).getByRole('button', { name: 'Guardar' }));
     await waitFor(() => expect(pedidos).toEqual([{ metodo: 'PUT', url: '/api/movil/categorias',
       cuerpo: { categorias: { 100: 'Puré' }, motivo: 'carga inicial' } }]));
+  });
+
+  it('los cambios van al mes que se está viendo, no al último', async () => {
+    let url = '';
+    server.use(http.put('*/api/movil/skus/*', ({ request }) => { url = request.url; return HttpResponse.json(estado()); }));
+    const user = userEvent.setup({ delay: null });
+    render(<MovilPage />);
+    await user.click(await screen.findByRole('checkbox', { name: 'Apagar 100' }));
+    await user.type(screen.getByRole('textbox', { name: /Motivo/ }), 'm');
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Apagar' }));
+    await waitFor(() => expect(new URL(url).searchParams.get('mes')).toBe('2026-10'));
   });
 
   it('exportar se habilita solo cuando kilos y pesos cierran', async () => {

@@ -44,6 +44,9 @@ from src.movil.recorrido import Recorrido, Regla, armar
 
 UNIDADES = {"kilos": KILOS, "plata": PLATA}
 
+# Lo que Deshacer y la vuelta atrás de un cambio fallido no tocan.
+_NO_SE_DESHACE = {"historial", "_antes_del_ultimo", "ultimo_cambio", "aprobado", "diferir", "es_ultimo"}
+
 # Revisión por etapa, en orden. Un cambio en una etapa borra el OK de esa y de las siguientes.
 ETAPAS = ("canal", "apertura")
 _NOMBRE_ETAPA = {"canal": "por canal", "apertura": "debajo del canal"}
@@ -119,6 +122,8 @@ class Sesion:
         # pide el resultado (`recorrido`), en vez de en cada acción.
         self.diferir = False
         self._sucio = False
+        # Un mes que ya no es el último es de solo lectura: el siguiente arrancó de su aprobado.
+        self.es_ultimo = True
         # El último cambio y el estado de antes, para deshacerlo. Una sola vez: después queda en None.
         self._antes_del_ultimo: tuple | None = None
         self.ultimo_cambio: Ajuste | None = None
@@ -301,12 +306,13 @@ class Sesion:
             raise ErrorDeAjuste(f"Los % de {canal} sumarían {a_texto(otros + valor)}%: no pueden pasar de 100.")
         return valor
 
-    def _cerrado(self, canal_base: str) -> bool:
-        return any(normalizar(c) == normalizar(canal_base) for c in self.canales_cerrados)
+    def _nombres_de_canal(self) -> dict[str, str]:
+        """Nombre normalizado -> nombre en los totales por canal."""
+        return {normalizar(c): c for c in (self._e.canales or {})}
 
     def _canal(self, canal: str) -> str:
         """El canal con el nombre de los totales por canal: "cordoba" es "Córdoba"."""
-        por_nombre = {normalizar(c): c for c in (self._e.canales or {})}
+        por_nombre = self._nombres_de_canal()
         if normalizar(canal) not in por_nombre:
             raise ErrorDeAjuste(f"{canal} no está en los totales por canal.")
         return por_nombre[normalizar(canal)]
@@ -333,7 +339,9 @@ class Sesion:
               motivo: str) -> None:
         motivo = _motivo(motivo)
         decimales = self._unidad(unidad)
-        r = self._exigir_recorrido()
+        if self.faltan():
+            raise ErrorDeAjuste(f"Falta cargar: {', '.join(self.faltan())}.")
+        objetivos, canales = self.objetivos_vigentes(), self._e.canales
         valor = numero(monto) if isinstance(monto, str) else None
         if valor is None:
             raise ErrorDeAjuste(f"'{monto}' no es un número.")
@@ -342,14 +350,14 @@ class Sesion:
         paso = Decimal(1).scaleb(-decimales)
         if valor % paso != 0:
             raise ErrorDeAjuste(f"{unidad} admite como máximo {decimales} decimales.")
-        if sku not in r.objetivos or sku in self.apagados_skus:
+        if sku not in objetivos or sku in self.apagados_skus:
             raise ErrorDeAjuste(f"El SKU {sku} no está en el reparto de este mes.")
-        if canal not in r.canales:
+        if canal not in canales:
             raise ErrorDeAjuste(f"El canal {canal} no está en los totales por canal.")
         if not self._se_vende(sku, canal):
             raise ErrorDeAjuste(f"El SKU {sku} no se vende en {canal}: no se puede fijar.")
-        objetivo = r.objetivos[sku].kilos if unidad == "kilos" else r.objetivos[sku].nns
-        total_canal = r.canales[canal].kilos if unidad == "kilos" else r.canales[canal].plata
+        objetivo = objetivos[sku].kilos if unidad == "kilos" else objetivos[sku].nns
+        total_canal = canales[canal].kilos if unidad == "kilos" else canales[canal].plata
         if objetivo is not None and valor > objetivo:
             raise ErrorDeAjuste(f"El valor supera el objetivo del SKU {sku} ({_con_unidad(objetivo, unidad)}).")
         if total_canal is not None and valor > total_canal:
@@ -396,7 +404,7 @@ class Sesion:
         pedidos = [c for c in (canales or []) if c and c.strip()]
         if not pedidos:
             raise ErrorDeAjuste("Elegí al menos un canal.")
-        por_nombre = {normalizar(c): c for c in (self._e.canales or {})}
+        por_nombre = self._nombres_de_canal()
         faltan = [c for c in pedidos if normalizar(c) not in por_nombre]
         if faltan:
             raise ErrorDeAjuste(f"No están en los totales por canal: {', '.join(faltan)}.")
@@ -440,15 +448,15 @@ class Sesion:
 
     def canales_que_se_abren(self) -> dict[str, bool]:
         """Los canales que tienen apertura en el mes anterior, y si hoy se abren o cierran en el canal."""
-        por_nombre = {normalizar(c): c for c in (self._e.canales or {})}
-        con_apertura = {por_nombre.get(normalizar(c), c) for _, c in self._e.apertura}
+        por_nombre = self._nombres_de_canal()
+        con_apertura = {por_nombre.get(normalizar(c), c) for c in {c for _, c in self._e.apertura}}
         return {c: c not in self.canales_cerrados for c in sorted(con_apertura)}
 
     def cambiar_apertura_canal(self, canal: str, abre: bool, autor: str, cuando: datetime, motivo: str) -> None:
         """Un canal que se abre en el archivo se cierra en el canal, o vuelve a abrirse."""
         motivo = _motivo(motivo)
         canal = self._canal(canal)
-        if canal not in self.canales_que_se_abren():
+        if not self._se_abre(canal):
             raise ErrorDeAjuste(f"{canal} no se abre debajo del canal en el mes anterior: no hay nada que cerrar.")
         if abre == (canal not in self.canales_cerrados):
             raise ErrorDeAjuste(f"{canal} ya {'se abre' if abre else 'cierra en el canal'}.")
@@ -574,8 +582,8 @@ class Sesion:
             self._proxima_regla = 1 + max((int(i[1:]) for i in self.reglas), default=0)
             self.porcentajes = {(c, e): (Decimal(p), ajuste) for c, e, p in foto["porcentajes"]}
             self.entidades_apagadas = {e: ajuste for e in foto["apagadas"]}
-            self.categorias = dict(foto.get("categorias", {}))
-            self.canales_cerrados = frozenset(foto.get("canales_cerrados", []))
+            self.categorias = dict(foto["categorias"])
+            self.canales_cerrados = frozenset(foto["canales_cerrados"])
             return ajuste
         self._aplicar(cambio)
 
@@ -628,12 +636,16 @@ class Sesion:
     def reabrir(self, autor: str, cuando: datetime, motivo: str) -> None:
         """Vuelve a borrador para poder cambiarlo (supuesto, A16: se puede reabrir)."""
         motivo = _motivo(motivo)
+        if not self.es_ultimo:
+            raise ErrorDeAjuste("Solo se puede reabrir el último mes: este ya es la base del siguiente.")
         if self.aprobado is None:
             raise ErrorDeAjuste("El móvil no está aprobado: ya se puede cambiar.")
         self.aprobado = None
         self.historial.append(Ajuste("reabrir", "Volvió el móvil a borrador", autor, cuando, motivo))
 
     def _exigir_borrador(self) -> None:
+        if not self.es_ultimo:
+            raise ErrorDeAjuste("Es un mes anterior: es de solo lectura.")
         if self.aprobado is not None:
             raise ErrorDeAjuste("El móvil está aprobado: para cambiarlo, reabrilo.")
 
@@ -658,20 +670,19 @@ class Sesion:
             self._recorrido, self._sucio = self._recalcular(), False
         return self._recorrido
 
-    @recorrido.setter
-    def recorrido(self, valor: Recorrido | None) -> None:
-        self._recorrido, self._sucio = valor, False
-
     # --- interno ------------------------------------------------------------
 
-    def _respaldo(self) -> tuple:
-        return (copy.copy(self._e), dict(self.apagados_skus), dict(self.entidades_apagadas),
-                {u: dict(f) for u, f in self._fijas.items()}, dict(self.reglas), self._proxima_regla,
-                dict(self.filas_elegidas), dict(self.canales_sku), dict(self.porcentajes), dict(self.entidades_nuevas), dict(self.revisadas), dict(self.categorias), self.canales_cerrados, (self._recorrido, self._sucio))
+    def _respaldo(self) -> dict:
+        """Todo el estado, menos lo que no se deshace: un campo nuevo entra solo."""
+        # Se copian los contenedores que se modifican en el lugar; el resto (el resultado calculado, números,
+        # frozensets) se guarda tal cual.
+        respaldo = {k: copy.copy(v) if isinstance(v, (dict, _Entradas)) else v
+                    for k, v in vars(self).items() if k not in _NO_SE_DESHACE}
+        respaldo["_fijas"] = {u: dict(f) for u, f in self._fijas.items()}
+        return respaldo
 
-    def _restaurar(self, respaldo: tuple) -> None:
-        (self._e, self.apagados_skus, self.entidades_apagadas, self._fijas, self.reglas,
-         self._proxima_regla, self.filas_elegidas, self.canales_sku, self.porcentajes, self.entidades_nuevas, self.revisadas, self.categorias, self.canales_cerrados, (self._recorrido, self._sucio)) = respaldo
+    def _restaurar(self, respaldo: dict) -> None:
+        self.__dict__.update(respaldo)
 
     def _unidad(self, unidad: str) -> int:
         if unidad not in UNIDADES:
@@ -695,7 +706,7 @@ class Sesion:
             if self.diferir:
                 self._sucio = True
             else:
-                self.recorrido = self._recalcular()
+                self._recorrido, self._sucio = self._recalcular(), False
         except Exception:
             self._restaurar(respaldo)
             raise
@@ -722,10 +733,11 @@ class Sesion:
             # Un repetido ya resuelto no se vuelve a informar: la decisión quedó en el historial.
             problemas1 = [p for p in self._e.problemas1
                           if not (p.tipo == "sku_repetido" and p.sku in self.filas_elegidas)]
-            porcentajes, avisos_porcentaje = self._porcentajes_vigentes()
+            porcentajes, avisos = self._porcentajes_vigentes()
+            cerrados = {normalizar(c) for c in self.canales_cerrados}
             sin = self.sin_categoria()
             if sin:  # uno solo para todos: con el template sin categoría, serían decenas
-                avisos_porcentaje.append(Problema(
+                avisos.append(Problema(
                     "aviso", f"{len(sin)} SKUs no tienen categoría: no entran en ninguna regla. Asignales una.",
                     bloque="input1", tipo="sin_categoria"))
             return armar(
@@ -735,8 +747,8 @@ class Sesion:
                 apagados=set(self.apagados_skus),
                 fijas_kilos=self._fijas_vigentes("kilos"),
                 fijas_plata=self._fijas_vigentes("plata"),
-                problemas=problemas1 + self._e.problemas2 + self._e.problemas_base + avisos_porcentaje,
-                apertura={k: v for k, v in self._e.apertura.items() if not self._cerrado(k[1])},
+                problemas=problemas1 + self._e.problemas2 + self._e.problemas_base + avisos,
+                apertura={k: v for k, v in self._e.apertura.items() if normalizar(k[1]) not in cerrados},
                 entidades_apagadas=set(self.entidades_apagadas),
                 reglas=[r.regla for r in self.reglas.values()],
                 canales_sku={k: c for k, (c, _) in self.canales_sku.items()},

@@ -22,3 +22,9 @@ export const UNIDADES = {
 /** "7.000,000 kg" o "$ 1.234,56". */
 export const conUnidad = (monto: string | null | undefined, unidad: keyof typeof UNIDADES): string =>
   unidad === 'kilos' ? `${formatear(monto)} kg` : `$ ${formatear(monto)}`;
+
+/** El mes, legible: "2026-10" → "octubre 2026". */
+export const nombreMes = (mes: string) => {
+  const [anio, m] = mes.split('-').map(Number);
+  return `${new Date(anio, m - 1, 1).toLocaleDateString('es-AR', { month: 'long' })} ${anio}`;
+};

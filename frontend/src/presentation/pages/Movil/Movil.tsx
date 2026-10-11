@@ -12,9 +12,9 @@ import AddRoundedIcon from '@mui/icons-material/AddRounded';
 import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded';
 import UndoRoundedIcon from '@mui/icons-material/UndoRounded';
 import TaskAltRoundedIcon from '@mui/icons-material/TaskAltRounded';
-import { nombreMes, useMovil, useSoloLectura } from '../../../stores/useMovil';
+import { useMovil, useSoloLectura } from '../../../stores/useMovil';
 import { Estado, Unidad } from '../../../stores/useMovil/useMovil.type';
-import { conUnidad, formatear, UNIDADES } from './formato';
+import { conUnidad, formatear, nombreMes, UNIDADES } from './formato';
 import { AVENA, CIERRA, NO_CIERRA, numeros } from './estilo';
 import { Ayuda } from './Ayuda';
 import { AYUDA } from './ayudas';
@@ -41,12 +41,14 @@ const ACCIONES: Record<string, string> = {
   agregar_entidad: 'Agregó un distribuidor o vendedor', eliminar_entidad: 'Eliminó un distribuidor o vendedor',
 };
 
-const Subir = ({ cargado, etiqueta, alElegir }: { cargado: boolean; etiqueta: string; alElegir: (f: File) => void }) => {
+export const Subir = ({ cargado, etiqueta, alElegir, texto }: {
+  cargado: boolean; etiqueta: string; alElegir: (f: File) => void; texto?: string;
+}) => {
   const { ocupado } = useMovil();
   const soloLectura = useSoloLectura();
   return (
     <Button component="label" variant="outlined" size="small" startIcon={<UploadFileRoundedIcon />} disabled={ocupado || soloLectura}>
-      {cargado ? 'Reemplazar' : 'Subir Excel'}
+      {texto ?? (cargado ? 'Reemplazar' : 'Subir Excel')}
       <input
         hidden type="file" accept=".xlsx" aria-label={etiqueta}
         onChange={e => { const f = e.target.files?.[0]; if (f) alElegir(f); e.target.value = ''; }}
@@ -499,12 +501,6 @@ const Etapas = ({ estado, cierra }: { estado: Estado; cierra: boolean }) => {
   );
 };
 
-/** "2026-12" → "2027-01". */
-const mesSiguiente = (mes: string) => {
-  const [anio, m] = mes.split('-').map(Number);
-  return m === 12 ? `${anio + 1}-01` : `${anio}-${String(m + 1).padStart(2, '0')}`;
-};
-
 /** Aprobar es una decisión de una persona: se confirma, y lo que quede para revisar se ve antes. */
 const AprobarDialog = ({ estado, onCerrar }: { estado: Estado; onCerrar: () => void }) => {
   const { aprobar, ocupado } = useMovil();
@@ -580,7 +576,7 @@ export const MovilPage = () => {
     paraRevisar && `${paraRevisar} para revisar`,
   ].filter(Boolean).join(' · ') || 'Nada';
   const cierraTodo = estado.cierra.kilos && estado.cierra.plata;
-  const anterior = ultimo !== undefined && estado.mes !== ultimo;
+  const anterior = !estado.es_ultimo;
   const sinRevisar = estado.etapas.filter(e => !e.revisada).map(e => NOMBRE_ETAPA[e.etapa]);
   const queDeshace = estado.deshacer
     && `Deshacer: ${ACCIONES[estado.deshacer.accion] ?? estado.deshacer.accion} · ${estado.deshacer.detalle}`;
@@ -602,7 +598,7 @@ export const MovilPage = () => {
             {meses.length > 1 ? (
               <TextField select size="small" value={estado.mes} SelectProps={{ native: true }}
                 inputProps={{ 'aria-label': 'Mes del móvil' }} sx={{ ml: 1 }}
-                onChange={e => verMes(e.target.value === ultimo ? undefined : e.target.value)}>
+                onChange={e => verMes(e.target.value)}>
                 {meses.map(m => <option key={m.mes} value={m.mes}>{nombreMes(m.mes)}{m.aprobado ? ' · aprobado' : ''}</option>)}
               </TextField>
             ) : (
@@ -670,7 +666,7 @@ export const MovilPage = () => {
         ) : estado.aprobado && (
           <Alert severity="success" icon={<TaskAltRoundedIcon />} action={
             <Button color="inherit" disabled={ocupado} onClick={() => empezarSiguiente()}>
-              Empezar {nombreMes(mesSiguiente(estado.mes))}
+              Empezar {nombreMes(estado.siguiente)}
             </Button>
           }>
             Aprobado por {estado.aprobado.autor} el {new Date(estado.aprobado.cuando).toLocaleString('es-AR')}. Es de

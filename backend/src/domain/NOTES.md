@@ -32,21 +32,22 @@ transacción: si el recálculo falla, vuelve al estado anterior.
 
 ## Persistencia: un móvil por mes
 
-- **Se guarda lo que hizo el planner, no el estado.** Cada acción que sale bien
-  (`repositorio.ACCIONES`) va a la tabla `comando` con sus datos; los archivos subidos,
-  tal cual, a `archivo`. Un mes se reconstruye volviendo a ejecutar sus acciones, la
+- **Se guarda lo que hizo el planner, no el estado.** Cada acción que sale bien (la que
+  deja una entrada en el historial) va a la tabla `comando` con sus datos; los archivos
+  subidos, tal cual, a `archivo`, atados a su acción. Un mes se reconstruye volviendo a ejecutar sus acciones, la
   primera vez que se lo pide; después queda en memoria.
 - **Al reconstruir se difiere el recálculo** (`Sesion.diferir`): se recalcula una vez,
-  cuando alguien pide `recorrido`. Un ajuste tarda ~0,35 s; cien, sin diferir, serían
+  cuando alguien pide `recorrido`. Por eso las acciones validan contra las entradas, no
+  contra el resultado (solo revisar y aprobar lo necesitan). Un ajuste tarda ~0,35 s; cien, sin diferir, serían
   medio minuto.
 - **El mes siguiente** (`Repositorio.empezar_siguiente`) exige el último aprobado y
   arranca con `heredar(foto)`: el reparto aprobado es la base, y se heredan totales por
   canal, reglas, %, entidades apagadas, categorías y canales cerrados. La foto va dentro
   del comando: el mes nuevo no depende de cómo se recalcule el anterior.
-- **Solo se reabre el último mes**: el siguiente ya arrancó del aprobado.
-- **Una acción nueva** que cambie el móvil tiene que sumarse a `ACCIONES`; si no, se
-  pierde al reiniciar. Sus argumentos tienen que ser JSON, `Path`/`BytesIO` (se guardan
-  como archivo), `datetime` o `Decimal`.
+- **Un mes anterior es de solo lectura** (`Sesion.es_ultimo`): el siguiente ya arrancó de
+  su aprobado. La pantalla manda siempre el mes en cada pedido.
+- **Una acción nueva** se guarda sola si deja una entrada en el historial. Sus argumentos
+  tienen que ser JSON, `Path`/`BytesIO` (se guardan como archivo) o `datetime`.
 - **ponytail: un solo proceso.** El repositorio tiene un lock global y una copia en
   memoria por mes; con varios workers cada uno tendría la suya.
 

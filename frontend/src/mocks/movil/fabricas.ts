@@ -33,6 +33,8 @@ const vacio = () => ({ kilos: [], plata: [] });
 
 export const estadoFactory = Factory.define<Estado>(() => ({
   mes: '2026-10',
+  es_ultimo: true,
+  siguiente: '2026-11',
   faltan: [],
   entradas: {
     input1: { archivo: 'objetivo_septiembre.xlsx', skus: 2, kilos: '1500.000', nns: '100.00' },
