@@ -73,7 +73,6 @@ class Repositorio:
             # La foto antes de crear el mes: si falla, no queda un mes vacío.
             foto, nuevo = anterior.foto(), mes_siguiente(ultimo)
             self._crear(nuevo)
-            anterior.es_ultimo = False
             _Grabadora(self._sesion(nuevo), self, nuevo).heredar(foto, ultimo, autor, cuando)
             return nuevo
 

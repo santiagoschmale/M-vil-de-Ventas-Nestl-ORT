@@ -24,7 +24,7 @@ beforeEach(() => {
     http.get('*/api/movil/cruce/*', () => HttpResponse.json({ unidad: 'kilos', cierra: true, canales: [], skus: [] })),
     // Ante un rechazo, la pantalla vuelve a pedir el estado y los meses.
     http.get('*/api/movil', () => HttpResponse.json(estadoFactory.build())),
-    http.get('*/api/movil/meses', () => HttpResponse.json([{ mes: '2026-10', aprobado: null }])),
+    http.get('*/api/movil/meses', () => HttpResponse.json([{ mes: '2026-10', aprobado: false }])),
   );
 });
 

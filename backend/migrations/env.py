@@ -7,7 +7,7 @@ from alembic import context
 from src.movil.almacen import Almacen, metadata
 
 if "DATABASE_URL" not in environ:
-    raise SystemExit("Falta DATABASE_URL. Ej.: DATABASE_URL=postgresql://motor:motor@localhost:5432/"
+    raise SystemExit("Falta DATABASE_URL. Ej.: DATABASE_URL=postgresql://motor:motor@localhost:5433/"
                      "motor_distribucion (o usar make db, que la setea).")
 motor = Almacen(environ["DATABASE_URL"]).motor
 

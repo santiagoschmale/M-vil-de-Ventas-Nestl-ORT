@@ -27,7 +27,7 @@ beforeEach(() => {
   server.use(
     http.get('*/api/movil', () => HttpResponse.json(estado())),
     http.get('*/api/movil/cruce/kilos', () => HttpResponse.json(cruce)),
-    http.get('*/api/movil/meses', () => HttpResponse.json([{ mes: '2026-10', aprobado: null }])),
+    http.get('*/api/movil/meses', () => HttpResponse.json([{ mes: '2026-10', aprobado: false }])),
     http.get('*/api/movil/apertura/*', () => HttpResponse.json({ detail: 'no se abre' }, { status: 404 })),
     http.put('*/api/movil/skus/*', anotar),
     http.put('*/api/movil/celdas/*', anotar),
@@ -531,7 +531,7 @@ describe('MovilPage', { timeout: 15000 }, () => {
     const aprobado = { accion: 'aprobar', detalle: 'Aprobó el móvil', autor: 'planner-local', cuando: '2026-10-24T10:00:00', motivo: null };
     server.use(
       http.get('*/api/movil', () => HttpResponse.json(estado({ aprobado }))),
-      http.get('*/api/movil/meses', () => HttpResponse.json([{ mes: '2026-10', aprobado }])),
+      http.get('*/api/movil/meses', () => HttpResponse.json([{ mes: '2026-10', aprobado: true }])),
       http.post('*/api/movil/meses/siguiente', () => { pedidos.push({ metodo: 'POST', url: '/api/movil/meses/siguiente', cuerpo: {} }); return HttpResponse.json(estado({ mes: '2026-11', faltan: ['objetivo de Contraloría'] })); }),
     );
     const user = userEvent.setup({ delay: null });
@@ -549,7 +549,7 @@ describe('MovilPage', { timeout: 15000 }, () => {
         pedidosMes.push(mes ?? 'último');
         return HttpResponse.json(mes === '2026-10' ? estado({ mes, aprobado, es_ultimo: false }) : estado({ mes: '2026-11' }));
       }),
-      http.get('*/api/movil/meses', () => HttpResponse.json([{ mes: '2026-10', aprobado }, { mes: '2026-11', aprobado: null }])),
+      http.get('*/api/movil/meses', () => HttpResponse.json([{ mes: '2026-10', aprobado: true }, { mes: '2026-11', aprobado: false }])),
     );
     const user = userEvent.setup({ delay: null });
     render(<MovilPage />);

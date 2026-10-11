@@ -16,7 +16,7 @@ NPM_PUBLICO := --registry https://registry.npmjs.org
 # La API queda en :3000; vite le reenvía /api.
 PUERTO_WEB := 5175
 # El Postgres de docker-compose.yml (el mismo que .env.example).
-DB_URL := postgresql://motor:motor@localhost:5432/motor_distribucion
+DB_URL := postgresql://motor:motor@localhost:5433/motor_distribucion
 
 .DEFAULT_GOAL := ayuda
 .PHONY: ayuda instalar api web dev db dev-db test

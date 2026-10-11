@@ -127,8 +127,8 @@ type Resultado = Promise<string | null>;
 /** A qué fila fue a mirar el planner desde "Para revisar". `vez` cambia en cada clic. */
 export type Foco = { tipo: 'regla' | 'sku' | 'celda'; id: string; vez: number }; // celda: "sku|canal"
 
-// Un móvil por mes: "2026-10". aprobado = null si está en borrador.
-export type MesResumen = { mes: string; aprobado: Ajuste | null };
+// Un móvil por mes: "2026-10".
+export type MesResumen = { mes: string; aprobado: boolean };
 
 export type TUseMovil = {
   mes?: string; // el mes que se está viendo; undefined = el último (hasta que llega el estado)

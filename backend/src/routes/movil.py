@@ -493,8 +493,7 @@ def revisar_etapa(etapa: str, s: Sesion = Depends(sesion), quien: str = Depends(
 
 @router.get("/meses", summary="Los móviles de cada mes, del más viejo al más nuevo, con su estado")
 def listar_meses(request: Request):
-    return [{"mes": m["mes"], "aprobado": _ajuste(m["aprobado"]) if m["aprobado"] else None}
-            for m in request.app.state.repositorio.meses()]
+    return [{"mes": m["mes"], "aprobado": m["aprobado"] is not None} for m in request.app.state.repositorio.meses()]
 
 
 @router.post("/meses/siguiente", summary="Empezar el mes siguiente desde el último aprobado: hereda su reparto como "
