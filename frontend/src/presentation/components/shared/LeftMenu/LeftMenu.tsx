@@ -8,6 +8,7 @@ import { Logo } from '../Logo';
 import ExpandMoreRoundedIcon from '@mui/icons-material/ExpandMoreRounded';
 import { useProfile } from '../../../../stores/useProfile';
 import { ReiniciarDialog } from '../../../pages/Movil/ReiniciarDialog';
+import { MesesMenu } from '../../../pages/Movil/MesesMenu';
 
 
 interface SidebarItem {
@@ -39,7 +40,7 @@ const LeftMenu = () => {
         <Logo />
       </div>
       
-      <div style={{ display: 'flex', flexGrow: 1, alignSelf: 'stretch' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', flexGrow: 1, alignSelf: 'stretch', overflowY: 'auto' }}>
         <List  sx={{width: 1}}>
           {items.map((item, index) => (
             <ListItem data-testid="sidebar-link" key={`${item.id}-${String(index)}`} disablePadding>
@@ -50,6 +51,7 @@ const LeftMenu = () => {
             </ListItem>
           ))}
         </List>
+        <MesesMenu />
       </div>
       
       <Divider />

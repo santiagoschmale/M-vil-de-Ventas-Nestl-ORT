@@ -169,6 +169,21 @@ export const AYUDA = {
       </>
     ),
   },
+  meses: {
+    titulo: 'Los meses del móvil',
+    texto: (
+      <>
+        <P>
+          Cada mes tiene su móvil. Acá están todos, del más nuevo al más viejo y agrupados por año: tocá un año para
+          abrirlo y un mes para verlo.
+        </P>
+        <P>
+          <b>En curso</b> es el mes que se está armando: el único que se puede cambiar. Los <b>aprobados</b> anteriores
+          son de solo lectura, porque el mes siguiente ya arrancó a partir de ellos.
+        </P>
+      </>
+    ),
+  },
   historial: {
     titulo: 'Qué guarda el historial',
     texto: (

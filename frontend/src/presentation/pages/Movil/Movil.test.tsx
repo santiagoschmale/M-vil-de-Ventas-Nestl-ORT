@@ -5,6 +5,7 @@ import '@testing-library/jest-dom';
 import { http, HttpResponse } from 'msw';
 import { server } from '../../../mocks/server';
 import { MovilPage } from './Movil';
+import { MesesMenu } from './MesesMenu';
 import { useMovil } from '../../../stores/useMovil';
 import { useSnackbarProps } from '../../../stores/useSnackbarProps';
 import { mensajeDeError } from '../../../stores/useMovil/useMovil';
@@ -556,8 +557,12 @@ describe('MovilPage', { timeout: 15000 }, () => {
       http.get('*/api/movil/meses', () => HttpResponse.json([{ mes: '2026-10', aprobado: true }, { mes: '2026-11', aprobado: false }])),
     );
     const user = userEvent.setup({ delay: null });
-    render(<MovilPage />);
-    await user.selectOptions(await screen.findByRole('combobox', { name: 'Mes del móvil' }), '2026-10');
+    render(<><MesesMenu /><MovilPage /></>);
+    // En el sidebar: el año del último mes arranca abierto, del más nuevo al más viejo.
+    const sidebar = await screen.findByRole('navigation', { name: 'Meses del móvil' });
+    await waitFor(() => expect(within(sidebar).getAllByRole('button').map(b => b.textContent).filter(Boolean))  // sin el ⓘ
+      .toEqual(['2026', 'noviembreEn curso', 'octubre✓ Aprobado']));
+    await user.click(within(sidebar).getByRole('button', { name: /octubre/ }));
     expect(await screen.findByText(/un mes anterior\. Es de solo lectura/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Reabrir' })).not.toBeInTheDocument();
     expect(pedidosMes).toContain('2026-10');

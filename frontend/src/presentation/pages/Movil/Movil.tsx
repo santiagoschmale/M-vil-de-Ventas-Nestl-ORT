@@ -653,15 +653,8 @@ export const MovilPage = () => {
           <Box sx={FILA_BARRA}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexWrap: 'nowrap' }}>
               <Typography variant="h5" fontWeight={700}>Móvil</Typography>
-              {meses.length > 1 ? (
-                <TextField select size="small" value={estado.mes} SelectProps={{ native: true }}
-                  inputProps={{ 'aria-label': 'Mes del móvil' }} sx={{ ml: 1 }}
-                  onChange={e => verMes(e.target.value)}>
-                  {meses.map(m => <option key={m.mes} value={m.mes}>{nombreMes(m.mes)}{m.aprobado ? ' · aprobado' : ''}</option>)}
-                </TextField>
-              ) : (
-                <Typography variant="h5" color="text.secondary" sx={{ ml: 1 }}>{nombreMes(estado.mes)}</Typography>
-              )}
+              {/* Los demás meses se eligen en el sidebar, agrupados por año. */}
+              <Typography variant="h5" color="text.secondary" sx={{ ml: 1 }}>{nombreMes(estado.mes)}</Typography>
               <Ayuda ayuda={AYUDA.movil} />
               {/* Sin entradas no hay tabla: la unidad recién importa cuando hay algo para ver. */}
               {cargado && (
