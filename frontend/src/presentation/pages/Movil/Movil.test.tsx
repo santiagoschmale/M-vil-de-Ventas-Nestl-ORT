@@ -523,6 +523,8 @@ describe('MovilPage', { timeout: 15000 }, () => {
     render(<MovilPage />);
     await user.click(await screen.findByRole('button', { name: 'sin totales por canal' }));
     await waitFor(() => expect(new URL(url).searchParams.get('totales')).toBe('false'));
+    await user.click(screen.getByRole('button', { name: 'solo el objetivo de Contraloría' }));
+    await waitFor(() => expect(new URL(url).searchParams.get('solo_objetivo')).toBe('true'));
   });
 
   it('el título dice de qué mes es el móvil', async () => {
@@ -560,7 +562,7 @@ describe('MovilPage', { timeout: 15000 }, () => {
     render(<><MesesMenu /><MovilPage /></>);
     // En el sidebar: el año del último mes arranca abierto, del más nuevo al más viejo.
     const sidebar = await screen.findByRole('navigation', { name: 'Meses del móvil' });
-    await waitFor(() => expect(within(sidebar).getAllByRole('button').map(b => b.textContent).filter(Boolean))  // sin el ⓘ
+    await waitFor(() => expect(within(sidebar).getAllByRole('button').map(b => b.textContent))
       .toEqual(['2026', 'noviembreEn curso', 'octubre✓ Aprobado']));
     await user.click(within(sidebar).getByRole('button', { name: /octubre/ }));
     expect(await screen.findByText(/un mes anterior\. Es de solo lectura/)).toBeInTheDocument();

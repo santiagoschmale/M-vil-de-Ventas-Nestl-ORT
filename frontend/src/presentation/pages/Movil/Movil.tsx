@@ -272,10 +272,14 @@ const Entradas = ({ estado }: { estado: Estado }) => {
           </Link>
           {' · '}
           <Tooltip describeChild title="Carga el objetivo y el mes anterior, y deja los totales por canal para armarlos en la pantalla">
-            <Link component="button" variant="body2" disabled={ocupado || soloLectura} onClick={() => cargarMuestra(false)}>
+            <Link component="button" variant="body2" disabled={ocupado || soloLectura} onClick={() => cargarMuestra('sin_totales')}>
               sin totales por canal
             </Link>
           </Tooltip>
+          {' · '}
+          <Link component="button" variant="body2" disabled={ocupado || soloLectura} onClick={() => cargarMuestra('objetivo')}>
+            solo el objetivo de Contraloría
+          </Link>
         </Box>
       )}
       {editar && (
@@ -655,7 +659,6 @@ export const MovilPage = () => {
               <Typography variant="h5" fontWeight={700}>Móvil</Typography>
               {/* Los demás meses se eligen en el sidebar, agrupados por año. */}
               <Typography variant="h5" color="text.secondary" sx={{ ml: 1 }}>{nombreMes(estado.mes)}</Typography>
-              <Ayuda ayuda={AYUDA.movil} />
               {/* Sin entradas no hay tabla: la unidad recién importa cuando hay algo para ver. */}
               {cargado && (
                 <>

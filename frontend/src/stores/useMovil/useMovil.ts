@@ -147,8 +147,11 @@ export const useMovil = create<TUseMovil>((set, get) => {
     editarTotales: texto =>
       cambiar(() => api.put(conMes('/movil/input2'), { texto }), { ...enDialogo, cargado: TOTALES_CARGADOS }),
     // Sin totales: objetivo y mes anterior, para armar los totales por canal en la pantalla.
-    cargarMuestra: (totales = true) => cambiar(() => api.post(conMes(`/movil/muestra?totales=${totales}`), {}),
-      totales ? {} : { cargado: 'Muestra cargada sin totales por canal: armalos en la pantalla.' }),
+    // Solo objetivo: para un mes que ya heredó el resto del aprobado.
+    cargarMuestra: (que = 'todo') => cambiar(
+      () => api.post(conMes(`/movil/muestra?totales=${que !== 'sin_totales'}&solo_objetivo=${que === 'objetivo'}`), {}),
+      que === 'sin_totales' ? { cargado: 'Muestra cargada sin totales por canal: armalos en la pantalla.' }
+        : que === 'objetivo' ? { cargado: 'Objetivo de Contraloría de muestra cargado.' } : {}),
 
     cambiarSku: (sku, activo, motivo) =>
       cambiar(() => api.put(conMes(`/movil/skus/${ruta(sku)}`), { activo, motivo }), enDialogo),

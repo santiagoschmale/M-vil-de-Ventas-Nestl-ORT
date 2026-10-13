@@ -339,6 +339,11 @@ def test_cerrar_y_abrir_la_apertura_de_un_canal():
     assert c.get(f"/api/movil/apertura/{sku}/Córdoba").status_code == 404  # ya no se abre
 
 
+def test_muestra_solo_objetivo():
+    r = TestClient(crear_app()).post("/api/movil/muestra?solo_objetivo=true").json()
+    assert r["faltan"] == ["totales por canal", "mes anterior"]
+
+
 def test_empezar_de_cero_solo_en_local():
     import os
     c = _cerrado()
