@@ -4,8 +4,6 @@ import ExpandMoreRoundedIcon from '@mui/icons-material/ExpandMoreRounded';
 import ChevronRightRoundedIcon from '@mui/icons-material/ChevronRightRounded';
 import { useMovil } from '../../../stores/useMovil';
 import { nombreMes } from './formato';
-import { Ayuda } from './Ayuda';
-import { AYUDA } from './ayudas';
 
 /**
  * En el sidebar, debajo de "Móvil": todos los meses, del más nuevo al más viejo, agrupados por año.
@@ -28,10 +26,7 @@ export const MesesMenu = () => {
 
   return (
     <Box component="nav" aria-label="Meses del móvil" sx={{ mt: 1 }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', px: 2, gap: 0.5 }}>
-        <Typography variant="overline" color="text.secondary">Meses</Typography>
-        <Ayuda ayuda={AYUDA.meses} />
-      </Box>
+      <Typography variant="overline" color="text.secondary" sx={{ px: 2 }}>Meses</Typography>
       {[...porAnio].map(([anio, delAnio]) => (
         <React.Fragment key={anio}>
           <ListItemButton dense aria-expanded={abierto(anio)} onClick={() => setAbiertos(a => ({ ...a, [anio]: !abierto(anio) }))}>

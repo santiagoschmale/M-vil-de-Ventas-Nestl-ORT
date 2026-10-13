@@ -6,27 +6,6 @@ import { Typography } from '@mui/material';
 const P = ({ children }: { children: React.ReactNode }) => <Typography paragraph>{children}</Typography>;
 
 export const AYUDA = {
-  movil: {
-    titulo: 'Qué es el móvil',
-    texto: (
-      <>
-        <P>
-          El móvil reparte el objetivo del mes: cuánto tiene que vender cada canal de cada producto (SKU), en kilos y
-          en pesos. La herramienta arma el primer reparto sola a partir del mes anterior; vos revisás y corregís lo
-          puntual.
-        </P>
-        <P>
-          <b>Cierra</b> quiere decir que se cumplen las dos cosas a la vez, exacto: cada SKU suma lo que pidió
-          Contraloría y cada canal suma lo que pediste para ese canal. Kilos y pesos se cierran por separado.
-        </P>
-        <P>Cuando los dos cierran, se puede exportar el Excel para los equipos comerciales.</P>
-        <P>
-          Debajo del título, <b>Siguiente</b> dice qué toca hacer ahora: cargar lo que falta, resolver lo que está en
-          rojo, revisar las etapas, aprobar o empezar el mes que sigue. El botón azul lleno es siempre ese paso.
-        </P>
-      </>
-    ),
-  },
   entradas: {
     titulo: 'Qué se carga',
     texto: (
@@ -165,21 +144,6 @@ export const AYUDA = {
           Cuando revisaste una etapa, marcala como revisada con los botones de arriba de la tabla; en el encabezado se ve
           cuáles faltan. Marcarla no bloquea nada. Si después cambiás algo, el OK de esa etapa y de las
           siguientes se borra, porque se recalculan. Para aprobar, las dos tienen que estar revisadas.
-        </P>
-      </>
-    ),
-  },
-  meses: {
-    titulo: 'Los meses del móvil',
-    texto: (
-      <>
-        <P>
-          Cada mes tiene su móvil. Acá están todos, del más nuevo al más viejo y agrupados por año: tocá un año para
-          abrirlo y un mes para verlo.
-        </P>
-        <P>
-          <b>En curso</b> es el mes que se está armando: el único que se puede cambiar. Los <b>aprobados</b> anteriores
-          son de solo lectura, porque el mes siguiente ya arrancó a partir de ellos.
         </P>
       </>
     ),
