@@ -530,7 +530,8 @@ def cambiar_apertura_canal(canal: str, cuerpo: AperturaCanalIn, s: Sesion = Depe
 
 @router.post("/reiniciar", summary="Empezar de cero: borra todos los meses (solo en local, para practicar)")
 def reiniciar(request: Request):
-    if environ.get("IS_LOCAL", "true").lower() == "false":
+    # Borra todo: solo con IS_LOCAL=true explícito (make api / dev-db lo setean), no por default.
+    if environ.get("IS_LOCAL", "").lower() != "true":
         raise HTTPException(403, "Empezar de cero solo se puede en una instalación local de prueba.")
     request.app.state.repositorio.reiniciar()
     with request.app.state.repositorio.usar() as s:

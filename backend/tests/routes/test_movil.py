@@ -346,6 +346,8 @@ def test_empezar_de_cero_solo_en_local():
     try:
         os.environ["IS_LOCAL"] = "false"
         assert c.post("/api/movil/reiniciar").status_code == 403
+        os.environ.pop("IS_LOCAL")
+        assert c.post("/api/movil/reiniciar").status_code == 403  # sin definir tampoco
         os.environ["IS_LOCAL"] = "true"
         r = c.post("/api/movil/reiniciar").json()
         assert r["faltan"] == ["objetivo de Contraloría", "totales por canal", "mes anterior"] and r["historial"] == []
