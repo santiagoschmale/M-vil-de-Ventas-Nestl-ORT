@@ -23,7 +23,7 @@ from datetime import datetime
 from decimal import Decimal
 
 from src.domain.cruce import Celda, ErrorDeCruce
-from src.domain.formato import a_texto
+from src.domain.formato import a_texto, nombre_mes
 from src.importer.entradas import (
     KILOS,
     PLATA,
@@ -572,6 +572,8 @@ class Sesion:
             apertura.setdefault((sku, canal), {})[entidad] = Decimal(v)
         canales = {c: TotalCanal(Decimal(k), None if p is None else Decimal(p)) for c, k, p in foto["totales"]}
 
+        de = nombre_mes(de)
+
         def cambio():
             ajuste = Ajuste("heredar", f"Arrancó desde el móvil aprobado de {de}", autor, cuando)
             self._e.base, self._e.apertura, self._e.problemas_base = base, apertura, []
@@ -586,6 +588,7 @@ class Sesion:
             self.canales_cerrados = frozenset(foto["canales_cerrados"])
             return ajuste
         self._aplicar(cambio)
+        self._antes_del_ultimo = self.ultimo_cambio = None  # arrancar el mes es una decisión, como aprobar: no se deshace
 
     # --- revisión por etapa -------------------------------------------------
 

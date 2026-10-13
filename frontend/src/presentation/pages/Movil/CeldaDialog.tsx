@@ -6,6 +6,7 @@ import {
 } from '@mui/material';
 import AddRoundedIcon from '@mui/icons-material/AddRounded';
 import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded';
+import EditRoundedIcon from '@mui/icons-material/EditRounded';
 import { useMovil, useSoloLectura } from '../../../stores/useMovil';
 import { Apertura, Celda } from '../../../stores/useMovil/useMovil.type';
 import { formatear, UNIDADES } from './formato';
@@ -124,6 +125,7 @@ export const CeldaDialog = ({ sku, descripcion, canal, celda, onCerrar }: Props)
   const [eliminar, setEliminar] = useState<string>();
   const fijada = estado?.fijas[unidad].find(f => f.sku === sku && f.canal === canal);
   const { simbolo, decimales } = UNIDADES[unidad];
+  const tocado = monto !== formatear(celda.monto) || !!motivo;
 
   useEffect(() => { traerApertura(sku, canal).then(setApertura); }, [sku, canal, estado]);
 
@@ -206,9 +208,10 @@ export const CeldaDialog = ({ sku, descripcion, canal, celda, onCerrar }: Props)
                       )}
                     </TableCell>
                     <TableCell>
-                      <Button size="small" color="inherit" disabled={ocupado || soloLectura} onClick={() => setBase(e)}
+                      <Button size="small" variant="outlined" color="inherit" disabled={ocupado || soloLectura}
+                        onClick={() => setBase(e)} endIcon={<EditRoundedIcon fontSize="small" />}
                         aria-label={`Base de ${e.nombre}: ${e.porcentaje ? `${formatear(e.porcentaje)}%` : 'histórico'}`}
-                        sx={{ fontWeight: e.porcentaje ? 700 : 400, textTransform: 'none', minWidth: 0 }}>
+                        sx={{ fontWeight: e.porcentaje ? 700 : 400, textTransform: 'none', minWidth: 0, whiteSpace: 'nowrap' }}>
                         {e.porcentaje ? `${formatear(e.porcentaje)}%` : 'Histórico'}
                       </Button>
                     </TableCell>
@@ -230,7 +233,8 @@ export const CeldaDialog = ({ sku, descripcion, canal, celda, onCerrar }: Props)
             Volver a calculado
           </Button>
         )}
-        <Button onClick={onCerrar}>Cancelar</Button>
+        {/* Si solo entraste a mirar (p. ej. la apertura), no hay nada que cancelar. */}
+        <Button onClick={onCerrar}>{tocado ? 'Cancelar' : 'Cerrar'}</Button>
         <Button type="submit" variant="contained" disabled={!motivo.trim() || !monto.trim() || ocupado || soloLectura}>
           Fijar
         </Button>

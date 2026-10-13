@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from datetime import datetime
+from os import environ
 from decimal import Decimal
 from io import BytesIO
 from pathlib import Path
@@ -525,3 +526,13 @@ def cambiar_apertura_canal(canal: str, cuerpo: AperturaCanalIn, s: Sesion = Depe
                            quien: str = Depends(autor)):
     _aplicar(s.cambiar_apertura_canal, canal, cuerpo.abre, quien, _ahora(), cuerpo.motivo)
     return _estado(s)
+
+
+@router.post("/reiniciar", summary="Empezar de cero: borra todos los meses (solo en local, para practicar)")
+def reiniciar(request: Request):
+    # Borra todo: solo con IS_LOCAL=true explícito (make api / dev-db lo setean), no por default.
+    if environ.get("IS_LOCAL", "").lower() != "true":
+        raise HTTPException(403, "Empezar de cero solo se puede en una instalación local de prueba.")
+    request.app.state.repositorio.reiniciar()
+    with request.app.state.repositorio.usar() as s:
+        return _estado(s)

@@ -129,7 +129,7 @@ describe('MovilPage', { timeout: 15000 }, () => {
       estado({ reglas, inconsistencias: { kilos: [inconsistenciaFactory.build({ reglas: ['R1', 'R2'] })], plata: [] } }))));
     const user = userEvent.setup({ delay: null });
     render(<MovilPage />);
-    await user.click(await screen.findByRole('button', { name: 'Ver R2' }));
+    await user.click(await screen.findByRole('button', { name: 'Ir a R2' }));
     expect(screen.getByRole('button', { name: /^Reglas/ })).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getByRole('row', { name: /^R2 / })).toHaveAttribute('aria-current', 'true');
     expect(screen.getByRole('row', { name: /^R1 / })).not.toHaveAttribute('aria-current');
@@ -142,7 +142,7 @@ describe('MovilPage', { timeout: 15000 }, () => {
     const user = userEvent.setup({ delay: null });
     render(<MovilPage />);
     await user.click(await screen.findByRole('button', { name: /^Para revisar/ }));  // no bloquea: está cerrada
-    await user.click(screen.getByRole('button', { name: 'Ver SKU 200' }));
+    await user.click(screen.getByRole('button', { name: 'Ir al SKU 200' }));
     expect(screen.getByRole('row', { name: /^Apagar 200/ })).toHaveAttribute('aria-current', 'true');
   });
 
@@ -154,7 +154,7 @@ describe('MovilPage', { timeout: 15000 }, () => {
     render(<MovilPage />);
     await user.click(await screen.findByRole('button', { name: /^Para revisar/ }));
     expect(screen.getByText(/Producto de otro país/)).toBeVisible();
-    expect(screen.queryByRole('button', { name: 'Ver SKU 999' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Ir al SKU 999' })).not.toBeInTheDocument();
   });
 
   it('el ⓘ explica el concepto en un modal y no abre ni cierra la sección', async () => {
@@ -414,7 +414,8 @@ describe('MovilPage', { timeout: 15000 }, () => {
     await user.click(await screen.findByRole('button', { name: 'Aprobar' }));
     const dialogo = screen.getByRole('dialog');
     expect(within(dialogo).getByText(/nadie puede cambiarlo/)).toBeInTheDocument();
-    await user.click(within(dialogo).getByRole('button', { name: 'Aprobar' }));
+    expect(within(dialogo).getByText(/vas a poder empezar noviembre/)).toBeInTheDocument();
+    await user.click(within(dialogo).getByRole('button', { name: 'Aprobar octubre' }));
     await waitFor(() => expect(pedidos).toEqual([{ metodo: 'POST', url: '/api/movil/aprobar', cuerpo: {} }]));
   });
 
@@ -433,7 +434,8 @@ describe('MovilPage', { timeout: 15000 }, () => {
     render(<MovilPage />);
     expect(await screen.findByRole('button', { name: 'Aprobar' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Marcar revisada la etapa debajo del canal' })).toBeDisabled();
-    expect(screen.getByLabelText('Etapa por canal: sin revisar')).toBeInTheDocument();  // el estado, en el encabezado
+    expect(screen.getByRole('button', { name: 'Etapas: 0 de 2 revisadas' })).toBeInTheDocument();  // el estado, en el encabezado
+    expect(screen.getByText('Se habilita al marcar la etapa 1.')).toBeVisible();  // la razón, a la vista y no solo en un tooltip
     await user.click(screen.getByRole('button', { name: 'Marcar revisada la etapa por canal' }));
     await waitFor(() => expect(pedidos).toEqual([{ metodo: 'POST', url: '/api/movil/etapas/canal', cuerpo: {} }]));
   });
@@ -536,8 +538,10 @@ describe('MovilPage', { timeout: 15000 }, () => {
     );
     const user = userEvent.setup({ delay: null });
     render(<MovilPage />);
-    await user.click(await screen.findByRole('button', { name: 'Empezar noviembre 2026' }));
+    const encabezado = await screen.findByRole('banner');
+    await user.click(within(encabezado).getByRole('button', { name: 'Empezar noviembre' }));
     await waitFor(() => expect(pedidos.map(p => p.url)).toEqual(['/api/movil/meses/siguiente']));
+    expect(await screen.findByText(/Arrancaste noviembre desde octubre aprobado.*Falta: objetivo de Contraloría/)).toBeInTheDocument();
   });
 
   it('un mes anterior se ve en solo lectura y se vuelve al último', async () => {
@@ -557,7 +561,8 @@ describe('MovilPage', { timeout: 15000 }, () => {
     expect(await screen.findByText(/un mes anterior\. Es de solo lectura/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Reabrir' })).not.toBeInTheDocument();
     expect(pedidosMes).toContain('2026-10');
-    await user.click(screen.getByRole('button', { name: 'Ir a noviembre 2026' }));
+    expect(within(screen.getByRole('banner')).getByText('Solo lectura')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Volver a noviembre 2026' }));
     await waitFor(() => expect(pedidosMes[pedidosMes.length - 1]).toBe('último'));
   });
 
@@ -570,8 +575,9 @@ describe('MovilPage', { timeout: 15000 }, () => {
     server.use(http.get('*/api/movil', () => HttpResponse.json(sinCategoria)));
     const user = userEvent.setup({ delay: null });
     render(<MovilPage />);
-    await user.click(await screen.findByText('Para revisar'));
-    await user.click(await screen.findByRole('button', { name: 'Asignar categorías' }));
+    // Pide una decisión: la sección se abre sola aunque nada esté en rojo.
+    expect(await screen.findByRole('button', { name: /^Para revisar/ })).toHaveAttribute('aria-expanded', 'true');
+    await user.click(screen.getByRole('button', { name: 'Asignar categorías' }));
     const dialogo = screen.getByRole('dialog', { name: 'Categorías de los SKUs' });
     expect(within(dialogo).getByText(/Subir Excel/)).toBeInTheDocument();
     await user.type(within(dialogo).getByRole('combobox', { name: 'Categoría de 100' }), 'Puré');
@@ -596,6 +602,71 @@ describe('MovilPage', { timeout: 15000 }, () => {
     server.use(http.get('*/api/movil', () => HttpResponse.json(estado({ cierra: { kilos: true, plata: false } }))));
     render(<MovilPage />);
     expect(await screen.findByRole('link', { name: 'Exportar' })).toHaveAttribute('aria-disabled', 'true');
+  });
+});
+
+
+describe('MovilPage: qué sigue', { timeout: 15000 }, () => {
+  const sinRevisar = [{ etapa: 'canal' as const, revisada: null }, { etapa: 'apertura' as const, revisada: null }];
+  const aprobado = { accion: 'aprobar', detalle: 'Aprobó el móvil', autor: 'planner-local', cuando: '2026-10-24T10:00:00', motivo: null };
+  const revisada = estadoFactory.build().etapas[0].revisada;
+  it.each([
+    ['falta una entrada', { faltan: ['objetivo de Contraloría'] }, 'Siguiente: en Entradas, cargá lo que falta (objetivo de Contraloría).'],
+    ['no cierra', { cierra: { kilos: false, plata: true } }, 'Siguiente: resolvé lo que está en rojo en Para revisar (kilos no cierra).'],
+    ['cierra, sin revisar', { etapas: sinRevisar }, 'Siguiente: revisá la tabla SKU × canal y marcá la etapa 1 como revisada.'],
+    ['falta la etapa 2', { etapas: [{ etapa: 'canal' as const, revisada }, sinRevisar[1]] },
+      'Siguiente: revisá cómo se abre cada canal (etapa 2) y marcala como revisada.'],
+    ['todo revisado', {}, 'Listo para aprobar.'],
+    ['aprobado', { aprobado }, 'Aprobado. Siguiente: empezar noviembre.'],
+    ['mes anterior', { aprobado, es_ultimo: false }, 'Mes anterior, solo lectura: no se puede cambiar.'],
+  ])('%s: la barra dice el paso siguiente', async (_, cambios, texto) => {
+    server.use(http.get('*/api/movil', () => HttpResponse.json(estado(cambios as Partial<Estado>))));
+    render(<MovilPage />);
+    expect(await within(await screen.findByRole('banner')).findByText(texto)).toBeInTheDocument();
+  });
+
+  it('el botón lleno es el paso siguiente: Aprobar, no Exportar', async () => {
+    render(<MovilPage />);
+    expect(await screen.findByRole('button', { name: 'Aprobar' })).toHaveClass('MuiButton-contained');
+    expect(screen.getByRole('link', { name: 'Exportar' })).toHaveClass('MuiButton-outlined');
+  });
+
+  it('aprobado, la barra fija muestra el estado y el botón para empezar el mes siguiente', async () => {
+    server.use(http.get('*/api/movil', () => HttpResponse.json(estado({ aprobado }))));
+    render(<MovilPage />);
+    const barra = await screen.findByRole('banner');
+    expect(await within(barra).findByText('Aprobado')).toBeInTheDocument();
+    expect(within(barra).getByRole('button', { name: 'Empezar noviembre' })).toHaveClass('MuiButton-contained');
+    expect(within(barra).getByRole('link', { name: 'Exportar' })).toHaveClass('MuiButton-outlined');
+  });
+
+  it('sin entradas, la barra no muestra controles que todavía no sirven', async () => {
+    server.use(http.get('*/api/movil', () => HttpResponse.json(estado({ faltan: ['objetivo de Contraloría'] }))));
+    render(<MovilPage />);
+    const barra = await screen.findByRole('banner');
+    await within(barra).findByText(/Siguiente: en Entradas/);
+    expect(within(barra).queryByRole('button', { name: 'Aprobar' })).not.toBeInTheDocument();
+    expect(within(barra).queryByRole('link', { name: 'Exportar' })).not.toBeInTheDocument();
+    expect(within(barra).queryByRole('group', { name: 'Unidad de la matriz' })).not.toBeInTheDocument();
+  });
+
+  it('el resumen de Reglas cuenta también dónde se vende cada SKU', async () => {
+    server.use(http.get('*/api/movil', () => HttpResponse.json(estado({
+      canales_sku: [{ sku: '200', canales: ['Directa (BA)'], accion: 'elegir_canales', detalle: '', autor: 'planner-local',
+                      cuando: '2026-09-28T10:00:00-03:00', motivo: 'lanzamiento' }],
+    }))));
+    render(<MovilPage />);
+    expect(await screen.findByText('Ninguna regla · 1 SKU con canales elegidos')).toBeInTheDocument();
+  });
+
+  it('en la celda, si solo entraste a mirar, se sale con Cerrar', async () => {
+    const user = userEvent.setup({ delay: null });
+    render(<MovilPage />);
+    await user.click(await screen.findByRole('button', { name: '100 en Catering: 1.000,000' }));
+    const dialogo = screen.getByRole('dialog');
+    expect(within(dialogo).getByRole('button', { name: 'Cerrar' })).toBeInTheDocument();
+    await user.type(within(dialogo).getByRole('textbox', { name: /Motivo/ }), 'x');
+    expect(within(dialogo).getByRole('button', { name: 'Cancelar' })).toBeInTheDocument();
   });
 });
 

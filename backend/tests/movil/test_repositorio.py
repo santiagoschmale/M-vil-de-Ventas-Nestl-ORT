@@ -91,7 +91,8 @@ def test_el_mes_siguiente_arranca_del_aprobado():
         assert s.mes == "2026-11" and s.faltan() == ["objetivo de Contraloría"]
         assert s.entradas.base == {k: v for k, v in aprobado.items()}
         assert set(s.reglas) == {"R1"} and s.porcentajes[("Córdoba", "Sofía Correa")][0] == 30
-        assert s.historial[-1].accion == "heredar" and "2026-10" in s.historial[-1].detalle
+        assert s.historial[-1].accion == "heredar" and "octubre 2026" in s.historial[-1].detalle
+        assert s.entradas.archivo2 == "Totales de octubre 2026"
         s.cargar_input1(MUESTRA / "input1_objetivo.xlsx", "objetivo de noviembre.xlsx", P, DESPUES)
         s.cambiar_sku(NUEVO, activo=False, autor=P, cuando=DESPUES, motivo="los SKUs apagados no se heredan")
         assert s.recorrido.kilos.celdas is not None  # con el objetivo nuevo, reparte
@@ -143,3 +144,32 @@ def test_un_mes_anterior_no_se_toca():
                 assert False, "tenía que rechazarse"
             except ErrorDeAjuste:
                 pass
+
+
+def test_arrancar_desde_el_aprobado_no_se_deshace():
+    """Deshacerlo dejaba el mes nuevo sin base ni totales, y no había forma de volver a heredar."""
+    r = Repositorio(_almacen(), hoy=HOY)
+    with r.usar() as s:
+        _armar(s)
+    r.empezar_siguiente(P, DESPUES)
+    with r.usar() as s:
+        assert s.ultimo_cambio is None
+        try:
+            s.deshacer(P, DESPUES)
+            assert False, "tenía que rechazarse"
+        except ErrorDeAjuste:
+            pass
+        assert s.entradas.base is not None and s.entradas.canales is not None
+
+
+def test_empezar_de_cero_borra_todos_los_meses():
+    """Para practicar la demo: se borra todo y se arranca el mes actual, vacío."""
+    almacen = _almacen()
+    r = Repositorio(almacen, hoy=HOY)
+    with r.usar() as s:
+        _armar(s)
+    r.empezar_siguiente(P, DESPUES)
+    r.reiniciar()
+    assert almacen.meses() == [] and almacen.comandos("2026-10") == []
+    with Repositorio(almacen, hoy=HOY).usar() as s:  # también después de reiniciar el servidor
+        assert s.mes == "2026-10" and s.faltan() and s.historial == []

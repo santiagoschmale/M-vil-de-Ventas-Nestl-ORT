@@ -14,3 +14,13 @@ def a_texto(valor: Decimal) -> str:
     entero, _, decimales = f"{abs(valor):f}".partition(".")
     miles = f"{int(entero):,}".replace(",", ".")
     return f"{'-' if valor < 0 else ''}{miles}{',' + decimales if decimales else ''}"
+
+
+MESES = ("enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre",
+         "noviembre", "diciembre")
+
+
+def nombre_mes(mes: str) -> str:
+    """ "2026-10" -> "octubre 2026": como lo dice el planner. Lo mismo que `nombreMes` del front. """
+    anio, m = mes.split("-")
+    return f"{MESES[int(m) - 1]} {anio}"

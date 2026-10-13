@@ -29,11 +29,6 @@ export const Matriz = ({ cruce }: { cruce: Cruce }) => {
 
   return (
     <>
-      {!cruce.cierra && (
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-          Los valores aparecen cuando el cruce cierra. Mientras tanto podés apagar SKUs desde acá.
-        </Typography>
-      )}
       <TableContainer sx={{ maxHeight: '65vh', border: `1px solid ${AVENA}`, borderRadius: 1 }}>
         <Table stickyHeader size="small" aria-label={`Matriz SKU por canal en ${UNIDADES[cruce.unidad].nombre.toLowerCase()}`}>
           <TableHead>

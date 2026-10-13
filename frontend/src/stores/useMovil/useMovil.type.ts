@@ -125,7 +125,7 @@ export type Apertura = {
 type Resultado = Promise<string | null>;
 
 /** A qué fila fue a mirar el planner desde "Para revisar". `vez` cambia en cada clic. */
-export type Foco = { tipo: 'regla' | 'sku' | 'celda'; id: string; vez: number }; // celda: "sku|canal"
+export type Foco = { tipo: 'regla' | 'sku' | 'celda' | 'etapas'; id: string; vez: number }; // celda: "sku|canal"
 
 // Un móvil por mes: "2026-10".
 export type MesResumen = { mes: string; aprobado: boolean };
@@ -135,6 +135,7 @@ export type TUseMovil = {
   meses: MesResumen[];
   verMes: (mes?: string) => Promise<void>;
   empezarSiguiente: () => Resultado;
+  reiniciar: () => Resultado; // empezar de cero: borra todos los meses (solo en local)
   asignarCategorias: (categorias: Record<string, string>, motivo: string) => Resultado;
   cargarCategorias: (archivo: File) => Resultado;
   cambiarAperturaCanal: (canal: string, abre: boolean, motivo: string) => Resultado;

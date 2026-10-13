@@ -337,3 +337,22 @@ def test_cerrar_y_abrir_la_apertura_de_un_canal():
     sku = next(f["codigo"] for f in c.get("/api/movil/cruce/kilos").json()["skus"]
                if D(f["celdas"].get("Córdoba", {}).get("monto", "0")) > 0)
     assert c.get(f"/api/movil/apertura/{sku}/Córdoba").status_code == 404  # ya no se abre
+
+
+def test_empezar_de_cero_solo_en_local():
+    import os
+    c = _cerrado()
+    antes = os.environ.get("IS_LOCAL")
+    try:
+        os.environ["IS_LOCAL"] = "false"
+        assert c.post("/api/movil/reiniciar").status_code == 403
+        os.environ.pop("IS_LOCAL")
+        assert c.post("/api/movil/reiniciar").status_code == 403  # sin definir tampoco
+        os.environ["IS_LOCAL"] = "true"
+        r = c.post("/api/movil/reiniciar").json()
+        assert r["faltan"] == ["objetivo de Contraloría", "totales por canal", "mes anterior"] and r["historial"] == []
+    finally:
+        if antes is None:
+            os.environ.pop("IS_LOCAL", None)
+        else:
+            os.environ["IS_LOCAL"] = antes

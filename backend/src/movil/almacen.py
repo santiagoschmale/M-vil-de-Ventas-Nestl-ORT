@@ -10,8 +10,8 @@ por dentro.
 
 from __future__ import annotations
 
-from sqlalchemy import JSON, Column, ForeignKey, Integer, LargeBinary, MetaData, String, Table, create_engine, insert, \
-    select
+from sqlalchemy import JSON, Column, ForeignKey, Integer, LargeBinary, MetaData, String, Table, create_engine, delete, \
+    insert, select
 from sqlalchemy.pool import StaticPool
 
 metadata = MetaData()
@@ -67,6 +67,12 @@ class Almacen:
             id_ = c.execute(insert(comando).values(mes=mes, metodo=metodo, args=args)).inserted_primary_key[0]
             for n, contenido in enumerate(archivos):
                 c.execute(insert(archivo).values(comando_id=id_, n=n, contenido=contenido))
+
+    def borrar_todo(self) -> None:
+        """Todos los meses, sus acciones y sus archivos. Solo para practicar en local."""
+        with self.motor.begin() as c:
+            for tabla in (archivo, comando, movil):
+                c.execute(delete(tabla))
 
     def archivos(self, comando_id: int) -> list[bytes]:
         with self.motor.connect() as c:
