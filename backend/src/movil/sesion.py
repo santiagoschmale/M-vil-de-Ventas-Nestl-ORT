@@ -588,6 +588,7 @@ class Sesion:
             self.canales_cerrados = frozenset(foto["canales_cerrados"])
             return ajuste
         self._aplicar(cambio)
+        self._antes_del_ultimo = self.ultimo_cambio = None  # arrancar el mes es una decisión, como aprobar: no se deshace
 
     # --- revisión por etapa -------------------------------------------------
 

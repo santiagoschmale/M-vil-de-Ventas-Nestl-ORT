@@ -144,3 +144,19 @@ def test_un_mes_anterior_no_se_toca():
                 assert False, "tenía que rechazarse"
             except ErrorDeAjuste:
                 pass
+
+
+def test_arrancar_desde_el_aprobado_no_se_deshace():
+    """Deshacerlo dejaba el mes nuevo sin base ni totales, y no había forma de volver a heredar."""
+    r = Repositorio(_almacen(), hoy=HOY)
+    with r.usar() as s:
+        _armar(s)
+    r.empezar_siguiente(P, DESPUES)
+    with r.usar() as s:
+        assert s.ultimo_cambio is None
+        try:
+            s.deshacer(P, DESPUES)
+            assert False, "tenía que rechazarse"
+        except ErrorDeAjuste:
+            pass
+        assert s.entradas.base is not None and s.entradas.canales is not None
