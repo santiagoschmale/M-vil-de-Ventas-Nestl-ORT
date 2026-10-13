@@ -64,6 +64,15 @@ def test_los_montos_viajan_como_texto_con_los_decimales_de_su_unidad():
     assert montos and all(isinstance(m, str) and len(m.split(".")[1]) == 3 for m in montos)
 
 
+def test_las_columnas_van_en_el_orden_del_archivo_de_totales():
+    texto = (MUESTRA / "input2_canales.tsv").read_text(encoding="utf-8")
+    orden = [linea.split("\t")[0] for linea in texto.splitlines()[1:] if linea.strip()]
+    c = _cerrado()
+    assert [x["nombre"] for x in c.get("/api/movil/cruce/kilos").json()["canales"]] == orden
+    hoja = load_workbook(BytesIO(c.get("/api/movil/exportar").content))["Kilos"]
+    assert [x.value for x in hoja[1]][3:3 + len(orden)] == orden
+
+
 def test_el_cruce_cierra_exacto_filas_y_columnas_por_http():
     cruce = _cerrado().get("/api/movil/cruce/kilos").json()
     for s in cruce["skus"]:
@@ -337,6 +346,11 @@ def test_cerrar_y_abrir_la_apertura_de_un_canal():
     sku = next(f["codigo"] for f in c.get("/api/movil/cruce/kilos").json()["skus"]
                if D(f["celdas"].get("Córdoba", {}).get("monto", "0")) > 0)
     assert c.get(f"/api/movil/apertura/{sku}/Córdoba").status_code == 404  # ya no se abre
+
+
+def test_muestra_solo_objetivo():
+    r = TestClient(crear_app()).post("/api/movil/muestra?solo_objetivo=true").json()
+    assert r["faltan"] == ["totales por canal", "mes anterior"]
 
 
 def test_empezar_de_cero_solo_en_local():

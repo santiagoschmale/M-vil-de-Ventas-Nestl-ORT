@@ -283,11 +283,15 @@ def cargar_base(archivo: UploadFile = File(...), s: Sesion = Depends(sesion), qu
 
 
 @router.post("/muestra", summary="Cargar las entradas de muestra (datos ficticios). Con totales=false, sin los "
-                                  "totales por canal, para armarlos en la pantalla")
-def cargar_muestra(totales: bool = True, s: Sesion = Depends(sesion), quien: str = Depends(autor)):
+                                  "totales por canal, para armarlos en la pantalla. Con solo_objetivo=true, solo el "
+                                  "objetivo de Contraloría (para un mes que ya heredó lo demás)")
+def cargar_muestra(totales: bool = True, solo_objetivo: bool = False, s: Sesion = Depends(sesion),
+                   quien: str = Depends(autor)):
     ahora = _ahora()
     # Los archivos del repo se llaman input1/input2 por historia; al planner se le muestra el nombre del negocio.
     _aplicar(s.cargar_input1, MUESTRA / "input1_objetivo.xlsx", "Muestra · objetivo de Contraloría.xlsx", quien, ahora)
+    if solo_objetivo:
+        return _estado(s)
     if totales:
         _aplicar(s.cargar_input2, MUESTRA / "input2_canales.xlsx", quien, ahora, nombre="Muestra · totales por canal.xlsx")
     elif s.entradas.canales is not None:
@@ -321,7 +325,7 @@ def obtener_cruce(unidad: str, s: Sesion = Depends(sesion)):
         "canales": [
             {"nombre": c, "pedido": _texto(total_canal[c], unidad),
              "repartido": _texto(_suma(v for (_, k), v in celdas.items() if k == c), unidad)}
-            for c in sorted(r.canales)
+            for c in r.canales  # en el orden del archivo de totales: como los piensa el planner
         ],
         "skus": [
             {

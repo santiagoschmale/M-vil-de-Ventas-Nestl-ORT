@@ -272,10 +272,14 @@ const Entradas = ({ estado }: { estado: Estado }) => {
           </Link>
           {' · '}
           <Tooltip describeChild title="Carga el objetivo y el mes anterior, y deja los totales por canal para armarlos en la pantalla">
-            <Link component="button" variant="body2" disabled={ocupado || soloLectura} onClick={() => cargarMuestra(false)}>
+            <Link component="button" variant="body2" disabled={ocupado || soloLectura} onClick={() => cargarMuestra('sin_totales')}>
               sin totales por canal
             </Link>
           </Tooltip>
+          {' · '}
+          <Link component="button" variant="body2" disabled={ocupado || soloLectura} onClick={() => cargarMuestra('objetivo')}>
+            solo el objetivo de Contraloría
+          </Link>
         </Box>
       )}
       {editar && (
@@ -653,16 +657,8 @@ export const MovilPage = () => {
           <Box sx={FILA_BARRA}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexWrap: 'nowrap' }}>
               <Typography variant="h5" fontWeight={700}>Móvil</Typography>
-              {meses.length > 1 ? (
-                <TextField select size="small" value={estado.mes} SelectProps={{ native: true }}
-                  inputProps={{ 'aria-label': 'Mes del móvil' }} sx={{ ml: 1 }}
-                  onChange={e => verMes(e.target.value)}>
-                  {meses.map(m => <option key={m.mes} value={m.mes}>{nombreMes(m.mes)}{m.aprobado ? ' · aprobado' : ''}</option>)}
-                </TextField>
-              ) : (
-                <Typography variant="h5" color="text.secondary" sx={{ ml: 1 }}>{nombreMes(estado.mes)}</Typography>
-              )}
-              <Ayuda ayuda={AYUDA.movil} />
+              {/* Los demás meses se eligen en el sidebar, agrupados por año. */}
+              <Typography variant="h5" color="text.secondary" sx={{ ml: 1 }}>{nombreMes(estado.mes)}</Typography>
               {/* Sin entradas no hay tabla: la unidad recién importa cuando hay algo para ver. */}
               {cargado && (
                 <>

@@ -33,6 +33,8 @@ vi.mock('../../shared/IconMenu', () => ({
   )),
 }));
 
+vi.mock('../../../pages/Movil/MesesMenu', () => ({ MesesMenu: () => null }));
+
 vi.mock('../../shared/Profile', () => ({
   Profile: vi.fn(() => <div data-testid="mock-profile">Profile Component</div>),
 }));
