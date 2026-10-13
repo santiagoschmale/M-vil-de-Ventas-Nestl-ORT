@@ -20,6 +20,10 @@ export const AYUDA = {
           Contraloría y cada canal suma lo que pediste para ese canal. Kilos y pesos se cierran por separado.
         </P>
         <P>Cuando los dos cierran, se puede exportar el Excel para los equipos comerciales.</P>
+        <P>
+          Debajo del título, <b>Siguiente</b> dice qué toca hacer ahora: cargar lo que falta, resolver lo que está en
+          rojo, revisar las etapas, aprobar o empezar el mes que sigue. El botón azul lleno es siempre ese paso.
+        </P>
       </>
     ),
   },
@@ -97,7 +101,10 @@ export const AYUDA = {
           SKU repetido en el Excel, un producto de otro país. Se puede exportar igual: el sistema te los muestra antes
           y quedan en la hoja Problemas del Excel.
         </P>
-        <P>Los botones de cada aviso te llevan a donde se resuelve.</P>
+        <P>
+          Los botones con borde lo resuelven ahí mismo (elegir canales, elegir la fila, ver la celda). «Ir a…» solo te
+          lleva a donde mirarlo: la regla o la fila del SKU en la tabla.
+        </P>
       </>
     ),
   },
