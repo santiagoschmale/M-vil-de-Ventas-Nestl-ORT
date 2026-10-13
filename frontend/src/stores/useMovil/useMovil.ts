@@ -128,7 +128,7 @@ export const useMovil = create<TUseMovil>((set, get) => {
       await get().refrescar();
     },
     empezarSiguiente: () => cambiar(() => api.post('/movil/meses/siguiente', {}),
-      { errorEnDialogo: true, aviso: 'Mes nuevo: cargá el objetivo de Contraloría.' }),
+      { aviso: 'Mes nuevo creado.' }),  // sin diálogo: si falla, el error va en el aviso
 
     elegirUnidad: async unidad => {
       set({ unidad });

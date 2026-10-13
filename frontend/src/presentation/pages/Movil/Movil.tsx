@@ -12,6 +12,8 @@ import AddRoundedIcon from '@mui/icons-material/AddRounded';
 import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded';
 import UndoRoundedIcon from '@mui/icons-material/UndoRounded';
 import TaskAltRoundedIcon from '@mui/icons-material/TaskAltRounded';
+import ArrowForwardRoundedIcon from '@mui/icons-material/ArrowForwardRounded';
+import ArrowBackRoundedIcon from '@mui/icons-material/ArrowBackRounded';
 import { useMovil, useSoloLectura } from '../../../stores/useMovil';
 import { Estado, Unidad } from '../../../stores/useMovil/useMovil.type';
 import { conUnidad, formatear, nombreMes, UNIDADES } from './formato';
@@ -286,21 +288,28 @@ const Entradas = ({ estado }: { estado: Estado }) => {
 
 const conSku = (p: Estado['problemas'][number]) => (p.sku ? `SKU ${p.sku} · ${p.mensaje}` : p.mensaje);
 
-/** "Ver R1", "Ver SKU 900…": de un problema al lugar donde se arregla. */
+/** "Ir a R1", "Ir al SKU 900…": de un problema al lugar donde se mira. Solo lleva: por eso va sin borde y con flecha. */
 const Ir = ({ destinos }: { destinos: [Foco['tipo'], string][] }) => {
   const { enfocar } = useMovil();
-  if (!destinos.length) return null;
   return (
-    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+    <>
       {destinos.map(([tipo, id]) => (
         <Button key={`${tipo}-${id}`} size="small" color="inherit" onClick={() => enfocar(tipo, id)}
-          sx={{ whiteSpace: 'nowrap' }}>
-          Ver {tipo === 'sku' ? `SKU ${id}` : id}
+          endIcon={<ArrowForwardRoundedIcon fontSize="small" />} sx={{ whiteSpace: 'nowrap' }}>
+          {tipo === 'sku' ? `Ir al SKU ${id}` : `Ir a ${id}`}
         </Button>
       ))}
-    </Box>
+    </>
   );
 };
+
+/** Lo que resuelve el aviso: con borde, para que se distinga de "Ir a…" y del texto del aviso. */
+const Resolver = (props: React.ComponentProps<typeof Button>) => (
+  <Button size="small" color="inherit" variant="outlined" {...props} sx={{ whiteSpace: 'nowrap' }} />
+);
+
+const enLinea = { alignItems: 'center', '& .MuiAlert-action': { pt: 0 } };
+const ACCIONES_SX = { display: 'flex', alignItems: 'center', flexWrap: 'nowrap', gap: 0.5 } as const;
 
 /** Un SKU repetido en el objetivo de Contraloría: el planner elige cuál fila vale, sin tocar el Excel. */
 const FilaDialog = ({ repetido, onCerrar }: { repetido: Repetido; onCerrar: () => void }) => {
@@ -356,23 +365,15 @@ const Pendientes = ({ estado, unidad, enMatriz }: { estado: Estado; unidad: Unid
     const r = p.tipo === 'sku_repetido' ? repetido(p.sku) : undefined;
     const celda = p.bloque === 'apertura' && p.sku && p.canal && enMatriz.has(p.sku) ? `${p.sku} · ${p.canal}` : null;
     return (
-      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+      <Box sx={ACCIONES_SX}>
         {celda && (
-          <Button size="small" color="inherit" sx={{ whiteSpace: 'nowrap' }} aria-label={`Ver celda ${celda}`}
-            onClick={() => enfocar('celda', `${p.sku}|${p.canal}`)}>
+          <Resolver aria-label={`Ver celda ${celda}`} onClick={() => enfocar('celda', `${p.sku}|${p.canal}`)}>
             Ver celda
-          </Button>
+          </Resolver>
         )}
-        {p.tipo === 'sin_categoria' && (
-          <Button size="small" color="inherit" sx={{ whiteSpace: 'nowrap' }} onClick={() => setCategorias(true)}>
-            Asignar categorías
-          </Button>
-        )}
+        {p.tipo === 'sin_categoria' && <Resolver onClick={() => setCategorias(true)}>Asignar categorías</Resolver>}
         {r && (
-          <Button size="small" color="inherit" sx={{ whiteSpace: 'nowrap' }} onClick={() => setEligiendo(r)}
-            aria-label={`Elegir fila de SKU ${r.sku}`}>
-            Elegir fila
-          </Button>
+          <Resolver onClick={() => setEligiendo(r)} aria-label={`Elegir fila de SKU ${r.sku}`}>Elegir fila</Resolver>
         )}
         <Ir destinos={skus([p.sku])} />
       </Box>
@@ -387,14 +388,13 @@ const Pendientes = ({ estado, unidad, enMatriz }: { estado: Estado; unidad: Unid
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
       {inconsistencias.map((i, n) => (
-        <Alert key={`i${n}`} severity="error"
+        <Alert key={`i${n}`} severity="error" sx={enLinea}
           action={
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+            <Box sx={ACCIONES_SX}>
               {i.tipo === 'sku_sin_canal' && i.skus[0] && (
-                <Button size="small" color="inherit" sx={{ whiteSpace: 'nowrap' }}
-                  aria-label={`Elegir canales de SKU ${i.skus[0]}`} onClick={() => setCanalesDe(i.skus[0])}>
+                <Resolver aria-label={`Elegir canales de SKU ${i.skus[0]}`} onClick={() => setCanalesDe(i.skus[0])}>
                   Elegir canales
-                </Button>
+                </Resolver>
               )}
               <Ir destinos={[...i.reglas.map((r): [Foco['tipo'], string] => ['regla', r]), ...skus(i.skus)]} />
             </Box>
@@ -403,9 +403,9 @@ const Pendientes = ({ estado, unidad, enMatriz }: { estado: Estado; unidad: Unid
         </Alert>
       ))}
       {/* Rojo solo lo que no cierra; lo del archivo o la apertura no bloquea: amarillo, lo más grave primero. */}
-      {errores.map((p, n) => <Alert key={`e${n}`} severity="warning" action={acciones(p)}>{conSku(p)}</Alert>)}
+      {errores.map((p, n) => <Alert key={`e${n}`} severity="warning" sx={enLinea} action={acciones(p)}>{conSku(p)}</Alert>)}
       {estado.avisos[unidad].map((a, n) => <Alert key={`a${n}`} severity="info">{a}</Alert>)}
-      {avisos.map((p, n) => <Alert key={`p${n}`} severity="warning" action={acciones(p)}>{conSku(p)}</Alert>)}
+      {avisos.map((p, n) => <Alert key={`p${n}`} severity="warning" sx={enLinea} action={acciones(p)}>{conSku(p)}</Alert>)}
       {eligiendo && <FilaDialog repetido={eligiendo} onCerrar={() => setEligiendo(undefined)} />}
       {canalesDe && <CanalesDialog sku={canalesDe} estado={estado} onCerrar={() => setCanalesDe(undefined)} />}
       {categorias && <CategoriasDialog estado={estado} onCerrar={() => setCategorias(false)} />}
@@ -451,53 +451,89 @@ const Seccion = ({ titulo, resumen, abierta = false, pedido, ayuda, children }: 
 
 const NOMBRE_ETAPA = { canal: 'por canal', apertura: 'debajo del canal' } as const;
 
-/** En el encabezado, solo el estado de cada etapa: se marcan junto a la tabla, donde se revisan. */
-const ResumenEtapas = ({ estado }: { estado: Estado }) => (
-  <Box sx={{ display: 'flex', gap: 0.5 }} aria-label="Revisión por etapa">
-    {estado.etapas.map(({ etapa, revisada }, n) => (
-      <Tooltip key={etapa} title={revisada
-        ? `Etapa ${NOMBRE_ETAPA[etapa]}: revisada por ${revisada.autor}`
-        : `Etapa ${NOMBRE_ETAPA[etapa]}: sin revisar. Se marca arriba de la tabla SKU × canal`}>
-        <Chip size="small" variant="outlined" label={`${n + 1} ${revisada ? '✓' : '·'}`}
-          aria-label={`Etapa ${NOMBRE_ETAPA[etapa]}: ${revisada ? 'revisada' : 'sin revisar'}`}
-          sx={revisada ? { borderColor: CIERRA, color: CIERRA, fontWeight: 700 } : undefined} />
-      </Tooltip>
-    ))}
-  </Box>
+/** En el encabezado, cuántas etapas están revisadas; al tocarlo lleva a donde se marcan, arriba de la tabla. */
+const ResumenEtapas = ({ estado }: { estado: Estado }) => {
+  const { enfocar } = useMovil();
+  const revisadas = estado.etapas.filter(e => e.revisada).length;
+  const todas = revisadas === estado.etapas.length;
+  const texto = todas ? 'Etapas revisadas' : `Etapas: ${revisadas} de ${estado.etapas.length} revisadas`;
+  return (
+    <Tooltip describeChild title="Ir a la revisión por etapa, arriba de la tabla SKU × canal">
+      <Chip size="small" variant="outlined" label={texto} onClick={() => enfocar('etapas', 'revision')}
+        sx={todas ? { borderColor: CIERRA, color: CIERRA, fontWeight: 700 } : undefined} />
+    </Tooltip>
+  );
+};
+
+/** Un estado del móvil en el encabezado, con el mismo estilo que "Kilos: cierra". */
+const ChipEstado = ({ texto }: { texto: string }) => (
+  <Chip size="small" variant="outlined" label={texto} sx={{ borderColor: CIERRA, color: CIERRA, fontWeight: 700 }} />
 );
 
-/** Las etapas en orden, arriba de la tabla: cada una se da por revisada después de la anterior. */
-const Etapas = ({ estado, cierra }: { estado: Estado; cierra: boolean }) => {
+const FILA_BARRA = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', columnGap: 2, rowGap: 1 } as const;
+
+const mesSolo = (mes: string) => nombreMes(mes).split(' ')[0];
+
+/** Qué hace el planner ahora, armado con lo que ya trae el estado: cada botón deshabilitado se explica acá. */
+export const siguientePaso = (estado: Estado) => {
+  if (!estado.es_ultimo) return 'Mes anterior, solo lectura: no se puede cambiar.';
+  if (estado.aprobado) return `Aprobado. Siguiente: empezar ${mesSolo(estado.siguiente)}.`;
+  if (estado.faltan.length) return `Siguiente: en Entradas, cargá lo que falta (${estado.faltan.join(', ')}).`;
+  const noCierran = (['kilos', 'plata'] as const).filter(u => !estado.cierra[u]).map(u => UNIDADES[u].nombre.toLowerCase());
+  if (noCierran.length) {
+    return `Siguiente: resolvé lo que está en rojo en Para revisar (${noCierran.join(' y ')} no ${noCierran.length > 1 ? 'cierran' : 'cierra'}).`;
+  }
+  const pendiente = estado.etapas.find(e => !e.revisada);
+  if (pendiente?.etapa === 'canal') return 'Siguiente: revisá la tabla SKU × canal y marcá la etapa 1 como revisada.';
+  if (pendiente) return 'Siguiente: revisá cómo se abre cada canal (etapa 2) y marcala como revisada.';
+  return 'Listo para aprobar.';
+};
+
+const QUE_SE_REVISA = {
+  canal: 'Por canal: esta tabla, SKU por canal.',
+  apertura: 'Debajo del canal: tocá una celda de un canal que se abre para ver cómo se reparte entre distribuidores o vendedores.',
+} as const;
+
+/** Las etapas en orden, arriba de la tabla, como un paso a paso: qué se revisa, el botón y por qué no se puede todavía. */
+const Etapas = ({ estado, cierra, valoresOcultos }: { estado: Estado; cierra: boolean; valoresOcultos: boolean }) => {
   const { revisarEtapa, ocupado } = useMovil();
   const soloLectura = useSoloLectura();
   return (
-    <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1.5 }}>
+    <Paper variant="outlined" id="etapas-revision" sx={{ p: 1.5, display: 'flex', flexDirection: 'column', gap: 1 }}>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
         <Typography variant="subtitle2" fontWeight={700}>Revisión por etapa</Typography>
         <Ayuda ayuda={AYUDA.etapas} />
       </Box>
-      <Typography variant="body2" color="text.secondary" sx={{ flexBasis: '100%', order: 9 }}>
-        La 1 es esta tabla. La 2 es cómo se abre cada canal: se revisa tocando las celdas.
-      </Typography>
       {estado.etapas.map(({ etapa, revisada }, n) => {
         const anteriorOk = estado.etapas.slice(0, n).every(e => e.revisada);
         const nombre = NOMBRE_ETAPA[etapa];
-        return revisada ? (
-          <Chip key={etapa} size="small" icon={<TaskAltRoundedIcon />} variant="outlined"
-            label={`${n + 1} · ${nombre}: revisada por ${revisada.autor}`} sx={{ borderColor: CIERRA, color: CIERRA }} />
-        ) : (
-          <Tooltip key={etapa} title={!cierra ? 'Se revisa cuando kilos y pesos cierran'
-            : !anteriorOk ? 'Primero revisá la etapa anterior: esta sale de ahí' : ''}>
-            <span>
-              <Button size="small" variant="outlined" disabled={!cierra || !anteriorOk || ocupado || soloLectura}
-                aria-label={`Marcar revisada la etapa ${nombre}`} onClick={() => revisarEtapa(etapa)}>
-                {n + 1} · {nombre}: marcar revisada
-              </Button>
-            </span>
-          </Tooltip>
+        const porQueNo = !cierra ? 'Se habilita cuando kilos y pesos cierran.'
+          : !anteriorOk ? `Se habilita al marcar la etapa ${n}.` : null;
+        return (
+          <Box key={etapa} sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', columnGap: 2, rowGap: 0.5 }}>
+            <Typography variant="body2" sx={{ flex: '1 1 320px' }}>{n + 1}. {QUE_SE_REVISA[etapa]}</Typography>
+            {revisada ? (
+              <Chip size="small" icon={<TaskAltRoundedIcon />} variant="outlined"
+                label={`Revisada por ${revisada.autor}`} sx={{ borderColor: CIERRA, color: CIERRA }} />
+            ) : (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                {porQueNo && <Typography variant="caption" color="text.secondary">{porQueNo}</Typography>}
+                <Button size="small" variant={porQueNo ? 'outlined' : 'contained'}
+                  disabled={!!porQueNo || ocupado || soloLectura}
+                  aria-label={`Marcar revisada la etapa ${nombre}`} onClick={() => revisarEtapa(etapa)}>
+                  Marcar revisada
+                </Button>
+              </Box>
+            )}
+          </Box>
         );
       })}
-    </Box>
+      {valoresOcultos && (
+        <Typography variant="body2" color="text.secondary">
+          Los valores de la tabla aparecen cuando el cruce cierra. Mientras tanto podés apagar SKUs desde acá.
+        </Typography>
+      )}
+    </Paper>
   );
 };
 
@@ -507,8 +543,10 @@ const AprobarDialog = ({ estado, onCerrar }: { estado: Estado; onCerrar: () => v
   const [error, setError] = useState<string | null>(null);
   const confirmar = async () => {
     const falla = await aprobar();
-    if (falla) setError(falla);
-    else onCerrar();
+    if (falla) return setError(falla);
+    onCerrar();
+    // Se aprueba desde la barra, casi siempre mirando la tabla: subir para que se vea el aviso y lo que sigue.
+    setTimeout(() => document.getElementById('movil-arriba')?.scrollIntoView?.({ block: 'start' }));
   };
   return (
     <Dialog open onClose={onCerrar} maxWidth="sm" fullWidth>
@@ -516,7 +554,7 @@ const AprobarDialog = ({ estado, onCerrar }: { estado: Estado; onCerrar: () => v
       <DialogContent>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
           Al aprobarlo, nadie puede cambiarlo hasta que alguien lo reabra, con motivo. Queda en el historial quién lo
-          aprobó y cuándo.
+          aprobó y cuándo. Después vas a poder empezar {mesSolo(estado.siguiente)} a partir de este reparto.
         </Typography>
         {estado.problemas.length > 0 && (
           <>
@@ -534,7 +572,7 @@ const AprobarDialog = ({ estado, onCerrar }: { estado: Estado; onCerrar: () => v
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2 }}>
         <Button onClick={onCerrar}>Cancelar</Button>
-        <Button variant="contained" onClick={confirmar} disabled={ocupado}>Aprobar</Button>
+        <Button variant="contained" onClick={confirmar} disabled={ocupado}>Aprobar {mesSolo(estado.mes)}</Button>
       </DialogActions>
     </Dialog>
   );
@@ -547,6 +585,7 @@ export const MovilPage = () => {
   const [confirmarExportar, setConfirmarExportar] = useState(false);
   const [confirmarAprobar, setConfirmarAprobar] = useState(false);
   const [reabriendo, setReabriendo] = useState(false);
+  const [arranco, setArranco] = useState<{ mes: string; de: string }>();
   useEffect(() => { refrescar(); }, []);
   // Llevar a la fila que se fue a ver, cuando la sección terminó de abrirse.
   useEffect(() => {
@@ -571,106 +610,162 @@ export const MovilPage = () => {
 
   const bloquean = estado.inconsistencias[unidad].length;
   const paraRevisar = estado.problemas.length + estado.avisos[unidad].length;
-  const resumen = [
-    bloquean && `${UNIDADES[unidad].nombre} no cierra`,
-    paraRevisar && `${paraRevisar} para revisar`,
-  ].filter(Boolean).join(' · ') || 'Nada';
+  // Se abre sola si algo bloquea o si hay un aviso que pide una decisión (no solo mirar).
+  const decidir = !estado.aprobado && estado.es_ultimo
+    && estado.problemas.some(p => p.tipo === 'sku_repetido' || p.tipo === 'sin_categoria');
+  const resumen = !bloquean && !paraRevisar ? <Dato>Nada</Dato> : (
+    <>
+      {bloquean > 0 && <Typography variant="body2" sx={{ color: NO_CIERRA }}>{UNIDADES[unidad].nombre} no cierra</Typography>}
+      {paraRevisar > 0 && (
+        <Chip size="small" color="warning" variant="outlined" label={`${paraRevisar} ${paraRevisar === 1 ? 'aviso' : 'avisos'}`} />
+      )}
+    </>
+  );
   const cierraTodo = estado.cierra.kilos && estado.cierra.plata;
+  const cargado = estado.faltan.length === 0;
   const anterior = !estado.es_ultimo;
-  const sinRevisar = estado.etapas.filter(e => !e.revisada).map(e => NOMBRE_ETAPA[e.etapa]);
+  const puedeAprobar = cierraTodo && estado.etapas.every(e => e.revisada);
+  const empezar = async () => {
+    const { mes, siguiente } = estado;
+    if (!(await empezarSiguiente())) setArranco({ mes: siguiente, de: mes });
+  };
   const queDeshace = estado.deshacer
     && `Deshacer: ${ACCIONES[estado.deshacer.accion] ?? estado.deshacer.accion} · ${estado.deshacer.detalle}`;
   const chocan = new Set([...estado.inconsistencias.kilos, ...estado.inconsistencias.plata].flatMap(i => i.reglas)).size;
-  const resumenReglas = estado.reglas.length
-    ? `${estado.reglas.length} ${estado.reglas.length === 1 ? 'regla' : 'reglas'}${chocan ? ` · ${chocan} ${chocan === 1 ? 'choca' : 'chocan'}` : ''}`
-    : 'Ninguna';
+  // Lo de "Dónde se vende" y los canales cerrados también es parte de Reglas: si no se cuenta, parece que no quedó.
+  const conCanales = estado.canales_sku.length;
+  const cerrados = estado.aperturas_canal.filter(a => !a.abre).length;
+  const resumenReglas = [
+    estado.reglas.length ? `${estado.reglas.length} ${estado.reglas.length === 1 ? 'regla' : 'reglas'}` : 'Ninguna regla',
+    chocan && `${chocan} ${chocan === 1 ? 'choca' : 'chocan'}`,
+    conCanales && `${conCanales} ${conCanales === 1 ? 'SKU' : 'SKUs'} con canales elegidos`,
+    cerrados && `${cerrados} ${cerrados === 1 ? 'canal' : 'canales'} sin abrir debajo`,
+  ].filter(Boolean).join(' · ');
 
   return (
-    <Box sx={{ px: 3, pb: 3, display: 'flex', flexDirection: 'column', gap: 2 }}>
-        {/* Fijo arriba: si cierra, en qué unidad se mira y la salida, siempre a la vista. */}
+    <Box id="movil-arriba" sx={{ px: 3, pb: 3, display: 'flex', flexDirection: 'column', gap: 2 }}>
+        {/* Fijo arriba, en dos filas: qué estoy viendo · cómo está; y el paso siguiente · qué hago. */}
         <Box component="header" sx={{
           position: 'sticky', top: 0, zIndex: 5, bgcolor: '#fff', mx: -3, px: 3, py: 1.5,
-          borderBottom: `1px solid ${AVENA}`, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1.5,
+          borderBottom: `1px solid ${AVENA}`, display: 'flex', flexDirection: 'column', gap: 1,
         }}>
           {ocupado && <LinearProgress sx={{ position: 'absolute', left: 0, right: 0, bottom: 0 }} aria-label="Recalculando" />}
-          <Box sx={{ mr: 'auto', display: 'flex', alignItems: 'center', gap: 0.5 }}>
-            <Typography variant="h5" fontWeight={700}>Móvil</Typography>
-            {meses.length > 1 ? (
-              <TextField select size="small" value={estado.mes} SelectProps={{ native: true }}
-                inputProps={{ 'aria-label': 'Mes del móvil' }} sx={{ ml: 1 }}
-                onChange={e => verMes(e.target.value)}>
-                {meses.map(m => <option key={m.mes} value={m.mes}>{nombreMes(m.mes)}{m.aprobado ? ' · aprobado' : ''}</option>)}
-              </TextField>
-            ) : (
-              <Typography variant="h5" color="text.secondary" sx={{ ml: 1 }}>{nombreMes(estado.mes)}</Typography>
-            )}
-            <Ayuda ayuda={AYUDA.movil} />
-          </Box>
-          {estado.faltan.length === 0 && (
-            <>
-              <ChipCierre unidad="kilos" cierra={estado.cierra.kilos} />
-              <ChipCierre unidad="plata" cierra={estado.cierra.plata} />
-            </>
-          )}
-          {/* Una sola vuelta atrás: después se deshabilita hasta el próximo cambio. */}
-          <Tooltip title={queDeshace ?? 'No hay un cambio para deshacer'}>
-            <span>
-              <Button size="small" color="inherit" startIcon={<UndoRoundedIcon />} disabled={!queDeshace || ocupado}
-                aria-label={queDeshace ?? 'Deshacer'} onClick={() => deshacer()}>
-                Deshacer
-              </Button>
-            </span>
-          </Tooltip>
-          <ToggleButtonGroup
-            size="small" exclusive value={unidad} aria-label="Unidad de la matriz"
-            onChange={(_, u: Unidad | null) => u && elegirUnidad(u)}
-          >
-            <ToggleButton value="kilos">{UNIDADES.kilos.nombre}</ToggleButton>
-            <ToggleButton value="plata">{UNIDADES.plata.nombre}</ToggleButton>
-          </ToggleButtonGroup>
-          {estado.faltan.length === 0 && !estado.aprobado && <ResumenEtapas estado={estado} />}
-          {estado.aprobado ? (
-            !anterior && <Button size="small" color="inherit" onClick={() => setReabriendo(true)} disabled={ocupado}>Reabrir</Button>
-          ) : (
-            <Tooltip title={!cierraTodo ? 'Se puede aprobar cuando kilos y pesos cierran'
-              : sinRevisar.length ? `Falta revisar la etapa ${sinRevisar.join(' y la ')}`
-                : 'Da por bueno el móvil del mes. Después no se puede cambiar sin reabrirlo'}>
-              <span>
-                <Button variant="outlined" startIcon={<TaskAltRoundedIcon />} disabled={!cierraTodo || sinRevisar.length > 0 || ocupado}
-                  onClick={() => setConfirmarAprobar(true)}>
-                  Aprobar
-                </Button>
-              </span>
-            </Tooltip>
-          )}
-          <Tooltip title={cierraTodo ? 'Descarga el Excel con kilos, pesos, apertura y problemas' : 'Se puede exportar cuando kilos y pesos cierran'}>
-            <span>
-              {estado.problemas.length ? (
-                // Cierra, pero hay algo sin resolver: se exporta igual solo si una persona lo decide.
-                <Button variant="contained" startIcon={<FileDownloadRoundedIcon />} disabled={!cierraTodo}
-                  onClick={() => setConfirmarExportar(true)}>
-                  Exportar
-                </Button>
+          <Box sx={FILA_BARRA}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexWrap: 'nowrap' }}>
+              <Typography variant="h5" fontWeight={700}>Móvil</Typography>
+              {meses.length > 1 ? (
+                <TextField select size="small" value={estado.mes} SelectProps={{ native: true }}
+                  inputProps={{ 'aria-label': 'Mes del móvil' }} sx={{ ml: 1 }}
+                  onChange={e => verMes(e.target.value)}>
+                  {meses.map(m => <option key={m.mes} value={m.mes}>{nombreMes(m.mes)}{m.aprobado ? ' · aprobado' : ''}</option>)}
+                </TextField>
               ) : (
-                <Button variant="contained" startIcon={<FileDownloadRoundedIcon />} href={`/api/movil/exportar?mes=${estado.mes}`} disabled={!cierraTodo}>
-                  Exportar
-                </Button>
+                <Typography variant="h5" color="text.secondary" sx={{ ml: 1 }}>{nombreMes(estado.mes)}</Typography>
               )}
-            </span>
-          </Tooltip>
+              <Ayuda ayuda={AYUDA.movil} />
+              {/* Sin entradas no hay tabla: la unidad recién importa cuando hay algo para ver. */}
+              {cargado && (
+                <>
+                  <Typography variant="body2" color="text.secondary" sx={{ ml: 1.5, mr: 0.5, whiteSpace: 'nowrap' }}>Ver en</Typography>
+                  <ToggleButtonGroup
+                    size="small" exclusive value={unidad} aria-label="Unidad de la matriz"
+                    onChange={(_, u: Unidad | null) => u && elegirUnidad(u)}
+                  >
+                    <ToggleButton value="kilos">{UNIDADES.kilos.nombre}</ToggleButton>
+                    <ToggleButton value="plata">{UNIDADES.plata.nombre}</ToggleButton>
+                  </ToggleButtonGroup>
+                </>
+              )}
+            </Box>
+            {cargado && (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'nowrap' }} role="group" aria-label="Cómo está el móvil">
+                {anterior ? <ChipEstado texto="Solo lectura" />
+                  : estado.aprobado ? <ChipEstado texto="Aprobado" />
+                    : (
+                      <>
+                        <ChipCierre unidad="kilos" cierra={estado.cierra.kilos} />
+                        <ChipCierre unidad="plata" cierra={estado.cierra.plata} />
+                        <ResumenEtapas estado={estado} />
+                      </>
+                    )}
+              </Box>
+            )}
+          </Box>
+          <Box sx={FILA_BARRA}>
+            <Typography variant="body2" color="text.secondary">{siguientePaso(estado)}</Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'nowrap', ml: 'auto' }}>
+              {/* Una sola vuelta atrás: después se deshabilita hasta el próximo cambio. */}
+              <Tooltip title={queDeshace ?? 'No hay un cambio para deshacer'}>
+                <span>
+                  <Button size="small" color="inherit" startIcon={<UndoRoundedIcon />} disabled={!queDeshace || ocupado}
+                    aria-label={queDeshace ?? 'Deshacer'} onClick={() => deshacer()}>
+                    Deshacer
+                  </Button>
+                </span>
+              </Tooltip>
+              {cargado && (
+                <Tooltip title={cierraTodo ? 'Descarga el Excel con kilos, pesos, apertura y problemas' : 'Se puede exportar cuando kilos y pesos cierran'}>
+                  <span>
+                    {estado.problemas.length ? (
+                      // Cierra, pero hay algo sin resolver: se exporta igual solo si una persona lo decide.
+                      <Button variant="outlined" startIcon={<FileDownloadRoundedIcon />} disabled={!cierraTodo}
+                        onClick={() => setConfirmarExportar(true)}>
+                        Exportar
+                      </Button>
+                    ) : (
+                      <Button variant="outlined" startIcon={<FileDownloadRoundedIcon />} href={`/api/movil/exportar?mes=${estado.mes}`} disabled={!cierraTodo}>
+                        Exportar
+                      </Button>
+                    )}
+                  </span>
+                </Tooltip>
+              )}
+              {/* El botón lleno es siempre el paso siguiente: aprobar y, aprobado, empezar el mes que sigue. */}
+              {anterior ? null : estado.aprobado ? (
+                <>
+                  <Button color="inherit" onClick={() => setReabriendo(true)} disabled={ocupado}>Reabrir</Button>
+                  <Button variant="contained" endIcon={<ArrowForwardRoundedIcon />} disabled={ocupado} onClick={empezar}
+                    sx={{ whiteSpace: 'nowrap' }}>
+                    Empezar {mesSolo(estado.siguiente)}
+                  </Button>
+                </>
+              ) : cargado && (
+                <Tooltip title={puedeAprobar ? 'Da por bueno el móvil del mes. Después no se puede cambiar sin reabrirlo' : ''}>
+                  <span>
+                    <Button variant={puedeAprobar ? 'contained' : 'outlined'} startIcon={<TaskAltRoundedIcon />}
+                      disabled={!puedeAprobar || ocupado} onClick={() => setConfirmarAprobar(true)}>
+                      Aprobar
+                    </Button>
+                  </span>
+                </Tooltip>
+              )}
+            </Box>
+          </Box>
         </Box>
         {anterior ? (
-          <Alert severity="info" action={<Button color="inherit" onClick={() => verMes(undefined)}>Ir a {nombreMes(ultimo!)}</Button>}>
+          <Alert severity="info" sx={{ alignItems: 'center' }} action={
+            <Button variant="outlined" color="info" size="small" startIcon={<ArrowBackRoundedIcon />}
+              sx={{ whiteSpace: 'nowrap' }} onClick={() => verMes(undefined)}>
+              Volver a {ultimo ? nombreMes(ultimo) : 'el último mes'}
+            </Button>
+          }>
             Estás viendo {nombreMes(estado.mes)}, un mes anterior. Es de solo lectura.
           </Alert>
         ) : estado.aprobado && (
-          <Alert severity="success" icon={<TaskAltRoundedIcon />} action={
-            <Button color="inherit" disabled={ocupado} onClick={() => empezarSiguiente()}>
-              Empezar {nombreMes(estado.siguiente)}
+          <Alert severity="success" icon={<TaskAltRoundedIcon />} sx={{ alignItems: 'center' }} action={
+            <Button variant="contained" color="success" size="small" endIcon={<ArrowForwardRoundedIcon />}
+              sx={{ whiteSpace: 'nowrap' }} disabled={ocupado} onClick={empezar}>
+              Empezar {mesSolo(estado.siguiente)}
             </Button>
           }>
             Aprobado por {estado.aprobado.autor} el {new Date(estado.aprobado.cuando).toLocaleString('es-AR')}. Es de
-            solo lectura: para cambiarlo, reabrilo. El mes siguiente arranca de este reparto.
+            solo lectura: para cambiarlo, reabrilo. El móvil de {nombreMes(estado.siguiente)} arranca de este reparto.
+          </Alert>
+        )}
+        {arranco && arranco.mes === estado.mes && (
+          <Alert severity="success" onClose={() => setArranco(undefined)}>
+            Arrancaste {mesSolo(estado.mes)} desde {mesSolo(arranco.de)} aprobado: se heredaron el reparto, los totales
+            por canal y las reglas.{estado.faltan.length ? ` Falta: ${estado.faltan.join(', ')}.` : ''}
           </Alert>
         )}
         {confirmarAprobar && <AprobarDialog estado={estado} onCerrar={() => setConfirmarAprobar(false)} />}
@@ -705,7 +800,7 @@ export const MovilPage = () => {
           </Dialog>
         )}
 
-        <Seccion
+        <Seccion key={`entradas-${estado.mes}`}
           titulo="Entradas" abierta={estado.faltan.length > 0} ayuda={AYUDA.entradas}
           resumen={<Dato>{estado.faltan.length ? `Falta: ${estado.faltan.join(', ')}` : 'Las tres cargadas'}</Dato>}
         >
@@ -718,7 +813,7 @@ export const MovilPage = () => {
         </Seccion>
 
         {estado.faltan.length === 0 && (
-          <Seccion titulo="Para revisar" abierta={bloquean > 0} ayuda={AYUDA.revisar} resumen={<Dato>{resumen}</Dato>}>
+          <Seccion titulo="Para revisar" abierta={bloquean > 0 || decidir} ayuda={AYUDA.revisar} resumen={resumen}>
             <Pendientes estado={estado} unidad={unidad} enMatriz={new Set(cruce?.skus.map(x => x.codigo))} />
           </Seccion>
         )}
@@ -726,8 +821,8 @@ export const MovilPage = () => {
         {cruce && (
           <Seccion titulo={`SKU × canal en ${UNIDADES[unidad].nombre.toLowerCase()} (${UNIDADES[unidad].simbolo})`}
             abierta ayuda={AYUDA.matriz}
-            pedido={foco?.tipo === 'sku' || foco?.tipo === 'celda' ? foco.vez : undefined}>
-            <Box sx={{ mb: 2 }}><Etapas estado={estado} cierra={cierraTodo} /></Box>
+            pedido={foco?.tipo === 'sku' || foco?.tipo === 'celda' || foco?.tipo === 'etapas' ? foco.vez : undefined}>
+            <Box sx={{ mb: 2 }}><Etapas estado={estado} cierra={cierraTodo} valoresOcultos={!cruce.cierra} /></Box>
             <Matriz cruce={cruce} />
           </Seccion>
         )}
