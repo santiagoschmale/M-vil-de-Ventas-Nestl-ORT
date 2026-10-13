@@ -135,6 +135,7 @@ export type TUseMovil = {
   meses: MesResumen[];
   verMes: (mes?: string) => Promise<void>;
   empezarSiguiente: () => Resultado;
+  reiniciar: () => Resultado; // empezar de cero: borra todos los meses (solo en local)
   asignarCategorias: (categorias: Record<string, string>, motivo: string) => Resultado;
   cargarCategorias: (archivo: File) => Resultado;
   cambiarAperturaCanal: (canal: string, abre: boolean, motivo: string) => Resultado;

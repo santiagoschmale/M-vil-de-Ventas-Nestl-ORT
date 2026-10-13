@@ -76,6 +76,13 @@ class Repositorio:
             _Grabadora(self._sesion(nuevo), self, nuevo).heredar(foto, ultimo, autor, cuando)
             return nuevo
 
+    def reiniciar(self) -> None:
+        """Borra todos los meses: el próximo pedido arranca el mes actual, vacío. Solo para practicar en local."""
+        with self._lock:
+            if self._almacen:
+                self._almacen.borrar_todo()
+            self._sesiones.clear()
+
     # --- interno ------------------------------------------------------------
 
     def _meses(self) -> list[str]:

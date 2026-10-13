@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import TableChartRoundedIcon from '@mui/icons-material/TableChartRounded';
 import { List, ListItem, ListItemIcon, ListItemText, ListItemButton, Divider } from '@mui/material';
 import { Link, To } from 'react-router-dom';
@@ -7,6 +7,7 @@ import { Profile } from '../Profile';
 import { Logo } from '../Logo';
 import ExpandMoreRoundedIcon from '@mui/icons-material/ExpandMoreRounded';
 import { useProfile } from '../../../../stores/useProfile';
+import { ReiniciarDialog } from '../../../pages/Movil/ReiniciarDialog';
 
 
 interface SidebarItem {
@@ -26,6 +27,7 @@ const items: SidebarItem[] = [
 const LeftMenu = () => {
 
   const { fetchProfile } = useProfile();
+  const [reiniciando, setReiniciando] = useState(false);
 
   useEffect(() => {
     fetchProfile()
@@ -61,12 +63,15 @@ const LeftMenu = () => {
           <IconMenu
             id="profile-menu"
             links={[{ name: 'Logout', location: '/signout' }]}
+            // Solo en la instalación local: para practicar la demo desde un mes vacío.
+            acciones={import.meta.env.DEV ? [{ name: 'Empezar de cero', onClick: () => setReiniciando(true) }] : []}
             icon={<ExpandMoreRoundedIcon />}
             anchorOrigin={{ vertical: 'top', horizontal: 'left' }}
             transformOrigin={{ vertical: 'bottom', horizontal: 'right' }}
             />
         </div>
       </div>
+      {reiniciando && <ReiniciarDialog onCerrar={() => setReiniciando(false)} />}
     </>
   )
 

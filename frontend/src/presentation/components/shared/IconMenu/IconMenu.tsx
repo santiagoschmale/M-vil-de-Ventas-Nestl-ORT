@@ -12,6 +12,10 @@ export type MenuOptions = {
     name: string;
     location: string;
   }[];
+  acciones?: {
+    name: string;
+    onClick: () => void;
+  }[];
   anchorOrigin: PopoverOrigin;
   transformOrigin: PopoverOrigin;
   icon: JSX.Element;
@@ -71,6 +75,11 @@ export const IconMenu = (options: MenuOptions) => {
               navigate(i.location);
             }}
           >
+            <Typography textAlign="center">{i.name}</Typography>
+          </MenuItem>
+        ))}
+        {options.acciones?.map(i => (
+          <MenuItem data-testid="menu-item" key={i.name} onClick={() => { setAnchorElNav(null); i.onClick(); }}>
             <Typography textAlign="center">{i.name}</Typography>
           </MenuItem>
         ))}

@@ -44,6 +44,8 @@ transacción: si el recálculo falla, vuelve al estado anterior.
   arranca con `heredar(foto)`: el reparto aprobado es la base, y se heredan totales por
   canal, reglas, %, entidades apagadas, categorías y canales cerrados. La foto va dentro
   del comando: el mes nuevo no depende de cómo se recalcule el anterior.
+- **Empezar de cero** (menú del usuario, solo en desarrollo; la API responde 403 con
+  IS_LOCAL=false): borra todos los meses y arranca el mes actual vacío. Para practicar la demo.
 - **Un mes anterior es de solo lectura** (`Sesion.es_ultimo`): el siguiente ya arrancó de
   su aprobado. La pantalla manda siempre el mes en cada pedido.
 - **Una acción nueva** se guarda sola si deja una entrada en el historial. Sus argumentos

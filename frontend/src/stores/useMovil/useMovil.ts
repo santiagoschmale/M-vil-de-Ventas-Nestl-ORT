@@ -123,6 +123,11 @@ export const useMovil = create<TUseMovil>((set, get) => {
     cambiarAperturaCanal: (canal, abre, motivo) =>
       cambiar(() => api.put(conMes(`/movil/aperturas/${ruta(canal)}`), { abre, motivo }), enDialogo),
 
+    reiniciar: async () => {
+      set({ mes: undefined });
+      return cambiar(() => api.post('/movil/reiniciar', {}), { errorEnDialogo: true, aviso: 'Listo: arrancaste de cero.' });
+    },
+
     verMes: async mes => {
       set({ mes, cruce: undefined, foco: undefined });
       await get().refrescar();
