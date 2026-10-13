@@ -291,7 +291,7 @@ def exportar(recorrido: Recorrido, destino) -> None:
     """
     libro = Workbook()
     libro.remove(libro.active)
-    canales = sorted(recorrido.canales)
+    canales = list(recorrido.canales)  # en el orden del archivo de totales, como la pantalla
     for nombre, cruce, total_sku, total_canal, formato in (
         ("Kilos", recorrido.kilos, lambda o: o.kilos, lambda t: t.kilos, "#,##0.000"),
         ("Plata", recorrido.plata, lambda o: o.nns, lambda t: t.plata, "#,##0.00"),

@@ -325,7 +325,7 @@ def obtener_cruce(unidad: str, s: Sesion = Depends(sesion)):
         "canales": [
             {"nombre": c, "pedido": _texto(total_canal[c], unidad),
              "repartido": _texto(_suma(v for (_, k), v in celdas.items() if k == c), unidad)}
-            for c in sorted(r.canales)
+            for c in r.canales  # en el orden del archivo de totales: como los piensa el planner
         ],
         "skus": [
             {
