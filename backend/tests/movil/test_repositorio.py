@@ -91,7 +91,8 @@ def test_el_mes_siguiente_arranca_del_aprobado():
         assert s.mes == "2026-11" and s.faltan() == ["objetivo de Contraloría"]
         assert s.entradas.base == {k: v for k, v in aprobado.items()}
         assert set(s.reglas) == {"R1"} and s.porcentajes[("Córdoba", "Sofía Correa")][0] == 30
-        assert s.historial[-1].accion == "heredar" and "2026-10" in s.historial[-1].detalle
+        assert s.historial[-1].accion == "heredar" and "octubre 2026" in s.historial[-1].detalle
+        assert s.entradas.archivo2 == "Totales de octubre 2026"
         s.cargar_input1(MUESTRA / "input1_objetivo.xlsx", "objetivo de noviembre.xlsx", P, DESPUES)
         s.cambiar_sku(NUEVO, activo=False, autor=P, cuando=DESPUES, motivo="los SKUs apagados no se heredan")
         assert s.recorrido.kilos.celdas is not None  # con el objetivo nuevo, reparte
