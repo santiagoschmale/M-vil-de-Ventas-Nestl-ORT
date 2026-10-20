@@ -71,7 +71,7 @@ de la siguiente. Eso define lo que sigue (§3, "Lo que sigue").
 | Categorías guardadas en la herramienta | ✅ | Si el objetivo no trae categoría, se completa desde lo asignado (B8). Se hereda |
 | Autenticación | 🟡 | Proveedor local detrás de una interfaz. Confirmado SSO con Entra, no usuario y contraseña (19/10). Depende de IT (I6) |
 | Entorno de pruebas para el cliente | ⬜ | IT ofreció armar la imagen Docker y subirla a un servidor de ellos (I2). Alternativa: uno nuestro, en memoria |
-| Leer el móvil real como mes anterior | ⬜ | **Bloquea la prueba real.** Hoy se lee el formato de la muestra (tres `.xlsx`, apertura en hoja aparte); el real es un `.xlsb` con bloques |
+| Leer el móvil real | ⬜ | **Bloquea la prueba real.** Hoy se lee el formato de la muestra (tres `.xlsx`, apertura en hoja aparte); el real es un `.xlsb` con bloques (`entendimiento-negocio.md` §15) |
 | Tests en CI | ✅ | Backend y front |
 | Deshacer el último cambio | ✅ | Una vez. Con login: solo el propio |
 | Totales por canal sin Excel | ✅ | Se arman en la pantalla con los canales y kilos del mes anterior; los pesos los completa el planner. Con persistencia, arrancar con el input 2 del mes anterior (kilos y pesos) |
@@ -184,11 +184,13 @@ Pendiente de UX: la etapa 2 se revisa celda por celda; una vista por canal (vend
 
 ### Lo que sigue (desde la demo del 19/10)
 
-En este orden: los tres primeros son para la prueba real del móvil de noviembre.
+En este orden: los tres primeros son para la prueba con datos reales.
 
-1. **Leer su móvil real como mes anterior** (septiembre u octubre). Sin esto no hay
-   prueba. Los archivos reales se usan en `data/real/` (git lo ignora) o en el
-   servidor de ellos, nunca en el repo.
+1. **Leer su móvil real y rearmar septiembre.** Con el único archivo que mandaron: el
+   objetivo sale de Móvil Mes, los totales por canal de las hojas de reparto y la
+   base de Participaciones (venta 2025). Se compara el resultado contra su reparto,
+   celda por celda. Los tests usan un archivo inventado con la misma forma; el real
+   se usa en `data/real/` (git lo ignora) o en el servidor de ellos, nunca en el repo.
 2. **Que lo puedan usar en un servidor de ellos**: el paquete Docker para IT. Los
    Dockerfiles necesitan los registros privados de Nestlé (I1), que tiene IT.
 3. **El Excel de salida del equipo de ventas**, cuando llegue el template, con NNS
@@ -284,7 +286,7 @@ siguiente desde el aprobado). Falta: versiones al reabrir (A16) y quién ve qué
 
 | Dependencia | Riesgo si llega tarde |
 |---|---|
-| Formato de entrada y de salida, con Finanzas (B6, A15) | **Alto.** Sin el de entrada no leemos datos reales; sin el de salida no se carga en SAP. Prometieron el móvil de septiembre y el template de ventas (19/10) |
+| Formato de entrada y de salida, con Finanzas (B6, A15) | **Alto.** Sin el de entrada no leemos datos reales; sin el de salida no se carga en SAP. Llegó el móvil de septiembre (20/10); falta el template de ventas |
 | Columna Categoría en el template de entrada (B8) | **Alto.** Sin ella no se pueden armar reglas |
 | Supuestos B1 a B3 (% manual, altas, OK por etapa) | Medio. Se validan en la demo |
 | Credenciales del índice privado (`nbra-*`, npm) | **Alto.** El pipeline de Nestlé no instala |

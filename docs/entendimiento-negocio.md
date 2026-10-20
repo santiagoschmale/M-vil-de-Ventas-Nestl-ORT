@@ -92,8 +92,8 @@ para lo puntual. [confirmado]
   El histórico define proporciones (qué parte de cada SKU va a cada canal y a cada
   entidad); el volumen lo ponen Contraloría y los totales por canal.
 - **Template de entrada** [a confirmar con Finanzas, B6]: proponen estandarizar el
-  objetivo del mes en `SKU | Descripción | kg | NNS / KG | NNS`. No trae NNS c/IIBB (no
-  se usa) ni Categoría, que hace falta para las reglas (B8).
+  objetivo del mes en `SKU | Descripción | kg | NNS / KG | NNS`. No trae NNS c/IIBB ni
+  Categoría; el objetivo del móvil real trae las dos (B8, B9).
 
 El archivo de mayo compartido ya viene con la distribución hecha: la hoja
 "Participaciones" es el trabajo del planner, no lo que manda Contraloría.
@@ -228,8 +228,10 @@ MÓVIL
   distribuidores. [confirmado, 07/10]
 - En Córdoba hoy hay una sola persona; la directa de Buenos Aires tiene varios
   vendedores. Los distribuidores no tienen vendedores debajo. [confirmado, 19/10]
-- Si Directa (BA), Córdoba y Rosario son canales o territorios de un mismo canal:
-  [a confirmar, A17].
+- En el móvil de septiembre, Soluciones se corta primero en Call Center y
+  Distribuidores; los canales son BS.As, KAM SAP, Córdoba, Rosario y KAM Córdoba, y
+  Córdoba y Rosario se abren en Directa y KAM con su propio %. Los asesores cuelgan
+  del Call Center. [datos] Cómo se mapea con los canales de arriba: A17.
 - **Canal nuevo** (el ejemplo fue "hoteles"): no tiene historia, así que su volumen
   sale de la primera bajada, los totales por canal. Lo mismo un canal que se está
   desarrollando (más clientes en Mayoristas): se le sube el total. Esa bajada la
@@ -356,6 +358,10 @@ entre las demás **del mismo canal**, nunca en otro (el volumen de Buenos Aires 
 puede ir a parar a Córdoba). [confirmado, 19/10] Falta saber si el % es el mismo
 para todos los SKUs y para kilos y pesos (B1).
 
+En el móvil de septiembre, el histórico de cada canal y de cada entidad es su venta
+de enero a diciembre de 2025, por SKU, en kilos y en NNS (hoja Participaciones).
+[datos] Cuál base usan está en A18.
+
 ## 12. Aprobación
 
 Del histórico quieren conservar **cómo quedó abierto el reparto y la intervención
@@ -416,7 +422,27 @@ Siglas y nombres a confirmar: **KAS** y dos nombres propios del archivo (ver not
 
 ---
 
-## 15. Lo que muestra el archivo de mayo
+## 15. Lo que muestran los archivos reales
+
+Mayo y septiembre de 2026: un solo `.xlsb` cada uno, con las mismas cinco hojas
+(Móvil Mes, Participaciones, Ingredientes, Soluciones, Distribuidores). No entran al
+repo: traen nombres reales.
+
+### Septiembre
+
+[datos]
+
+- **Móvil Mes**: el objetivo por SKU, con categoría, kg, NNS y NNS c/IIBB, y el
+  kilaje de cada SKU ya partido entre Ingredientes y Soluciones.
+- **Participaciones**: la venta de enero a diciembre de 2025 por SKU de cada canal,
+  distribuidor y asesor, y su % sobre el total. Es la base con la que se reparte.
+- **Ingredientes, Soluciones y Distribuidores**: el reparto final por SKU, en kg, NNS
+  y NNS c/IIBB, con una columna de diferencia contra el total que da cero: cierra.
+- **No hay un archivo de totales por canal**: los totales salen de las mismas hojas.
+- Los asesores aparecen con dos sufijos según el sistema de origen (A5), igual que
+  en mayo.
+
+### Mayo
 
 [datos]
 

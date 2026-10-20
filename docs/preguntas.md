@@ -5,8 +5,9 @@ POC Distribución del Móvil · Nestlé DIL Región Plata · Universidad ORT
 Solo lo que falta definir. Cuando una se responde, la respuesta pasa a
 `entendimiento-negocio.md` (marcada [confirmado]) y se borra de acá.
 
-Decidido por nosotros (B8): el template propuesto no trae Categoría y no la pedimos;
-la herramienta guarda la categoría de cada SKU y la hereda mes a mes.
+Categoría (B8): el objetivo del móvil real la trae por SKU; el template propuesto (B6)
+no. La herramienta la toma del archivo si viene, y si no, guarda la asignada y la
+hereda mes a mes.
 
 Respondidas por el referente de negocio (07/10): base de cálculo (B4), apertura de
 canales (A10, B5) y NNS c/IIBB (B7, no viene en el template). En la primera demo
@@ -33,9 +34,9 @@ código: no se renumeran.
 
 | # | Pregunta | Qué hacemos hoy |
 |---|---|---|
-| A5 | ¿La entidad es la persona o la persona más el sistema de origen (el mismo vendedor aparece con dos sufijos)? | Cada columna es una entidad |
+| A5 | ¿La entidad es la persona o la persona más el sistema de origen? En el móvil de septiembre los asesores siguen apareciendo con dos sufijos (-ACQUA y -SAP) | Cada columna es una entidad |
 | A14 | Un SKU que cae donde ningún vendedor o distribuidor lo vendió: ¿se reparte como el canal entero, se le asigna a alguien o se saca del canal? | Se avisa y queda sin abrir |
-| A17 | Directa (BA), Córdoba y Rosario: ¿son canales separados, como vienen en los totales por canal, o territorios de un mismo canal? | Canales separados |
+| A17 | **Estructura de Soluciones.** En el móvil de septiembre: primer corte Call Center contra Distribuidores; canales BS.As, KAM SAP, Córdoba, Rosario y KAM Córdoba; Córdoba y Rosario se abren en Directa y KAM con su propio %. ¿Qué es cada uno, y cómo se relacionan con "Directa (BA)" y "KAM Sol"? | Cada canal es una columna de los totales por canal |
 | A11 | Los SKUs que están en Ingredientes y en Soluciones: ¿se parten como cualquier otro? | Supuesto: los parte el cruce según los totales de cada canal |
 
 ### Datos de entrada y salida
@@ -43,11 +44,11 @@ código: no se renumeran.
 | # | Pregunta | Qué hacemos hoy |
 |---|---|---|
 | A15 | **Excel de salida.** Hay dos: el del equipo de ventas (por distribuidor, vendedor y canal; por SKU; kilos y plata, con y sin IIBB), que nos mandan con el de octubre, y el de Finanzas para la carga, que el referente pide a Finanzas. ¿La herramienta genera los dos? | Lo definimos nosotros: Kilos, Plata, Apertura, Problemas |
-| B9 | **NNS c/IIBB en la salida.** El equipo de ventas recibe la plata con y sin Ingresos Brutos, pero el template de entrada no trae c/IIBB (B7). ¿De dónde sale: otra columna en el objetivo, o un % de IIBB? | No se genera |
+| B9 | **NNS c/IIBB en la salida.** El equipo de ventas recibe la plata con y sin Ingresos Brutos. El objetivo del móvil real lo trae por SKU; el template propuesto (B6) no. ¿Lo suman al template? | No se genera |
 | B6 | **Formato de entrada**: proponen un template estándar `SKU \| Descripción \| kg \| NNS / KG \| NNS` para el objetivo del mes. Lo están validando con Finanzas. | El objetivo se lee por nombre de columna: ese template se lee sin cambios |
 | A4 | SKU nuevo sin historia: ¿el planner dice en qué canales va y se reparte en proporción al total de cada uno? | Supuesto: así ("Dónde se vende") |
 | A12 | Editar el mes anterior: ¿qué se edita, cuánto vendió un SKU en un canal o dónde se vende? | No se edita |
-| A18 | **Estacionalidad.** El café vende 2 a 3 veces más en invierno: el referente prefiere, a futuro, comparar contra el mismo mes del año anterior. Por ahora, el mes anterior (19/10). ¿Cuándo y para qué canales? | Mes anterior |
+| A18 | **Base del reparto.** El móvil de septiembre reparte con el peso de la venta de enero a diciembre de 2025 (hoja Participaciones). En la demo (19/10): mes anterior por ahora, mismo mes del año anterior a futuro, por estacionalidad. ¿Cuál usan: el año, el mes anterior o el mismo mes del año anterior? | Mes anterior |
 
 ### Reglas
 
