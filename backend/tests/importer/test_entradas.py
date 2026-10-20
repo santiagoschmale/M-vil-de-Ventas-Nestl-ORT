@@ -351,3 +351,21 @@ def test_categorias_desde_un_excel_de_sku_y_categoria():
     wb.save(salida)
     salida.seek(0)
     assert leer_categorias(salida) == {"90020001": "Café"}
+
+
+def test_muchos_skus_en_cero_van_en_un_solo_aviso():
+    """El móvil real trae decenas de SKUs en cero: uno por SKU llenaría Para revisar."""
+    libro = Workbook()
+    hoja = libro.active
+    hoja.append(["SKU", "Descripción", "Kgs", "NNS"])
+    for n in range(8):
+        hoja.append([1000 + n, f"Producto {n}", 0, 0])
+    hoja.append([2000, "Con objetivo", 10.1234, 100.555])
+    archivo = BytesIO()
+    libro.save(archivo)
+    archivo.seek(0)
+    objetivos, problemas = leer_input1(archivo)
+    avisos = _mensajes(problemas, "aviso")
+    assert "8 SKUs tienen objetivo en cero (obsoletos o estacionales): no se reparten." in avisos
+    assert "Kilos: 1 SKU tiene más de 3 decimales; se redondean al gramo." in avisos
+    assert objetivos["2000"].kilos == D("10.123")

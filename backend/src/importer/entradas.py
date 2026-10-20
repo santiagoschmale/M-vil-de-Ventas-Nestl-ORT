@@ -142,24 +142,45 @@ def _columnas(encabezado, entrada: str) -> dict[str, int]:
     return encontradas
 
 
-def _al_paso(valor: Decimal, decimales: int, que: str, sku, problemas: list[Problema]) -> Decimal:
+def _al_paso(valor: Decimal, decimales: int, que: str, sku, problemas: list[Problema] | None) -> Decimal:
+    """Al paso de la unidad. Con `problemas` en None no avisa: quien llama junta los redondeos."""
     paso = Decimal(1).scaleb(-decimales)
     redondeado = valor.quantize(paso, rounding=ROUND_HALF_EVEN)
-    if redondeado != valor:
+    if redondeado != valor and problemas is not None:
         problemas.append(Problema("aviso", f"{que} con más de {decimales} decimales: {a_texto(valor)} se redondea a "
                                            f"{a_texto(redondeado)}.", sku=sku))
     return redondeado
 
 
-def _hojas_de_excel(origen) -> list[list[list]]:
+def libro(origen) -> dict[str, list[list]]:
+    """Las hojas de un Excel, por nombre: .xlsx, o .xlsb (el formato en que trabaja el planner)."""
     try:
-        libro = load_workbook(origen, read_only=True, data_only=True)
+        wb = load_workbook(origen, read_only=True, data_only=True)
     except Exception as e:  # openpyxl lanza de todo según qué esté roto
-        raise ErrorDeEntrada(f"No se pudo abrir el archivo como Excel (.xlsx): {e}") from e
+        if hasattr(origen, "seek"):
+            origen.seek(0)
+        try:
+            return _libro_xlsb(origen)
+        except Exception:
+            raise ErrorDeEntrada(f"No se pudo abrir el archivo como Excel (.xlsx o .xlsb): {e}") from e
     try:
-        return [[list(f) for f in hoja.iter_rows(values_only=True)] for hoja in libro.worksheets]
+        return {h.title: [list(f) for f in h.iter_rows(values_only=True)] for h in wb.worksheets}
     finally:
-        libro.close()
+        wb.close()
+
+
+def _libro_xlsb(origen) -> dict[str, list[list]]:
+    from pyxlsb import open_workbook
+    with open_workbook(origen) as wb:
+        hojas = {}
+        for nombre in wb.sheets:
+            with wb.get_sheet(nombre) as hoja:
+                hojas[nombre] = [[c.v for c in fila] for fila in hoja.rows()]
+        return hojas
+
+
+def _hojas_de_excel(origen) -> list[list[list]]:
+    return list(libro(origen).values())
 
 
 def _encabezado(hojas: list[list[list]], entrada: str, obligatorios: set[str], que: str):
@@ -190,6 +211,8 @@ def leer_input1(origen) -> tuple[dict[str, ObjetivoSku], list[Problema]]:
         return fila[i] if i is not None and i < len(fila) else None
 
     objetivos: dict[str, ObjetivoSku] = {}
+    redondeados: dict[str, int] = {}
+    en_cero: list[str] = []
     todos = problemas
     for numero_fila, fila in enumerate(filas[n + 1:], start=n + 2):
         codigo = _codigo(campo(fila, "sku"))
@@ -214,15 +237,18 @@ def leer_input1(origen) -> tuple[dict[str, ObjetivoSku], list[Problema]]:
                 problemas.append(Problema("error", f"{etiqueta} negativo ({a_texto(valor)}). Se toma 0.", sku=codigo,
                                           bloque="input1"))
                 valor = Decimal(0)
-            montos[nombre] = _al_paso(valor, decimales, etiqueta, codigo, problemas)
+            # El NNS del móvil real es kilos por precio: casi siempre trae más decimales. Un aviso por columna.
+            if valor.quantize(Decimal(1).scaleb(-decimales)) != valor:
+                redondeados[etiqueta] = redondeados.get(etiqueta, 0) + (not repetida)
+            montos[nombre] = _al_paso(valor, decimales, etiqueta, codigo, None)
 
         pais = campo(fila, "pais")
         if pais and normalizar(pais) != normalizar(FORMATO["pais_local"]):
             problemas.append(Problema("aviso", f"Producto de otro país ({pais}) en el archivo de "
                                                f"{FORMATO['pais_local']}.", sku=codigo, bloque="input1"))
         if montos["kilos"] == 0 and not montos["nns"]:
-            problemas.append(Problema("aviso", "SKU con objetivo en cero (obsoleto o estacional): no se reparte.",
-                                      sku=codigo, bloque="input1"))
+            if not repetida:
+                en_cero.append(codigo)
         elif montos["kilos"] == 0:
             problemas.append(Problema("error", f"SKU con NNS ({a_texto(montos['nns'])}) pero kilos en cero: los kilos son "
                                                f"esenciales, no se reparte ni en kilos ni en pesos.",
@@ -245,6 +271,19 @@ def leer_input1(origen) -> tuple[dict[str, ObjetivoSku], list[Problema]]:
             todos.append(Problema("error", f"Está repetido en el objetivo de Contraloría (filas {filas_txt}): se "
                                            f"usa la fila {o.fila} hasta que elijas cuál vale.",
                                   sku=codigo, bloque="input1", tipo="sku_repetido"))
+    # Pocos, uno por SKU (se puede ir a cada uno); muchos, uno solo: el móvil real trae decenas en cero.
+    if len(en_cero) <= 5:
+        todos.extend(Problema("aviso", "SKU con objetivo en cero (obsoleto o estacional): no se reparte.", sku=s,
+                              bloque="input1") for s in en_cero)
+    else:
+        todos.append(Problema("aviso", f"{len(en_cero)} SKUs tienen objetivo en cero (obsoletos o estacionales): no se "
+                                       f"reparten.", bloque="input1"))
+    for etiqueta, cuantos in redondeados.items():
+        if cuantos:
+            decimales = KILOS if etiqueta == "Kilos" else PLATA
+            todos.append(Problema("aviso", f"{etiqueta}: {cuantos} {'SKU tiene' if cuantos == 1 else 'SKUs tienen'} más de "
+                                           f"{decimales} decimales; se redondean al {'gramo' if decimales == KILOS else 'centavo'}.",
+                                  bloque="input1"))
     if not objetivos:
         raise ErrorDeEntrada("Objetivo de Contraloría: no hay ningún SKU.")
     return objetivos, todos
@@ -347,7 +386,11 @@ def leer_input2(origen) -> tuple[dict[str, TotalCanal], list[Problema]]:
 # ---------------------------------------------------------------------------
 
 def leer_base(origen) -> tuple[dict[tuple[str, str], Decimal], list[Problema]]:
-    filas, n, cols = _encabezado(_hojas_de_excel(origen), "base", {"sku"}, "Base del mes anterior")
+    from src.importer import movil_real
+    hojas = libro(origen)
+    if movil_real.es_movil(hojas):
+        return movil_real.base(hojas)
+    filas, n, cols = _encabezado(list(hojas.values()), "base", {"sku"}, "Base del mes anterior")
     meta = set(cols.values())
     canales = [(i, str(v).strip()) for i, v in enumerate(filas[n]) if v is not None and i not in meta]
     problemas: list[Problema] = []
@@ -388,7 +431,11 @@ def leer_apertura(origen) -> tuple[dict[tuple[str, str], dict[str, Decimal]], li
     canal (distribuidores, vendedores). Supuesto A10: los vendedores cuelgan de la
     venta directa y de cada territorio.
     """
-    filas, n, cols = _encabezado(_hojas_de_excel(origen), "apertura", {"sku", "canal", "entidad", "kilos"},
+    from src.importer import movil_real
+    hojas = libro(origen)
+    if movil_real.es_movil(hojas):
+        return movil_real.apertura(hojas)
+    filas, n, cols = _encabezado(list(hojas.values()), "apertura", {"sku", "canal", "entidad", "kilos"},
                                  "Apertura del mes anterior")
     problemas: list[Problema] = []
     apertura: dict[tuple[str, str], dict[str, Decimal]] = {}
