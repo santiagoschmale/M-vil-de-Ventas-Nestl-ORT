@@ -1,4 +1,4 @@
-import { formatear } from './formato';
+import { conUnidad, formatear } from './formato';
 
 // El backend manda montos como texto con los decimales de su unidad. El front sólo
 // cambia separadores: nunca pasa por un número de JavaScript.
@@ -19,5 +19,12 @@ describe('formatear', () => {
 
   it('un monto que no hay se muestra como raya', () => {
     expect(formatear(null)).toBe('—');
+  });
+});
+
+describe('conUnidad', () => {
+  it('une la unidad al número con espacio duro, para que no quede sola al cortar la línea', () => {
+    expect(conUnidad('1234.50', 'plata')).toBe('$\u00A01.234,50');
+    expect(conUnidad('7000.000', 'kilos')).toBe('7.000,000\u00A0kg');
   });
 });
