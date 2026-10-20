@@ -18,8 +18,10 @@ const theme = createTheme({
           overflow-x: hidden;
         }
         html {
-          scroll-behavior: smooth;
           font-size: var(--base-unit, 16px);
+        }
+        @media (prefers-reduced-motion: no-preference) {
+          html { scroll-behavior: smooth; }
         }
         #root {
           display: flex;
