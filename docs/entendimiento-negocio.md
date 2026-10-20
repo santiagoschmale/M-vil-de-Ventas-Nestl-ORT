@@ -10,8 +10,8 @@ Cada afirmación está marcada según su origen:
 - **[a confirmar]** hipótesis o punto abierto (el id está en `preguntas.md`)
 
 Fuentes: documento funcional v1.0 del cliente (26/08/2026), reunión inicial, reunión
-de reglas (sep 2026) y archivo de mayo. Si el documento funcional y una reunión
-posterior se contradicen, vale la reunión, y se anota la diferencia.
+de reglas (sep 2026), archivo de mayo y primera demo (19/10/2026). Si el documento funcional y una reunión
+posterior se contradicen, vale la reunión.
 
 ---
 
@@ -86,6 +86,11 @@ para lo puntual. [confirmado]
   inicial del mes anterior y la herramienta arma su propio histórico con cada móvil
   aprobado: el aprobado de un mes es la base del siguiente. La distribución se puede
   modificar a medida que avanza el proceso.
+- **El histórico da una base, no la respuesta.** [confirmado, 19/10] Hay
+  estacionalidad: el café vende 2 a 3 veces más en invierno. A futuro prefieren
+  comparar contra el mismo mes del año anterior; por ahora, el mes anterior (A18).
+  El histórico define proporciones (qué parte de cada SKU va a cada canal y a cada
+  entidad); el volumen lo ponen Contraloría y los totales por canal.
 - **Template de entrada** [a confirmar con Finanzas, B6]: proponen estandarizar el
   objetivo del mes en `SKU | Descripción | kg | NNS / KG | NNS`. No trae NNS c/IIBB (no
   se usa) ni Categoría, que hace falta para las reglas (B8).
@@ -221,6 +226,14 @@ MÓVIL
 - Distribuidores se abre en 5 distribuidores. [datos]
 - Los vendedores cuelgan de la venta directa y los territorios, no de los
   distribuidores. [confirmado, 07/10]
+- En Córdoba hoy hay una sola persona; la directa de Buenos Aires tiene varios
+  vendedores. Los distribuidores no tienen vendedores debajo. [confirmado, 19/10]
+- Si Directa (BA), Córdoba y Rosario son canales o territorios de un mismo canal:
+  [a confirmar, A17].
+- **Canal nuevo** (el ejemplo fue "hoteles"): no tiene historia, así que su volumen
+  sale de la primera bajada, los totales por canal. Lo mismo un canal que se está
+  desarrollando (más clientes en Mayoristas): se le sube el total. Esa bajada la
+  decide el planner. [confirmado, 19/10]
 
 La **profundidad es variable**: cada rama define hasta dónde se abre. [confirmado]
 
@@ -250,7 +263,7 @@ En el archivo de mayo, la apertura de Soluciones viene en tres bloques [datos]:
 |---|---|---|
 | **Contraloría** | Define el objetivo por SKU | Fuera de la herramienta. Manda el input 1 |
 | **Planner** (Sales Planning Lead) | Carga lineamientos, revisa, corrige, aprueba | **Único usuario.** ~20 concurrentes, web desktop |
-| **Equipos comerciales** | Vendedores, distribuidores, finanzas | Reciben su parte en Excel |
+| **Equipos comerciales** | Vendedores, distribuidores, finanzas | Reciben su parte en Excel: por SKU, en kilos y plata, con y sin IIBB (A15, B9). El seguimiento del mes contra el objetivo es en Power BI, fuera de la herramienta [confirmado, 19/10] |
 | **Vendedor** | Empleado de Nestlé con cartera de clientes | Entidad de datos |
 | **Distribuidor** | Empresa tercera que compra y revende | Entidad de datos |
 
@@ -326,7 +339,7 @@ Casos del documento funcional (§7) [confirmado]:
 | Distribuidor en convocatoria de acreedores | Se apaga antes de repartir. Su parte se reparte entre los demás "con el criterio que se defina" (A1; hoy proporcional al histórico) |
 | Vendedor con la cartera cambiada | Se le asigna un % manual en vez del histórico |
 | SKU discontinuado o reemplazado | Se apaga |
-| Vendedor o territorio nuevo | Se da de alta sin desarrollo, con base histórica o % (B2) |
+| Vendedor o territorio nuevo | Se da de alta en la herramienta, con %, y se recalcula [confirmado, 19/10]. Sumar gente no suma volumen: muchas veces entra uno y sale otro |
 | Venta puntual a un cliente nuevo | Ajuste manual con trazabilidad |
 | Cargas masivas | A futuro, no en la POC |
 
@@ -338,8 +351,10 @@ Cada vendedor y distribuidor reparte por **histórico** o por un **% manual**, c
 por caso. El % sirve cuando la historia ya no lo representa: cartera cambiada o
 entidad nueva.
 
-Falta definir cómo se aplica el % (B1): si es sobre el total del canal, si es igual
-para todos los SKUs y para kilos y pesos, y cómo se reparte el resto.
+El 100 % son todas las entidades del canal: lo que se le saca a una se compensa
+entre las demás **del mismo canal**, nunca en otro (el volumen de Buenos Aires no
+puede ir a parar a Córdoba). [confirmado, 19/10] Falta saber si el % es el mismo
+para todos los SKUs y para kilos y pesos (B1).
 
 ## 12. Aprobación
 
@@ -357,6 +372,13 @@ inicial]
 ## 13. Revisión humana
 
 - El total por SKU **siempre cierra**: la herramienta lo garantiza.
+- **Cierra exacto, sin margen.** [confirmado, 19/10] El reparto termina siendo el
+  objetivo variable de cada vendedor, del que depende su premio: si no suma 100,
+  alguien cobra de menos.
+- Errores que frenan y avisos que se pueden pasar por alto, como en un sistema de
+  rendición de gastos: lo validaron en la demo. [confirmado, 19/10]
+- Cuando no cierra, preguntaron si la herramienta sugiere dónde poner la diferencia.
+  Quedó como compromiso: una sugerencia según el histórico, que el planner revisa.
 - Lo que se marca para revisión: totales por canal que no se pueden alcanzar,
   reglas que no se pueden cumplir, conflictos entre reglas.
 - El planner puede sobrescribir un valor puntual. El valor editado queda fijo y el
@@ -421,6 +443,9 @@ Siglas y nombres a confirmar: **KAS** y dos nombres propios del archivo (ver not
 - La referente de negocio deja la organización. Nestlé designa un nuevo referente
   para validar reglas y cerrar los puntos abiertos.
 - Preguntas pendientes enviadas a la referente saliente.
+- 19/10: primera demo con el cliente. Pidieron foco en la distribución del móvil:
+  lo demás, después. Python es obligatorio (lo confirmó IT). Acordaron una prueba
+  con datos reales del móvil de noviembre (ver `preguntas.md`, Pedidos pendientes).
 
 ---
 

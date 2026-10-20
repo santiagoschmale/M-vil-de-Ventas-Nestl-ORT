@@ -39,6 +39,12 @@ Eso hace de la persistencia el próximo paso.
 La persistencia no figura en los MUST del cliente, pero la aprobación y el
 histórico la necesitan para tener sentido.
 
+**19/10, primera demo.** Recorrido completo sobre la muestra: cargar, resolver lo
+que no cierra, ajustar, aprobar, exportar y empezar noviembre. Confirmaron B1 en lo
+principal, B2 y el cierre exacto (A2). Pidieron foco en la distribución y acordaron
+**probarlo con datos reales del móvil de noviembre** a fin de esa semana o principio
+de la siguiente. Eso define lo que sigue (§3, "Lo que sigue").
+
 ---
 
 ## 2. Backlog
@@ -54,7 +60,7 @@ histórico la necesitan para tener sentido.
 | Alta de vendedor o distribuidor nuevo | ✅ | **M3**, con el supuesto B2 |
 | Aprobación del móvil | ✅ | **M1**: aprobar si cierra, solo lectura, reabrir con motivo. En memoria hasta la persistencia |
 | Revisión por etapa | ✅ | **M4**, con el supuesto B3: OK por etapa, en orden, y aprobar lo exige |
-| Exportación a Excel | ✅ | Formato de salida a confirmar (A15) |
+| Exportación a Excel | 🟡 | Falta el formato del equipo de ventas (llega con el de octubre) y el de Finanzas (A15), con NNS c/IIBB (B9) |
 | Trazabilidad (quién, qué, cuándo, por qué) | ✅ | En memoria; se pierde al reiniciar |
 
 ### Necesario para los MUST (no figura en el MoSCoW)
@@ -63,8 +69,9 @@ histórico la necesitan para tener sentido.
 |---|---|---|
 | Persistencia en Postgres, un móvil por mes | ✅ | Cada acción queda guardada; meses anteriores en solo lectura. Falta probarlo en el Postgres del sandbox |
 | Categorías guardadas en la herramienta | ✅ | Si el objetivo no trae categoría, se completa desde lo asignado (B8). Se hereda |
-| Autenticación | 🟡 | Proveedor local detrás de una interfaz. Entra depende de IT (I6) |
-| Entorno de pruebas para el cliente | ⬜ | Depende de IT (I1, I2) |
+| Autenticación | 🟡 | Proveedor local detrás de una interfaz. Confirmado SSO con Entra, no usuario y contraseña (19/10). Depende de IT (I6) |
+| Entorno de pruebas para el cliente | ⬜ | IT ofreció armar la imagen Docker y subirla a un servidor de ellos (I2). Alternativa: uno nuestro, en memoria |
+| Leer el móvil real como mes anterior | ⬜ | **Bloquea la prueba real.** Hoy se lee el formato de la muestra (tres `.xlsx`, apertura en hoja aparte); el real es un `.xlsb` con bloques |
 | Tests en CI | ✅ | Backend y front |
 | Deshacer el último cambio | ✅ | Una vez. Con login: solo el propio |
 | Totales por canal sin Excel | ✅ | Se arman en la pantalla con los canales y kilos del mes anterior; los pesos los completa el planner. Con persistencia, arrancar con el input 2 del mes anterior (kilos y pesos) |
@@ -78,11 +85,13 @@ histórico la necesitan para tener sentido.
 | Profundidad de apertura configurable por canal desde la herramienta | ✅ En Reglas, "Cómo se abre cada canal" |
 | Simulación de escenarios | ⬜ |
 | Cuadratura automática de totales | ✅ |
+| Sugerir dónde poner la diferencia cuando los totales no coinciden, según el histórico | ⬜ Comprometido en la demo (19/10) |
 
 ### COULD
 
 Dashboard vendedor × kilos y facturación · template de carga para SAP (A15) · cargas
-masivas · multi-país y multi-negocio. Nada empezado.
+masivas · multi-país y multi-negocio · base del mismo mes del año anterior (A18).
+Nada empezado.
 
 ### Fuera de la POC
 
@@ -171,11 +180,22 @@ Pendiente de UX: la etapa 2 se revisa celda por celda; una vista por canal (vend
 - **Un cambio en una etapa** desmarca las siguientes, porque las recalcula.
 - **Aprobar exige** todas las etapas revisadas.
 
-### Después de los MUST
+### Lo que sigue (desde la demo del 19/10)
 
-1. Persistencia (§6), que habilita la herencia de reglas y el histórico.
-2. El formato real de entrada y salida, según B6 y A15.
-3. Los SHOULD.
+En este orden: los tres primeros son para la prueba real del móvil de noviembre.
+
+1. **Leer su móvil real como mes anterior** (septiembre u octubre). Sin esto no hay
+   prueba. Los archivos reales se usan en `data/real/` (git lo ignora) o en el
+   servidor de ellos, nunca en el repo.
+2. **Que lo puedan usar en un servidor de ellos**: el paquete Docker para IT. Los
+   Dockerfiles necesitan los registros privados de Nestlé (I1), que tiene IT.
+3. **El Excel de salida del equipo de ventas**, cuando llegue el template, con NNS
+   c/IIBB (A15, B9).
+4. **Sugerir dónde poner la diferencia** según el histórico, si llega antes de la
+   prueba.
+5. Después de la prueba: SSO con Entra (I6) y la base del mismo mes del año anterior
+   (A18).
+
 
 ---
 
@@ -202,7 +222,9 @@ Pendiente de UX: la etapa 2 se revisa celda por celda; una vista por canal (vend
 |---|---|
 | Stack | Python + FastAPI, PostgreSQL, React. Monorepo de Backstage, deploy con ArgoCD |
 | Autenticación | Microsoft Entra ID, sujeto a IT |
-| Alcance | Professional Argentina. SAP es nice to have |
+| Alcance | Professional Argentina. SAP es nice to have. Primero que la distribución del móvil funcione bien; lo demás, después (19/10) |
+| Lenguaje | Python obligatorio (IT, 19/10) |
+| Cierre | Exacto, sin margen: es el objetivo variable de cada vendedor (19/10) |
 | Escala | ~20 planners concurrentes, web desktop, ciclo mensual |
 | Entorno de pruebas | El cliente quiere probar por su cuenta, no ver demos: al grupo anterior las demos le andaban y el producto no. Cada merge despliega al sandbox, así que no se mergea sin verificar |
 
@@ -262,7 +284,7 @@ siguiente desde el aprobado). Falta: versiones al reabrir (A16) y quién ve qué
 
 | Dependencia | Riesgo si llega tarde |
 |---|---|
-| Formato de entrada y de salida, con Finanzas (B6, A15) | **Alto.** Sin el de entrada no leemos datos reales; sin el de salida no se carga en SAP |
+| Formato de entrada y de salida, con Finanzas (B6, A15) | **Alto.** Sin el de entrada no leemos datos reales; sin el de salida no se carga en SAP. Prometieron el móvil de septiembre y el template de ventas (19/10) |
 | Columna Categoría en el template de entrada (B8) | **Alto.** Sin ella no se pueden armar reglas |
 | Supuestos B1 a B3 (% manual, altas, OK por etapa) | Medio. Se validan en la demo |
 | Credenciales del índice privado (`nbra-*`, npm) | **Alto.** El pipeline de Nestlé no instala |
@@ -281,7 +303,8 @@ siguiente desde el aprobado). Falta: versiones al reabrir (A16) y quién ve qué
 | Se construye M2 sobre un supuesto que el cliente cambia | Mostrarlo funcionando el viernes; el reparto está aislado en `apertura.py` |
 | El formato real de entrada o de salida es distinto del nuestro | Preguntarlo (B6, A15). La lectura está aislada en `importer/` |
 | Una salida mal armada se carga en SAP (ya pasó: aperturas invertidas con totales correctos) | Cuadratura en cada nivel, no solo en el total. No cambiar el formato sin confirmarlo |
-| Datos reales en el repo | Solo muestra inventada. El archivo de mayo no se sube |
+| Datos reales en el repo | Solo muestra inventada. El archivo de mayo no se sube. Los que lleguen para la prueba, en `data/real/` (ignorado por git) o en el servidor de ellos |
+| La prueba real no llega a tiempo porque no leemos su formato | Pedir el archivo apenas se pueda y empezar por el importador |
 | Algo que se ve bien en la demo y falla en uso | Entorno de pruebas abierto al cliente y tests en CI |
 | Reglas reales fuera del catálogo | Validar con los ejemplos (R7) |
 
@@ -292,6 +315,8 @@ siguiente desde el aprobado). Falta: versiones al reabrir (A16) y quién ve qué
 - **Septiembre, definición**: ✅ recorrido end-to-end sobre datos de prueba y dominio
   consolidado.
 - **Octubre, construcción**: los MUST (§3), la persistencia y el entorno de pruebas.
+  19/10, primera demo. Prueba con datos reales del móvil de noviembre, a fin de esa
+  semana o principio de la siguiente.
 - **Noviembre, validación y entrega**: datos reales de varios meses, validación con el
   planner, documentación y defensa. La última semana, entera para documentación y
   ensayo.
