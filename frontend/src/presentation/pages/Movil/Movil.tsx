@@ -26,6 +26,7 @@ import { Reglas } from './Reglas';
 import { CanalesDialog } from './CanalesDialog';
 import { CategoriasDialog } from './CategoriasDialog';
 import { MotivoDialog } from './MotivoDialog';
+import { DiferenciaDialog } from './DiferenciaDialog';
 
 const ACCIONES: Record<string, string> = {
   agregar_regla: 'Agregó una regla', editar_regla: 'Editó una regla', eliminar_regla: 'Eliminó una regla',
@@ -41,6 +42,7 @@ const ACCIONES: Record<string, string> = {
   porcentaje: 'Cambió la base de cálculo', quitar_input2: 'Sacó los totales por canal',
   asignar_categorias: 'Asignó categorías', heredar: 'Arrancó desde el mes anterior aprobado',
   agregar_entidad: 'Agregó un distribuidor o vendedor', eliminar_entidad: 'Eliminó un distribuidor o vendedor',
+  abrir_canal: 'Abrió un canal entre distribuidores o vendedores', cerrar_canal: 'Dejó un canal sin abrir debajo', repartir_diferencia: 'Repartió la diferencia entre los canales',
 };
 
 export const Subir = ({ cargado, etiqueta, alElegir, texto }: {
@@ -363,6 +365,8 @@ const Pendientes = ({ estado, unidad, enMatriz }: { estado: Estado; unidad: Unid
   const [eligiendo, setEligiendo] = useState<Repetido>();
   const [canalesDe, setCanalesDe] = useState<string>();
   const [categorias, setCategorias] = useState(false);
+  const [repartiendo, setRepartiendo] = useState(false);
+  const soloLectura = useSoloLectura();
   const repetido = (sku: string | null) => estado.repetidos.find(r => r.sku === sku);
   const { enfocar } = useMovil();
   const acciones = (p: Estado['problemas'][number]) => {
@@ -395,6 +399,9 @@ const Pendientes = ({ estado, unidad, enMatriz }: { estado: Estado; unidad: Unid
         <Alert key={`i${n}`} severity="error" sx={enLinea}
           action={
             <Box sx={ACCIONES_SX}>
+              {i.tipo === 'totales_distintos' && !soloLectura && (
+                <Resolver onClick={() => setRepartiendo(true)}>Repartir la diferencia</Resolver>
+              )}
               {i.tipo === 'sku_sin_canal' && i.skus[0] && (
                 <Resolver aria-label={`Elegir canales de SKU ${i.skus[0]}`} onClick={() => setCanalesDe(i.skus[0])}>
                   Elegir canales
@@ -413,6 +420,7 @@ const Pendientes = ({ estado, unidad, enMatriz }: { estado: Estado; unidad: Unid
       {eligiendo && <FilaDialog repetido={eligiendo} onCerrar={() => setEligiendo(undefined)} />}
       {canalesDe && <CanalesDialog sku={canalesDe} estado={estado} onCerrar={() => setCanalesDe(undefined)} />}
       {categorias && <CategoriasDialog estado={estado} onCerrar={() => setCategorias(false)} />}
+      {repartiendo && <DiferenciaDialog unidad={unidad} onCerrar={() => setRepartiendo(false)} />}
     </Box>
   );
 };

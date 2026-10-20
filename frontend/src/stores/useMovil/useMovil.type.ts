@@ -13,6 +13,17 @@ export type Ajuste = {
   motivo: string | null;
 };
 
+/** Repartir entre los canales la diferencia con Contraloría. Todo lo calcula el backend. */
+export type Diferencia = {
+  unidad: Unidad;
+  pide: Monto;
+  suman: Monto;
+  // Pide menos lo que suman los valores escritos: negativo si sobra; null si alguno no es un número.
+  falta: Monto | null;
+  cierra: boolean;
+  canales: { canal: string; hoy: Monto; peso: string; sugerido: Monto; cambio: Monto | null; error: string | null }[];
+};
+
 export type Inconsistencia = {
   tipo: string;
   mensaje: string;
@@ -159,6 +170,9 @@ export type TUseMovil = {
   fijar: (sku: string, canal: string, monto: string, motivo: string) => Resultado;
   desfijar: (sku: string, canal: string, motivo: string) => Resultado;
   apertura: (sku: string, canal: string) => Promise<Apertura | null>;
+  // Sin valores, la sugerencia; con valores, cuánto falta o sobra con ellos (no cambia nada).
+  diferencia: (unidad: Unidad, valores?: Record<string, string>) => Promise<Diferencia>;
+  repartirDiferencia: (unidad: Unidad, valores: Record<string, string>, motivo: string) => Resultado;
   agregarRegla: (datos: DatosRegla, motivo: string) => Resultado;
   editarRegla: (id: string, datos: DatosRegla, motivo: string) => Resultado;
   eliminarRegla: (id: string, motivo: string) => Resultado;

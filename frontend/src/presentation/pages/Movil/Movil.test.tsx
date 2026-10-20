@@ -606,6 +606,22 @@ describe('MovilPage', { timeout: 15000 }, () => {
     await waitFor(() => expect(pedidosMes[pedidosMes.length - 1]).toBe('último'));
   });
 
+  it('si los totales no suman lo que pide Contraloría, ofrece repartir la diferencia', async () => {
+    const distintos = estado({ cierra: { kilos: false, plata: true }, inconsistencias: { kilos: [inconsistenciaFactory.build({
+      tipo: 'totales_distintos', mensaje: 'El objetivo de Contraloría suma 1.000 y los totales por canal suman 900: difieren en 100.',
+    })], plata: [] } });
+    server.use(
+      http.get('*/api/movil', () => HttpResponse.json(distintos)),
+      http.get('*/api/movil/diferencia/kilos', () => HttpResponse.json({ unidad: 'kilos', pide: '1000.000', suman: '900.000',
+        falta: '0.000', cierra: true, canales: [{ canal: 'Catering', hoy: '900.000', peso: '100.0', sugerido: '1000.000',
+          cambio: '100.000', error: null }] })),
+    );
+    const user = userEvent.setup({ delay: null });
+    render(<MovilPage />);
+    await user.click(await screen.findByRole('button', { name: 'Repartir la diferencia' }));
+    expect(await screen.findByRole('dialog', { name: 'Repartir la diferencia en kilos' })).toBeInTheDocument();
+  });
+
   it('a los SKUs sin categoría se les asigna una desde Para revisar', async () => {
     const sinCategoria = estado({
       sin_categoria: [{ sku: '100', descripcion: 'Puré 2x1kg' }, { sku: '200', descripcion: 'Caldo 5kg' }],

@@ -353,6 +353,20 @@ def test_muestra_solo_objetivo():
     assert r["faltan"] == ["totales por canal", "mes anterior"]
 
 
+def test_repartir_la_diferencia_por_http():
+    c = _cargado("input2_sin_sku_nuevo.tsv")
+    d = c.get("/api/movil/diferencia/kilos").json()
+    valores = {x["canal"]: x["sugerido"] for x in d["canales"]}
+    canal = next(iter(valores))
+    r = c.post("/api/movil/diferencia/kilos/revisar", json={"valores": dict(valores, **{canal: "0"})}).json()
+    assert r["cierra"] is False and D(r["falta"]) > 0
+    assert c.put("/api/movil/diferencia/kilos", json={"valores": dict(valores, **{canal: "0"}), "motivo": "x"}).status_code == 422
+    r = c.put("/api/movil/diferencia/kilos", json={"valores": valores, "motivo": "Contraloría ajustó"}).json()
+    assert r["historial"][-1]["accion"] == "repartir_diferencia"
+    assert not any(i["tipo"] == "totales_distintos" for i in r["inconsistencias"]["kilos"])
+    assert c.get("/api/movil/diferencia/litros").status_code == 422
+
+
 def test_empezar_de_cero_solo_en_local():
     import os
     c = _cerrado()

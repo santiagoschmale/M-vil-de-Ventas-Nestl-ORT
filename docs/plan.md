@@ -85,7 +85,7 @@ de la siguiente. Eso define lo que sigue (§3, "Lo que sigue").
 | Profundidad de apertura configurable por canal desde la herramienta | ✅ En Reglas, "Cómo se abre cada canal" |
 | Simulación de escenarios | ⬜ |
 | Cuadratura automática de totales | ✅ |
-| Sugerir dónde poner la diferencia cuando los totales no coinciden, según el histórico | ⬜ Comprometido en la demo (19/10) |
+| Sugerir dónde poner la diferencia cuando los totales no coinciden | ✅ "Repartir la diferencia" en Para revisar: según el peso de cada canal en los totales; se aplica con motivo y solo si cierra |
 
 ### COULD
 
@@ -191,9 +191,7 @@ En este orden: los tres primeros son para la prueba real del móvil de noviembre
    Dockerfiles necesitan los registros privados de Nestlé (I1), que tiene IT.
 3. **El Excel de salida del equipo de ventas**, cuando llegue el template, con NNS
    c/IIBB (A15, B9).
-4. **Sugerir dónde poner la diferencia** según el histórico, si llega antes de la
-   prueba.
-5. Después de la prueba: SSO con Entra (I6) y la base del mismo mes del año anterior
+4. Después de la prueba: SSO con Entra (I6) y la base del mismo mes del año anterior
    (A18).
 
 

@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { api } from '../../infra/http';
 import { useSnackbarProps } from '../useSnackbarProps';
-import { Apertura, Cruce, Estado, MesResumen, TUseMovil } from './useMovil.type';
+import { Apertura, Cruce, Diferencia, Estado, MesResumen, TUseMovil } from './useMovil.type';
 
 // Los errores del cliente HTTP traen la respuesta del backend: { detail: "..." }.
 const respuesta = (e: unknown) =>
@@ -186,6 +186,13 @@ export const useMovil = create<TUseMovil>((set, get) => {
     revisarEtapa: etapa => cambiar(() => api.post(conMes(`/movil/etapas/${ruta(etapa)}`), {}), { aviso: 'Etapa revisada.' }),
     reabrir: motivo => cambiar(() => api.post(conMes('/movil/reabrir'), { motivo }),
       { errorEnDialogo: true, aviso: 'El móvil volvió a borrador.' }),
+
+    diferencia: async (unidad, valores) => (valores
+      ? (await api.post(conMes(`/movil/diferencia/${unidad}/revisar`), { valores })).data as Diferencia
+      : (await api.get<Diferencia>(conMes(`/movil/diferencia/${unidad}`))).data),
+    repartirDiferencia: (unidad, valores, motivo) => cambiar(
+      () => api.put(conMes(`/movil/diferencia/${unidad}`), { valores, motivo }),
+      { ...enDialogo, aviso: 'Totales por canal actualizados.' }),
 
     apertura: async (sku, canal) => {
       try {

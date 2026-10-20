@@ -63,6 +63,14 @@ def _aplicar(fn, *args, **kwargs):
 # Esquemas
 # ---------------------------------------------------------------------------
 
+class ValoresIn(BaseModel):
+    valores: dict[str, str] = Field(description="Canal -> monto escrito por el planner ('1.234,5' o '1234.5')")
+
+
+class RepartoIn(ValoresIn):
+    motivo: str
+
+
 class TextoIn(BaseModel):
     texto: str = Field(description="Totales por canal como tabla de texto (canal, kilos, plata), p. ej. editada en la pantalla")
 
@@ -529,6 +537,23 @@ def asignar_categorias(cuerpo: CategoriasIn, s: Sesion = Depends(sesion), quien:
 def cambiar_apertura_canal(canal: str, cuerpo: AperturaCanalIn, s: Sesion = Depends(sesion),
                            quien: str = Depends(autor)):
     _aplicar(s.cambiar_apertura_canal, canal, cuerpo.abre, quien, _ahora(), cuerpo.motivo)
+    return _estado(s)
+
+
+@router.get("/diferencia/{unidad}", summary="Sugerencia para repartir entre los canales la diferencia con Contraloría")
+def sugerir_diferencia(unidad: str, s: Sesion = Depends(sesion)):
+    return _aplicar(s.diferencia, unidad)
+
+
+@router.post("/diferencia/{unidad}/revisar", summary="Cuánto falta o sobra con los valores que escribió el planner. "
+                                                     "No cambia nada")
+def revisar_diferencia(unidad: str, cuerpo: ValoresIn, s: Sesion = Depends(sesion)):
+    return _aplicar(s.diferencia, unidad, cuerpo.valores)
+
+
+@router.put("/diferencia/{unidad}", summary="Aplicar los totales por canal revisados: solo si cierran con Contraloría")
+def repartir_diferencia(unidad: str, cuerpo: RepartoIn, s: Sesion = Depends(sesion), quien: str = Depends(autor)):
+    _aplicar(s.repartir_diferencia, unidad, cuerpo.valores, autor=quien, cuando=_ahora(), motivo=cuerpo.motivo)
     return _estado(s)
 
 
