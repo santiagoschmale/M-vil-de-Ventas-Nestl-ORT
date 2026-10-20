@@ -15,8 +15,8 @@ const SnackbarGlobal = () => {
 
   return (
     <Snackbar 
-      anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
-      sx={{ top: { xs: 80, sm: 80 } }} // debajo del encabezado fijo, para no tapar Exportar ni el estado de cierre
+      // Abajo: arriba tapaba Exportar y Aprobar, y el alto del encabezado fijo cambia según el ancho.
+      anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
       open={undefined !== snackbarProps} 
       autoHideDuration={5000} 
       onClose={handlerClose}> 
