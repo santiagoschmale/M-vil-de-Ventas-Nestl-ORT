@@ -76,6 +76,14 @@ describe('MovilPage', { timeout: 15000 }, () => {
     });
   });
 
+  it('una celda se abre con Espacio, como cualquier botón', async () => {
+    const user = userEvent.setup({ delay: null });
+    render(<MovilPage />);
+    (await screen.findByRole('button', { name: '100 en Catering: 1.000,000' })).focus();
+    await user.keyboard(' ');
+    expect(screen.getByRole('dialog')).toHaveTextContent('100 · Catering');
+  });
+
   it('apagar un SKU pide motivo y codifica la ruta', async () => {
     const user = userEvent.setup({ delay: null });
     render(<MovilPage />);

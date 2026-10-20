@@ -79,7 +79,12 @@ export const Matriz = ({ cruce }: { cruce: Cruce }) => {
                     <TableCell
                       key={c.nombre}
                       onClick={() => setAbierta({ sku: s, canal: c.nombre, celda })}
-                      onKeyDown={e => e.key === 'Enter' && setAbierta({ sku: s, canal: c.nombre, celda })}
+                      onKeyDown={e => {
+                        // Enter y Espacio, como cualquier botón; Espacio sin scrollear la página.
+                        if (e.key !== 'Enter' && e.key !== ' ') return;
+                        e.preventDefault();
+                        setAbierta({ sku: s, canal: c.nombre, celda });
+                      }}
                       tabIndex={0} role="button"
                       aria-label={`${s.codigo} en ${c.nombre}: ${formatear(celda.monto)}${celda.fijada ? ', fijado' : ''}`}
                       sx={{
