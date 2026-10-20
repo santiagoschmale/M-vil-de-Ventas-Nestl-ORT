@@ -7,9 +7,14 @@ ARG AZ_DEVOPS_PAT
 
 COPY package.json package-lock.json ./
 
-RUN echo "registry=https://pkgs.dev.azure.com/nestle-it/BR-DIGITAL-NEW-TECH/_packaging/nbra-js-feed/npm/registry/" > .npmrc \
-    && echo "always-auth=true" >> .npmrc \
-    && echo "//pkgs.dev.azure.com/nestle-it/BR-DIGITAL-NEW-TECH/_packaging/nbra-js-feed/npm/registry/:_authToken=${AZ_DEVOPS_PAT}" >> .npmrc \
+# Sin AZ_DEVOPS_PAT, el registro público: el front no usa paquetes internos.
+RUN if [ -n "$AZ_DEVOPS_PAT" ]; then \
+      echo "registry=https://pkgs.dev.azure.com/nestle-it/BR-DIGITAL-NEW-TECH/_packaging/nbra-js-feed/npm/registry/" > .npmrc \
+      && echo "always-auth=true" >> .npmrc \
+      && echo "//pkgs.dev.azure.com/nestle-it/BR-DIGITAL-NEW-TECH/_packaging/nbra-js-feed/npm/registry/:_authToken=${AZ_DEVOPS_PAT}" >> .npmrc; \
+    else \
+      echo "registry=https://registry.npmjs.org/" > .npmrc; \
+    fi \
     && npm ci --ignore-scripts \
     && rm -f .npmrc
 
@@ -35,13 +40,23 @@ server {
     root /usr/share/nginx/html;
     index index.html;
 
+    # Los Excel del móvil real pesan varios MB: el límite por defecto de nginx (1 MB) los rechaza.
+    client_max_body_size 50m;
+
     location / {
         try_files $uri $uri/ /index.html;
     }
 
+    # Hasta que haya login real (Entra): el nombre va como "Apellido,Nombre".
     location /api/whoami {
         default_type application/json;
-        return 200 '{"name":"Local User","username":"local-user","roles":["sm-admin"],"custom":{}}';
+        return 200 '{"name":"Prueba,Usuario","username":"usuario-prueba","roles":["sm-admin"],"custom":{}}';
+    }
+
+    # El backend, por su nombre en docker-compose.yml.
+    location /api/ {
+        proxy_pass http://backend:3000;
+        proxy_read_timeout 120s;
     }
 
     location /api/users {
