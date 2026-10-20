@@ -24,6 +24,7 @@ from decimal import Decimal
 
 from src.domain.cruce import Celda, ErrorDeCruce
 from src.domain.formato import a_texto, nombre_mes
+from src.domain.reparto import repartir
 from src.importer.entradas import (
     KILOS,
     PLATA,
@@ -160,6 +161,81 @@ class Sesion:
             detalle = f"{nombre} · {len(canales)} canales" if nombre else f"{len(canales)} canales, editados a mano"
             return Ajuste("cargar_input2", detalle, autor, cuando)
         self._aplicar(cambio)
+
+    def diferencia(self, unidad: str, valores: dict[str, str] | None = None) -> dict:
+        """
+        Cuando los totales por canal no suman lo que pide Contraloría: cuánto le toca a cada canal
+        de la diferencia, según su peso en los totales de hoy, y cuánto falta (o sobra, en negativo)
+        con los `valores` que escribió el planner. Solo lee: no cambia nada.
+        """
+        decimales = self._unidad(unidad)
+        pide, hoy = self._pide(unidad), self._totales(unidad)
+        suman = sum(hoy.values(), Decimal(0))
+        if suman == 0:
+            raise ErrorDeAjuste("Los totales por canal están en cero: no hay peso para repartir.")
+        dif = pide - suman
+        # repartir() no admite negativos: lo que sobra se reparte en positivo y se resta.
+        parte = repartir(abs(dif), hoy, decimales)
+        sugeridos = {c: v + (parte[c] if dif >= 0 else -parte[c]) for c, v in hoy.items()}
+        paso = Decimal(1).scaleb(-decimales)
+        canales, total, valido = [], Decimal(0), True
+        for c, v in hoy.items():
+            texto = None if valores is None else valores.get(c)
+            queda, error = sugeridos[c], None
+            if texto is not None:
+                queda, error = _monto(texto, decimales)
+            if error:
+                valido = False
+            else:
+                total += queda
+            canales.append({
+                "canal": c, "hoy": str(v), "peso": str((v * 100 / suman).quantize(Decimal("0.1"))),
+                "sugerido": str(sugeridos[c]), "cambio": None if error else str((queda - v).quantize(paso)),
+                "error": error,
+            })
+        falta = (pide - total).quantize(paso) if valido else None
+        return {"unidad": unidad, "pide": str(pide), "suman": str(suman.quantize(paso)), "canales": canales,
+                "falta": None if falta is None else str(falta), "cierra": falta == 0}
+
+    def repartir_diferencia(self, unidad: str, valores: dict[str, str], autor: str, cuando: datetime,
+                            motivo: str) -> None:
+        """Aplica los totales de una unidad que el planner revisó: solo si cierran con Contraloría."""
+        motivo = _motivo(motivo)
+        d = self.diferencia(unidad, valores)
+        malos = [f"{c['canal']} ({c['error']})" for c in d["canales"] if c["error"]]
+        if malos:
+            raise ErrorDeAjuste(f"Revisá {', '.join(malos)}.")
+        if not d["cierra"]:
+            falta = Decimal(d["falta"])
+            raise ErrorDeAjuste(f"No cierra: {'faltan' if falta > 0 else 'sobran'} {a_texto(abs(falta))} "
+                                f"para llegar a lo que pide Contraloría.")
+        nuevos = {c["canal"]: Decimal(c["hoy"]) + Decimal(c["cambio"]) for c in d["canales"]}
+        diferencia = Decimal(d["pide"]) - Decimal(d["suman"])
+
+        def cambio():
+            campo = "kilos" if unidad == "kilos" else "plata"
+            self._e.canales = {c: replace(t, **{campo: nuevos[c]}) for c, t in self._e.canales.items()}
+            self._e.archivo2 = None
+            que = "faltaban" if diferencia > 0 else "sobraban"
+            detalle = f"Repartió entre los canales la diferencia en {unidad}: {que} {a_texto(abs(diferencia))}"
+            return Ajuste("repartir_diferencia", detalle, autor, cuando, motivo)
+        self._aplicar(cambio)
+
+    def _pide(self, unidad: str) -> Decimal:
+        """Lo que el cruce compara contra los totales por canal: los SKUs que se reparten."""
+        if self._e.objetivos is None or self._e.canales is None:
+            raise ErrorDeAjuste("Para repartir la diferencia hacen falta el objetivo de Contraloría y los totales por canal.")
+        activos = [o for s, o in self.objetivos_vigentes().items() if s not in self.apagados_skus and o.kilos > 0]
+        if unidad == "kilos":
+            return sum((o.kilos for o in activos), Decimal(0))
+        return sum((o.nns for o in activos if o.nns is not None and o.nns > 0), Decimal(0))
+
+    def _totales(self, unidad: str) -> dict[str, Decimal]:
+        if unidad == "kilos":
+            return {c: t.kilos for c, t in self._e.canales.items()}
+        if any(t.plata is None for t in self._e.canales.values()):
+            raise ErrorDeAjuste("Faltan los pesos de algún canal: completalos en los totales por canal.")
+        return {c: t.plata for c, t in self._e.canales.items()}
 
     def quitar_input2(self, autor: str, cuando: datetime) -> None:
         """Saca los totales por canal: para volver a armarlos en la pantalla desde el mes anterior."""
@@ -805,6 +881,18 @@ def _motivo(motivo: str | None) -> str:
     if not texto:
         raise ErrorDeAjuste("Todo ajuste necesita un motivo: queda en el historial.")
     return texto
+
+
+def _monto(texto: str, decimales: int) -> tuple[Decimal | None, str | None]:
+    """Un monto escrito por el planner, o el motivo por el que no vale."""
+    valor = numero(texto) if isinstance(texto, str) else None
+    if valor is None:
+        return None, "no es un número"
+    if valor < 0:
+        return None, "no puede ser negativo"
+    if valor % Decimal(1).scaleb(-decimales) != 0:
+        return None, f"admite como máximo {decimales} decimales"
+    return valor, None
 
 
 def _leer(lector, origen):
