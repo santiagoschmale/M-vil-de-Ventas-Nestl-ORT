@@ -42,7 +42,7 @@ jobs:
       # .npmrc apunta al registro privado de Nestlé; acá se usa el público.
       - run: npm ci --registry=https://registry.npmjs.org/
       - run: npx tsc --noEmit
-      # En procesos separados: con hilos, en un runner cargado vitest corta con "Timeout calling onTaskUpdate"
-      # aunque todos los tests pasen.
-      - run: npx vitest run --coverage.enabled=false --pool=forks
+      # Sin la consola de los tests: miles de avisos de act() saturan a vitest en un runner lento y corta con
+      # "Timeout calling onTaskUpdate" aunque todos los tests pasen. Los fallos se siguen mostrando.
+      - run: npx vitest run --coverage.enabled=false --silent
       - run: npx vite build
