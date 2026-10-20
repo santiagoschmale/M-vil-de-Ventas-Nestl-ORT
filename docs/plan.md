@@ -196,8 +196,6 @@ En este orden: los tres primeros son para la prueba real del móvil de noviembre
 5. Después de la prueba: SSO con Entra (I6) y la base del mismo mes del año anterior
    (A18).
 
-Fuera de alcance por pedido del cliente: otro lenguaje que no sea Python, una app de
-escritorio, tableros de seguimiento.
 
 ---
 

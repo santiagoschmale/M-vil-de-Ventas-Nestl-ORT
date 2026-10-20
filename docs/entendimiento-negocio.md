@@ -11,7 +11,7 @@ Cada afirmación está marcada según su origen:
 
 Fuentes: documento funcional v1.0 del cliente (26/08/2026), reunión inicial, reunión
 de reglas (sep 2026), archivo de mayo y primera demo (19/10/2026). Si el documento funcional y una reunión
-posterior se contradicen, vale la reunión, y se anota la diferencia.
+posterior se contradicen, vale la reunión.
 
 ---
 
@@ -226,11 +226,10 @@ MÓVIL
 - Distribuidores se abre en 5 distribuidores. [datos]
 - Los vendedores cuelgan de la venta directa y los territorios, no de los
   distribuidores. [confirmado, 07/10]
-- La estructura real es más chica que la del archivo: en Córdoba hoy hay una sola
-  persona, la directa de Buenos Aires tiene varios vendedores (se habló de 6 o 7, como
-  ejemplo) y los distribuidores no tienen vendedores debajo. [confirmado, 19/10]
-- En la demo se lo dijo como "primero canal, después territorio". En los totales por
-  canal, Directa (BA), Córdoba y Rosario son canales separados: a confirmar (A17).
+- En Córdoba hoy hay una sola persona; la directa de Buenos Aires tiene varios
+  vendedores. Los distribuidores no tienen vendedores debajo. [confirmado, 19/10]
+- Si Directa (BA), Córdoba y Rosario son canales o territorios de un mismo canal:
+  [a confirmar, A17].
 - **Canal nuevo** (el ejemplo fue "hoteles"): no tiene historia, así que su volumen
   sale de la primera bajada, los totales por canal. Lo mismo un canal que se está
   desarrollando (más clientes en Mayoristas): se le sube el total. Esa bajada la

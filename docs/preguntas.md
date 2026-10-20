@@ -35,7 +35,7 @@ código: no se renumeran.
 |---|---|---|
 | A5 | ¿La entidad es la persona o la persona más el sistema de origen (el mismo vendedor aparece con dos sufijos)? | Cada columna es una entidad |
 | A14 | Un SKU que cae donde ningún vendedor o distribuidor lo vendió: ¿se reparte como el canal entero, se le asigna a alguien o se saca del canal? | Se avisa y queda sin abrir |
-| A17 | En la demo (19/10) se habló de "primero canal, después territorio". En los totales por canal, Directa (BA), Córdoba y Rosario vienen como canales separados. ¿Es así, o Directa es un canal con tres territorios? Confirmarlo por escrito | Canales separados, como en el archivo |
+| A17 | Directa (BA), Córdoba y Rosario: ¿son canales separados, como vienen en los totales por canal, o territorios de un mismo canal? | Canales separados |
 | A11 | Los SKUs que están en Ingredientes y en Soluciones: ¿se parten como cualquier otro? | Supuesto: los parte el cruce según los totales de cada canal |
 
 ### Datos de entrada y salida
