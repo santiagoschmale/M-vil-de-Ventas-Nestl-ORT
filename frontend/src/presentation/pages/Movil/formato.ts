@@ -19,9 +19,9 @@ export const UNIDADES = {
   plata: { nombre: 'Pesos', simbolo: '$', decimales: 2 },
 } as const;
 
-/** "7.000,000 kg" o "$ 1.234,56". */
+/** "7.000,000 kg" o "$ 1.234,56", con espacio duro: al cortar la línea, la unidad no queda sola. */
 export const conUnidad = (monto: string | null | undefined, unidad: keyof typeof UNIDADES): string =>
-  unidad === 'kilos' ? `${formatear(monto)} kg` : `$ ${formatear(monto)}`;
+  unidad === 'kilos' ? `${formatear(monto)}\u00A0kg` : `$\u00A0${formatear(monto)}`;
 
 /** El mes, legible: "2026-10" → "octubre 2026". */
 export const nombreMes = (mes: string) => {

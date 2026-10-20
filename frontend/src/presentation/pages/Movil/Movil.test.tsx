@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 import { http, HttpResponse } from 'msw';
@@ -74,6 +74,24 @@ describe('MovilPage', { timeout: 15000 }, () => {
       metodo: 'PUT', url: '/api/movil/celdas/kilos/100/Catering',
       cuerpo: { monto: '1234,5', motivo: 'acuerdo comercial' },
     });
+  });
+
+  it('el diálogo de una celda arranca con el valor seleccionado, para escribir encima', async () => {
+    const user = userEvent.setup({ delay: null });
+    render(<MovilPage />);
+    await user.click(await screen.findByRole('button', { name: '100 en Catering: 1.000,000' }));
+    const valor = within(screen.getByRole('dialog')).getByLabelText('Nuevo valor') as HTMLInputElement;
+    expect(valor).toHaveFocus();
+    // Se selecciona al terminar de abrir el diálogo.
+    await waitFor(() => expect([valor.selectionStart, valor.selectionEnd]).toEqual([0, valor.value.length]));
+  });
+
+  it('una celda se abre con Espacio, como cualquier botón', async () => {
+    const user = userEvent.setup({ delay: null });
+    render(<MovilPage />);
+    (await screen.findByRole('button', { name: '100 en Catering: 1.000,000' })).focus();
+    await user.keyboard(' ');
+    expect(screen.getByRole('dialog')).toHaveTextContent('100 · Catering');
   });
 
   it('apagar un SKU pide motivo y codifica la ruta', async () => {
@@ -322,15 +340,23 @@ describe('MovilPage', { timeout: 15000 }, () => {
     expect(within(dialogo).getByText('antes: 500,000')).toBeInTheDocument();
   });
 
-  it('el aviso de cada cambio es corto e informativo: el reparto se recalculó', async () => {
+  it('un recálculo de rutina no muestra aviso: el cambio ya se ve en la tabla', async () => {
+    useSnackbarProps.setState({ snackbarProps: undefined });
     const user = userEvent.setup({ delay: null });
     render(<MovilPage />);
     await user.click(await screen.findByRole('checkbox', { name: 'Apagar 200' }));
     const dialogo = screen.getByRole('dialog');
     await user.type(within(dialogo).getByRole('textbox', { name: /Motivo/ }), 'x');
     await user.click(within(dialogo).getByRole('button', { name: 'Apagar' }));
-    await waitFor(() => expect(useSnackbarProps.getState().snackbarProps)
-      .toEqual({ message: 'Reparto recalculado.', severity: 'info' }));
+    await waitFor(() => expect(pedidos).toHaveLength(1));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(useSnackbarProps.getState().snackbarProps).toBeUndefined();
+  });
+
+  it('lo que no es un recálculo sí avisa', async () => {
+    useSnackbarProps.setState({ snackbarProps: undefined });
+    await useMovil.getState().revisarEtapa('canal');
+    expect(useSnackbarProps.getState().snackbarProps).toEqual({ message: 'Etapa revisada.', severity: 'info' });
   });
 
   it('rojo es solo lo que no cierra: los problemas del archivo se ven en amarillo', async () => {
@@ -418,6 +444,13 @@ describe('MovilPage', { timeout: 15000 }, () => {
     expect(within(dialogo).getByText(/vas a poder empezar noviembre/)).toBeInTheDocument();
     await user.click(within(dialogo).getByRole('button', { name: 'Aprobar octubre' }));
     await waitFor(() => expect(pedidos).toEqual([{ metodo: 'POST', url: '/api/movil/aprobar', cuerpo: {} }]));
+  });
+
+  it('mientras recalcula, los switches de la tabla no se grisan', async () => {
+    render(<MovilPage />);
+    const apagar = await screen.findByRole('checkbox', { name: 'Apagar 100' });
+    act(() => useMovil.setState({ ocupado: true }));
+    expect(apagar).toBeEnabled();
   });
 
   it('aprobado, lo que edita queda deshabilitado', async () => {

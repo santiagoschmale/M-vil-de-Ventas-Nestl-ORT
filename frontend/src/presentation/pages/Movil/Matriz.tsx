@@ -13,7 +13,7 @@ type Sku = Cruce['skus'][number];
 const fija = { position: 'sticky' as const, left: 0, zIndex: 2, background: '#fff' };
 
 export const Matriz = ({ cruce }: { cruce: Cruce }) => {
-  const { cambiarSku, ocupado, foco, soltarFoco } = useMovil();
+  const { cambiarSku, foco, soltarFoco } = useMovil();
   const soloLectura = useSoloLectura();
   const [abierta, setAbierta] = useState<{ sku: Sku; canal: string; celda: Celda }>();
   const [prender, setPrender] = useState<Sku>();
@@ -59,8 +59,9 @@ export const Matriz = ({ cruce }: { cruce: Cruce }) => {
                      foco?.tipo === 'sku' && foco.id === s.codigo && ENFOCADA]}>
                 <TableCell sx={fija}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    {/* Sin `ocupado`: solo abre el diálogo, y deshabilitarlo grisaba toda la columna en cada recálculo. */}
                     <Switch
-                      size="small" checked={s.activo} disabled={ocupado || soloLectura}
+                      size="small" checked={s.activo} disabled={soloLectura}
                       inputProps={{ 'aria-label': `${s.activo ? 'Apagar' : 'Prender'} ${s.codigo}` }}
                       onChange={() => setPrender(s)}
                     />
@@ -78,7 +79,12 @@ export const Matriz = ({ cruce }: { cruce: Cruce }) => {
                     <TableCell
                       key={c.nombre}
                       onClick={() => setAbierta({ sku: s, canal: c.nombre, celda })}
-                      onKeyDown={e => e.key === 'Enter' && setAbierta({ sku: s, canal: c.nombre, celda })}
+                      onKeyDown={e => {
+                        // Enter y Espacio, como cualquier botón; Espacio sin scrollear la página.
+                        if (e.key !== 'Enter' && e.key !== ' ') return;
+                        e.preventDefault();
+                        setAbierta({ sku: s, canal: c.nombre, celda });
+                      }}
                       tabIndex={0} role="button"
                       aria-label={`${s.codigo} en ${c.nombre}: ${formatear(celda.monto)}${celda.fijada ? ', fijado' : ''}`}
                       sx={{

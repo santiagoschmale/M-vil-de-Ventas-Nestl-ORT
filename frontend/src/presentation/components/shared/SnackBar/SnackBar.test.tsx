@@ -106,7 +106,7 @@ describe('SnackbarGlobal', () => {
     expect(screen.getByTestId('mui-alert')).toHaveAttribute('data-severity', 'error');
   });
   
-  it('is anchored at the top-right position', () => {
+  it('is anchored at the bottom-right position', () => {
     (useSnackbarProps as vi.Mock).mockReturnValue({
       snackbarProps: { message: 'Test message' },
       setSnackbarProps: mockSetSnackbarProps
@@ -115,7 +115,7 @@ describe('SnackbarGlobal', () => {
     render(<SnackbarGlobal />);
     
     const snackbar = screen.getByTestId('mui-snackbar');
-    expect(snackbar).toHaveAttribute('data-anchor-vertical', 'top');
+    expect(snackbar).toHaveAttribute('data-anchor-vertical', 'bottom');
     expect(snackbar).toHaveAttribute('data-anchor-horizontal', 'right');
   });
   
