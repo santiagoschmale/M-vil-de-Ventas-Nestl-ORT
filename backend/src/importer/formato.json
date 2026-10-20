@@ -11,7 +11,8 @@
     "descripcion": [
       "descripcion",
       "producto",
-      "descripcion sku"
+      "descripcion sku",
+      "product name"
     ],
     "categoria": [
       "categoria"
@@ -23,7 +24,8 @@
       "kilos",
       "kg",
       "volumen kg",
-      "objetivo kg"
+      "objetivo kg",
+      "kgs"
     ],
     "nns": [
       "nns",

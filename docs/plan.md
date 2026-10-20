@@ -71,7 +71,7 @@ de la siguiente. Eso define lo que sigue (§3, "Lo que sigue").
 | Categorías guardadas en la herramienta | ✅ | Si el objetivo no trae categoría, se completa desde lo asignado (B8). Se hereda |
 | Autenticación | 🟡 | Proveedor local detrás de una interfaz. Confirmado SSO con Entra, no usuario y contraseña (19/10). Depende de IT (I6) |
 | Entorno de pruebas para el cliente | ⬜ | IT ofreció armar la imagen Docker y subirla a un servidor de ellos (I2). Alternativa: uno nuestro, en memoria |
-| Leer el móvil real | ⬜ | **Bloquea la prueba real.** Hoy se lee el formato de la muestra (tres `.xlsx`, apertura en hoja aparte); el real es un `.xlsb` con bloques (`entendimiento-negocio.md` §15) |
+| Leer el móvil real | 🟡 | Se lee el `.xlsb` del planner: el objetivo de Móvil Mes y el mes anterior de las hojas de reparto (`importer/movil_real.py`). Soluciones entra como Call Center y Distribuidores mientras A17 siga abierta; un cero en el reparto no aplica. Falta: los totales por canal desde el mismo archivo |
 | Tests en CI | ✅ | Backend y front |
 | Deshacer el último cambio | ✅ | Una vez. Con login: solo el propio |
 | Totales por canal sin Excel | ✅ | Se arman en la pantalla con los canales y kilos del mes anterior; los pesos los completa el planner. Con persistencia, arrancar con el input 2 del mes anterior (kilos y pesos) |
