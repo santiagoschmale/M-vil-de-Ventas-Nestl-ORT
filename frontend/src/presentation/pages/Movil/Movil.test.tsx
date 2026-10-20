@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 import { http, HttpResponse } from 'msw';
@@ -426,6 +426,13 @@ describe('MovilPage', { timeout: 15000 }, () => {
     expect(within(dialogo).getByText(/vas a poder empezar noviembre/)).toBeInTheDocument();
     await user.click(within(dialogo).getByRole('button', { name: 'Aprobar octubre' }));
     await waitFor(() => expect(pedidos).toEqual([{ metodo: 'POST', url: '/api/movil/aprobar', cuerpo: {} }]));
+  });
+
+  it('mientras recalcula, los switches de la tabla no se grisan', async () => {
+    render(<MovilPage />);
+    const apagar = await screen.findByRole('checkbox', { name: 'Apagar 100' });
+    act(() => useMovil.setState({ ocupado: true }));
+    expect(apagar).toBeEnabled();
   });
 
   it('aprobado, lo que edita queda deshabilitado', async () => {

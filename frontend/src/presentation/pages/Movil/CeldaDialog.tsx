@@ -190,7 +190,7 @@ export const CeldaDialog = ({ sku, descripcion, canal, celda, onCerrar }: Props)
                   <TableRow key={e.nombre} sx={{ color: e.activo ? undefined : APAGADO }}>
                     <TableCell padding="checkbox">
                       <Switch
-                        size="small" checked={e.activo} disabled={ocupado || soloLectura}
+                        size="small" checked={e.activo} disabled={soloLectura}
                         inputProps={{ 'aria-label': `${e.activo ? 'Apagar' : 'Prender'} ${e.nombre}` }}
                         onChange={() => setEntidad(e)}
                       />

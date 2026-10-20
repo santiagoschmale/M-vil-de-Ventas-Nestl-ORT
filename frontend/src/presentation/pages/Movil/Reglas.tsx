@@ -123,7 +123,7 @@ const ReglaDialog = ({ regla, estado, onCerrar }: Formulario & { estado: Estado;
 };
 
 export const Reglas = ({ estado }: { estado: Estado }) => {
-  const { eliminarRegla, quitarCanales, cambiarAperturaCanal, foco, ocupado } = useMovil();
+  const { eliminarRegla, quitarCanales, cambiarAperturaCanal, foco } = useMovil();
   const soloLectura = useSoloLectura();
   const [canalesDe, setCanalesDe] = useState<string>();
   const [quitarDe, setQuitarDe] = useState<string>();
@@ -214,7 +214,7 @@ export const Reglas = ({ estado }: { estado: Estado }) => {
           <FormGroup row>
             {estado.aperturas_canal.map(a => (
               <FormControlLabel key={a.canal} label={a.canal} control={
-                <Switch size="small" checked={a.abre} disabled={ocupado || soloLectura}
+                <Switch size="small" checked={a.abre} disabled={soloLectura}
                   inputProps={{ 'aria-label': `${a.canal} se abre debajo del canal` }}
                   onChange={() => setApertura({ canal: a.canal, abre: !a.abre })} />
               } />
