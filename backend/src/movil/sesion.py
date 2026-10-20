@@ -194,7 +194,8 @@ class Sesion:
                 "error": error,
             })
         falta = (pide - total).quantize(paso) if valido else None
-        return {"unidad": unidad, "pide": str(pide), "suman": str(suman.quantize(paso)), "canales": canales,
+        return {"unidad": unidad, "pide": str(pide), "suman": str(suman.quantize(paso)), "diferencia": str(dif.quantize(paso)),
+                "canales": canales,
                 "falta": None if falta is None else str(falta), "cierra": falta == 0}
 
     def repartir_diferencia(self, unidad: str, valores: dict[str, str], autor: str, cuando: datetime,

@@ -58,7 +58,7 @@ from math import ceil, floor
 from typing import Mapping, Sequence
 
 from .flujo import INFINITO, FlujoMaximo, flujo_de_costo_minimo
-from .formato import a_texto
+from .formato import a_texto, cantidad
 
 Celda = tuple[str, str]  # (sku, canal)
 
@@ -161,16 +161,18 @@ def cruzar(
         dif = _a_decimal(abs(total_filas - total_columnas), decimales)
         # SKUs con objetivo que el mes anterior no se vendieron en ningún canal (el caso del SKU nuevo).
         sin_historia = [x for x, v in r.items() if v > 0 and not any(k[0] == x and w > 0 for k, w in semillas.items())]
+        causa = ""
         if sin_historia and total_filas - total_columnas == sum(r[x] for x in sin_historia):
             # El planner ya lo descontó de los totales por canal pero no lo apagó.
             quien = f"el SKU {sin_historia[0]}" if len(sin_historia) == 1 else f"los SKUs {_lista(sin_historia)}"
-            causa = f"Es el objetivo de {quien}, que no tiene historia: podés apagarlo."
-        else:
-            causa = "Tienen que coincidir para poder repartir."
+            causa = f" Es el objetivo de {quien}, que no tiene historia: podés apagarlo."
+        # La diferencia primero: con dos totales casi iguales, cuesta encontrar el dígito que cambia.
+        pide = cantidad(_a_decimal(total_filas, decimales), decimales)
+        que = (f"faltan {cantidad(dif, decimales)} para llegar a" if total_filas > total_columnas
+               else f"sobran {cantidad(dif, decimales)} respecto de")
         inconsistencias.append(Inconsistencia(
             "totales_distintos",
-            f"El objetivo de Contraloría suma {a_texto(_a_decimal(total_filas, decimales))} y los totales por canal "
-            f"suman {a_texto(_a_decimal(total_columnas, decimales))}: difieren en {a_texto(dif)}. {causa}",
+            f"A los totales por canal les {que} lo que pide Contraloría ({pide}).{causa}",
             diferencia=dif,
         ))
 

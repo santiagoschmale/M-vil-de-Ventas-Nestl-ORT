@@ -171,7 +171,8 @@ def test_totales_de_los_dos_inputs_que_no_coinciden():
     assert inc.tipo == "totales_distintos"
     assert inc.diferencia == D("10.000")
     # En el mensaje, como se lee en Argentina: "10.000" serían diez mil.
-    assert "suma 100,000" in inc.mensaje and "difieren en 10,000." in inc.mensaje
+    # La diferencia primero, con su unidad.
+    assert inc.mensaje.startswith("A los totales por canal les faltan 10,000 kg para llegar a lo que pide Contraloría (100,000 kg).")
 
 
 def test_sku_sin_ningun_canal_en_la_base():
@@ -380,7 +381,8 @@ def test_totales_distintos_muestra_los_totales_cargados_aunque_haya_fijadas():
     por_tipo = {i.tipo: i for i in r.inconsistencias}
     assert set(por_tipo) == {"totales_distintos", "canal_sin_sku"}
     totales = por_tipo["totales_distintos"]
-    assert "suma 100 " in totales.mensaje and "suman 90:" in totales.mensaje
+    # Los totales cargados (100 contra 90), no lo que queda después de las fijadas.
+    assert "les faltan $ 10 para llegar" in totales.mensaje and "($ 100)" in totales.mensaje
     assert totales.diferencia == D("10")
     # X pide 60 y su única celda está fijada en 30: faltan 30, y el mensaje dice por qué.
     x = por_tipo["canal_sin_sku"]
@@ -457,7 +459,14 @@ def test_si_la_diferencia_de_totales_es_el_sku_sin_historia_el_mensaje_lo_dice()
     assert "10,000" in nuevo.mensaje  # cuánto hay que descontar
 
 
+def test_una_diferencia_chica_se_lee_en_gramos_o_centavos_y_si_sobra_lo_dice():
+    r = cruzar(filas={"A": D("454981.590")}, columnas={"X": D("454981.490")}, base={("A", "X"): D(1)}, decimales=3)
+    assert "les faltan 0,100 kg (100 gramos) para llegar" in r.inconsistencias[0].mensaje
+    r = cruzar(filas={"A": D("10.00")}, columnas={"X": D("10.01")}, base={("A", "X"): D(1)}, decimales=2)
+    assert "les sobran $ 0,01 (1 centavo) respecto de lo que pide Contraloría ($ 10,00)" in r.inconsistencias[0].mensaje
+
+
 def test_si_la_diferencia_no_es_el_sku_sin_historia_se_pide_corregir_los_totales():
     r = cruzar(filas={"A": D("100")}, columnas={"X": D("90")}, base={("A", "X"): D(1)}, decimales=3)
     (totales,) = r.inconsistencias
-    assert "Tienen que coincidir" in totales.mensaje
+    assert totales.mensaje == "A los totales por canal les faltan 10,000 kg para llegar a lo que pide Contraloría (100,000 kg)."

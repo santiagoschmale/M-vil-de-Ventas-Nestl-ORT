@@ -608,11 +608,11 @@ describe('MovilPage', { timeout: 15000 }, () => {
 
   it('si los totales no suman lo que pide Contraloría, ofrece repartir la diferencia', async () => {
     const distintos = estado({ cierra: { kilos: false, plata: true }, inconsistencias: { kilos: [inconsistenciaFactory.build({
-      tipo: 'totales_distintos', mensaje: 'El objetivo de Contraloría suma 1.000 y los totales por canal suman 900: difieren en 100.',
+      tipo: 'totales_distintos', mensaje: 'A los totales por canal les faltan 100,000 kg para llegar a lo que pide Contraloría (1.000,000 kg).',
     })], plata: [] } });
     server.use(
       http.get('*/api/movil', () => HttpResponse.json(distintos)),
-      http.get('*/api/movil/diferencia/kilos', () => HttpResponse.json({ unidad: 'kilos', pide: '1000.000', suman: '900.000',
+      http.get('*/api/movil/diferencia/kilos', () => HttpResponse.json({ unidad: 'kilos', pide: '1000.000', suman: '900.000', diferencia: '100.000',
         falta: '0.000', cierra: true, canales: [{ canal: 'Catering', hoy: '900.000', peso: '100.0', sugerido: '1000.000',
           cambio: '100.000', error: null }] })),
     );

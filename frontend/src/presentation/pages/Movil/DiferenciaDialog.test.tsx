@@ -12,7 +12,7 @@ const canal = (nombre: string, hoy: string, peso: string, sugerido: string, camb
   ({ canal: nombre, hoy, peso, sugerido, cambio, error: null });
 
 const sugerencia: Diferencia = {
-  unidad: 'kilos', pide: '1000.000', suman: '900.000', falta: '0.000', cierra: true,
+  unidad: 'kilos', pide: '1000.000', suman: '999.900', diferencia: '0.100', falta: '0.000', cierra: true,
   canales: [canal('Catering', '600.000', '66.7', '666.667', '66.667'), canal('Vending', '300.000', '33.3', '333.333', '33.333')],
 };
 
@@ -63,6 +63,10 @@ describe('DiferenciaDialog', { timeout: 15000 }, () => {
     expect(await screen.findByText('Repartido: cierra con Contraloría')).toBeInTheDocument();
     expect(screen.getByRole('textbox', { name: 'Queda en Catering' })).toHaveValue('666,667');
     expect(screen.getByText('66,7 %')).toBeInTheDocument();
+    // La diferencia, en gramos porque es chica, y los dígitos que cambian resaltados.
+    expect(screen.getByText('Faltan')).toBeInTheDocument();
+    expect(screen.getByText(/^0,100.kg \(100 gramos\)$/)).toBeInTheDocument();
+    expect(document.querySelectorAll('mark').length).toBeGreaterThan(0);
     expect(screen.getByText('+66,667')).toBeInTheDocument();
     await waitFor(() => expect(screen.getByRole('button', { name: 'Aplicar a los totales' })).toBeEnabled());
   });
