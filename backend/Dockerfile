@@ -16,8 +16,17 @@ ARG INDEX_URL
 ENV PIP_EXTRA_INDEX_URL=$INDEX_URL
 
 COPY requirements.txt /requirements.txt
+COPY local_shims /local_shims
 
-RUN /venv/bin/pip install --no-cache-dir --disable-pip-version-check -r /requirements.txt
+# Con INDEX_URL (pipeline de Nestlé), las nbra-* salen del índice privado. Sin él, se usan los
+# reemplazos de local_shims: nunca se buscan nbra-* en el índice público (otro podría publicarlas).
+RUN if [ -n "$INDEX_URL" ]; then \
+      /venv/bin/pip install --no-cache-dir --disable-pip-version-check -r /requirements.txt; \
+    else \
+      grep -v '^nbra-' /requirements.txt > /requirements.publicas.txt && \
+      /venv/bin/pip install --no-cache-dir --disable-pip-version-check -r /requirements.publicas.txt \
+        /local_shims/nbra_logger /local_shims/nbra_envs_python; \
+    fi
 
 FROM gcr.io/distroless/python3-debian12:nonroot
 
