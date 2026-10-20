@@ -152,3 +152,6 @@ backend/.requirements.publicas.txt
 
 # Salidas locales del recorrido
 backend/movil*.xlsx
+
+# Archivos reales del cliente: nunca al repo
+data/real/
