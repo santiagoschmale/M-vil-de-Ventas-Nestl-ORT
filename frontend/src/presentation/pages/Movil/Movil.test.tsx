@@ -322,15 +322,23 @@ describe('MovilPage', { timeout: 15000 }, () => {
     expect(within(dialogo).getByText('antes: 500,000')).toBeInTheDocument();
   });
 
-  it('el aviso de cada cambio es corto e informativo: el reparto se recalculó', async () => {
+  it('un recálculo de rutina no muestra aviso: el cambio ya se ve en la tabla', async () => {
+    useSnackbarProps.setState({ snackbarProps: undefined });
     const user = userEvent.setup({ delay: null });
     render(<MovilPage />);
     await user.click(await screen.findByRole('checkbox', { name: 'Apagar 200' }));
     const dialogo = screen.getByRole('dialog');
     await user.type(within(dialogo).getByRole('textbox', { name: /Motivo/ }), 'x');
     await user.click(within(dialogo).getByRole('button', { name: 'Apagar' }));
-    await waitFor(() => expect(useSnackbarProps.getState().snackbarProps)
-      .toEqual({ message: 'Reparto recalculado.', severity: 'info' }));
+    await waitFor(() => expect(pedidos).toHaveLength(1));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(useSnackbarProps.getState().snackbarProps).toBeUndefined();
+  });
+
+  it('lo que no es un recálculo sí avisa', async () => {
+    useSnackbarProps.setState({ snackbarProps: undefined });
+    await useMovil.getState().revisarEtapa('canal');
+    expect(useSnackbarProps.getState().snackbarProps).toEqual({ message: 'Etapa revisada.', severity: 'info' });
   });
 
   it('rojo es solo lo que no cierra: los problemas del archivo se ven en amarillo', async () => {

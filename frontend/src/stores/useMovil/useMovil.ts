@@ -37,8 +37,7 @@ type Opciones = {
   aviso?: string;
 };
 
-// El aviso dura unos segundos: corto e informativo. Si cierra o no ya se ve en el encabezado.
-const RECALCULADO = 'Reparto recalculado.';
+// Un recálculo de rutina no avisa: se ve en la tabla y en el encabezado, y pasa decenas de veces por día.
 const TOTALES_CARGADOS = 'Totales por canal cargados.';
 
 /** Aprobado, o un mes anterior, es de solo lectura: lo que edita se deshabilita (el backend igual lo rechaza). */
@@ -66,7 +65,8 @@ export const useMovil = create<TUseMovil>((set, get) => {
       const estado = (await pedido()).data;
       set({ estado, mes: estado.mes, errorDeCarga: undefined });
       await Promise.all([traerCruce(estado), traerMeses().catch(() => undefined)]);
-      avisar(opciones.aviso ?? (estado.faltan.length ? opciones.cargado ?? 'Guardado.' : RECALCULADO), 'info');
+      const aviso = opciones.aviso ?? opciones.cargado ?? (estado.faltan.length ? 'Guardado.' : null);
+      if (aviso) avisar(aviso, 'info');
       return null;
     } catch (e) {
       const mensaje = mensajeDeError(e);
