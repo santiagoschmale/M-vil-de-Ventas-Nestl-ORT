@@ -18,6 +18,7 @@ export type Diferencia = {
   unidad: Unidad;
   pide: Monto;
   suman: Monto;
+  diferencia: Monto; // pide menos suman, con los totales de hoy: negativo si sobra
   // Pide menos lo que suman los valores escritos: negativo si sobra; null si alguno no es un número.
   falta: Monto | null;
   cierra: boolean;

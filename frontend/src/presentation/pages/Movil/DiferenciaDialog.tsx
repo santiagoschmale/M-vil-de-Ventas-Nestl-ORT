@@ -8,7 +8,7 @@ import UndoRoundedIcon from '@mui/icons-material/UndoRounded';
 import TaskAltRoundedIcon from '@mui/icons-material/TaskAltRounded';
 import { useMovil } from '../../../stores/useMovil';
 import { Diferencia, Unidad } from '../../../stores/useMovil/useMovil.type';
-import { conUnidad, formatear, UNIDADES } from './formato';
+import { conUnidad, distintos, enMenores, formatear, UNIDADES } from './formato';
 import { CIERRA, NO_CIERRA, numeros } from './estilo';
 
 type Props = { unidad: Unidad; onCerrar: () => void };
@@ -17,6 +17,41 @@ type Props = { unidad: Unidad; onCerrar: () => void };
 const PAUSA_MS = 250;
 
 const sinSigno = (m: string) => m.replace(/^-/, '');
+
+/** Un monto con los caracteres que cambian respecto de `otro` resaltados. */
+const Resaltado = ({ monto, otro }: { monto: string; otro: string }) => (
+  <>
+    {[...monto].map((c, i) => (distintos(monto, otro)[i]
+      ? <Box key={i} component="mark" sx={{ bgcolor: alpha('#E0A800', 0.3), color: 'inherit', borderRadius: 0.5, px: '1px' }}>{c}</Box>
+      : c))}
+  </>
+);
+
+/**
+ * Lo que pide Contraloría y lo que suman los canales, uno debajo del otro con los dígitos que cambian
+ * resaltados, y la diferencia: con dos totales casi iguales, cuesta encontrarla a simple vista.
+ */
+const Comparacion = ({ d, unidad }: { d: Diferencia; unidad: Unidad }) => {
+  const [pide, suman] = [formatear(d.pide), formatear(d.suman)];
+  const sobra = d.diferencia.startsWith('-');
+  const fila = (etiqueta: string, valor: React.ReactNode, sx = {}) => (
+    <>
+      <Typography variant="body2" color="text.secondary">{etiqueta}</Typography>
+      <Typography variant="body2" sx={{ ...numeros, ...sx }}>{valor}</Typography>
+    </>
+  );
+  // Igual que conUnidad: "1.234,500 kg" y "$ 1.234,50".
+  const con = (texto: React.ReactNode) => (unidad === 'kilos' ? <>{texto}{'\u00A0'}kg</> : <>${'\u00A0'}{texto}</>);
+  return (
+    <Box sx={{ display: 'grid', gridTemplateColumns: 'auto auto', justifyContent: 'start', columnGap: 3, rowGap: 0.5 }}>
+      {fila('Contraloría pide', con(<Resaltado monto={pide} otro={suman} />))}
+      {fila('Los canales suman', con(<Resaltado monto={suman} otro={pide} />))}
+      {fila(sobra ? 'Sobran' : 'Faltan',
+        `${conUnidad(sinSigno(d.diferencia), unidad)}${enMenores(d.diferencia, unidad)}`,
+        { fontWeight: 600 })}
+    </Box>
+  );
+};
 const conSigno = (m: string) => (m.startsWith('-') ? `−${formatear(sinSigno(m))}` : /[1-9]/.test(m) ? `+${formatear(m)}` : formatear(m));
 
 /**
@@ -92,10 +127,9 @@ export const DiferenciaDialog = ({ unidad, onCerrar }: Props) => {
         {!sugerencia && !error && <LinearProgress aria-label="Calculando la sugerencia" />}
         {sugerencia && (
           <>
+            <Comparacion d={sugerencia} unidad={unidad} />
             <Typography variant="body2" color="text.secondary">
-              Contraloría pide {conUnidad(sugerencia.pide, unidad)} y los canales suman{' '}
-              {conUnidad(sugerencia.suman, unidad)}. Cada canal se lleva una parte según su peso: el que tiene más,
-              recibe más. Podés cambiar cualquier valor.
+              Cada canal se lleva una parte según su peso: el que tiene más, recibe más. Podés cambiar cualquier valor.
             </Typography>
             {/* Fijo arriba mientras se baja por los canales: es lo que hay que mirar al escribir. */}
             <Box sx={{ position: 'sticky', top: 0, zIndex: 1, bgcolor: 'background.paper', pb: 0.5 }}>
@@ -111,7 +145,8 @@ export const DiferenciaDialog = ({ unidad, onCerrar }: Props) => {
               </Typography>
               {falta !== null && (
                 <Typography variant="h6" component="span" sx={{ ...numeros, color: 'inherit', fontWeight: 600 }}>
-                  {estado === 'cierra' ? conUnidad(sugerencia.pide, unidad) : conUnidad(sinSigno(falta), unidad)}
+                  {estado === 'cierra' ? conUnidad(sugerencia.pide, unidad)
+                    : `${conUnidad(sinSigno(falta), unidad)}${enMenores(falta, unidad)}`}
                 </Typography>
               )}
             </Box>

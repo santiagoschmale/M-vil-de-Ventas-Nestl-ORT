@@ -16,6 +16,20 @@ def a_texto(valor: Decimal) -> str:
     return f"{'-' if valor < 0 else ''}{miles}{',' + decimales if decimales else ''}"
 
 
+def cantidad(valor: Decimal, decimales: int) -> str:
+    """
+    Un monto con su unidad, como lo lee el planner: "1.234,500 kg" o "$ 1.234,50". Si es menos de
+    uno, también en gramos o centavos ("0,100 kg (100 gramos)"): con tantos ceros, cuesta leerlo.
+    ponytail: la unidad sale de los decimales (3 = kilos, 2 = pesos), que es como el dominio las distingue.
+    """
+    texto = f"{a_texto(valor)} kg" if decimales == 3 else f"$ {a_texto(valor)}"
+    if 0 < abs(valor) < 1:
+        menores = int(abs(valor).scaleb(decimales))
+        nombre = ("gramo" if decimales == 3 else "centavo") + ("" if menores == 1 else "s")
+        texto += f" ({menores} {nombre})"
+    return texto
+
+
 MESES = ("enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre",
          "noviembre", "diciembre")
 

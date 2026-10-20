@@ -26,7 +26,7 @@ def _valores(d, campo="sugerido"):
 def test_la_sugerencia_reparte_la_diferencia_exacta_segun_el_peso_de_cada_canal():
     d = _corta().diferencia("kilos")
     pide, suman = D(d["pide"]), D(d["suman"])
-    assert pide - suman == D("10.000")
+    assert pide - suman == D("10.000") == D(d["diferencia"])
     assert D(d["falta"]) == 0  # con la sugerencia tal cual, no falta nada
     sugeridos = [D(c["sugerido"]) for c in d["canales"]]
     assert sum(sugeridos) == pide  # cierra al gramo

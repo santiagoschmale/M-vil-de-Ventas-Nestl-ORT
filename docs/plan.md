@@ -90,8 +90,10 @@ de la siguiente. Eso define lo que sigue (§3, "Lo que sigue").
 ### COULD
 
 Dashboard vendedor × kilos y facturación · template de carga para SAP (A15) · cargas
-masivas · multi-país y multi-negocio · base del mismo mes del año anterior (A18).
-Nada empezado.
+masivas · multi-país y multi-negocio · base del mismo mes del año anterior (A18) ·
+pasada de tema visual con impecable: llevar el tema de MUI al estilo de los mockups
+(superficies planas, tintes suaves en vez de colores llenos, bordes finos, números
+alineados). Nada empezado.
 
 ### Fuera de la POC
 
