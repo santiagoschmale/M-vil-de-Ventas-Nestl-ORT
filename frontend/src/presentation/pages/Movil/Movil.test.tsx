@@ -76,6 +76,16 @@ describe('MovilPage', { timeout: 15000 }, () => {
     });
   });
 
+  it('el diálogo de una celda arranca con el valor seleccionado, para escribir encima', async () => {
+    const user = userEvent.setup({ delay: null });
+    render(<MovilPage />);
+    await user.click(await screen.findByRole('button', { name: '100 en Catering: 1.000,000' }));
+    const valor = within(screen.getByRole('dialog')).getByLabelText('Nuevo valor') as HTMLInputElement;
+    expect(valor).toHaveFocus();
+    // Se selecciona al terminar de abrir el diálogo.
+    await waitFor(() => expect([valor.selectionStart, valor.selectionEnd]).toEqual([0, valor.value.length]));
+  });
+
   it('una celda se abre con Espacio, como cualquier botón', async () => {
     const user = userEvent.setup({ delay: null });
     render(<MovilPage />);

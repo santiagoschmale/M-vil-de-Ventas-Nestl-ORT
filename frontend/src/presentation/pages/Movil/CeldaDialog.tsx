@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Alert, Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Divider,
   FormControlLabel, IconButton, Radio, RadioGroup, Switch, Table, TableBody, TableCell, TableHead, TableRow, TextField,
@@ -126,6 +126,7 @@ export const CeldaDialog = ({ sku, descripcion, canal, celda, onCerrar }: Props)
   const fijada = estado?.fijas[unidad].find(f => f.sku === sku && f.canal === canal);
   const { simbolo, decimales } = UNIDADES[unidad];
   const tocado = monto !== formatear(celda.monto) || !!motivo;
+  const valor = useRef<HTMLInputElement>(null);
 
   useEffect(() => { traerApertura(sku, canal).then(setApertura); }, [sku, canal, estado]);
 
@@ -137,7 +138,10 @@ export const CeldaDialog = ({ sku, descripcion, canal, celda, onCerrar }: Props)
   const alDesfijar = async () => resultado(await desfijar(sku, canal, motivo.trim()));
 
   return (
-    <Dialog open onClose={onCerrar} maxWidth="sm" fullWidth PaperProps={{ component: 'form', onSubmit: alFijar }}>
+    // Se entra casi siempre a fijar: el valor queda seleccionado para escribir encima. Al terminar de abrir,
+    // porque el diálogo reacomoda el foco al final de la animación y en Chrome se perdía la selección.
+    <Dialog open onClose={onCerrar} maxWidth="sm" fullWidth PaperProps={{ component: 'form', onSubmit: alFijar }}
+      TransitionProps={{ onEntered: () => valor.current?.select() }}>
       <DialogTitle>
         {sku} · {canal}
         <Typography variant="body2" color="text.secondary">{descripcion}</Typography>
@@ -157,6 +161,7 @@ export const CeldaDialog = ({ sku, descripcion, canal, celda, onCerrar }: Props)
         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mt: 3 }}>
           <TextField
             label="Nuevo valor" value={monto} onChange={e => { setMonto(e.target.value); setError(null); }}
+            autoFocus inputRef={valor}
             inputProps={{ inputMode: 'decimal', style: numeros }} sx={{ width: 180 }}
             helperText={`En ${simbolo}, hasta ${decimales} decimales`}
           />
