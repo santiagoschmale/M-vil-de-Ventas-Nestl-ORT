@@ -42,6 +42,7 @@ const ACCIONES: Record<string, string> = {
   porcentaje: 'Cambió la base de cálculo', quitar_input2: 'Sacó los totales por canal',
   asignar_categorias: 'Asignó categorías', heredar: 'Arrancó desde el mes anterior aprobado',
   agregar_entidad: 'Agregó un distribuidor o vendedor', eliminar_entidad: 'Eliminó un distribuidor o vendedor',
+  abrir_canal: 'Abrió un canal entre distribuidores o vendedores', cerrar_canal: 'Dejó un canal sin abrir debajo', repartir_diferencia: 'Repartió la diferencia entre los canales',
 };
 
 export const Subir = ({ cargado, etiqueta, alElegir, texto }: {
