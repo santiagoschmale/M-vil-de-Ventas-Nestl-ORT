@@ -82,6 +82,36 @@ cd frontend; npx vitest --watch=false
 Abrir http://localhost:5175 y tocar "Cargar datos de muestra". Si la pantalla dice
 "Contestó otra aplicación", otro programa está usando el puerto 3000.
 
+## Desplegarlo con Docker
+
+Probado: dos imágenes (API y pantalla) y un PostgreSQL 16. Desde la raíz:
+
+```bash
+docker build -t movil-backend --build-arg INDEX_URL=<índice privado de Python> backend
+docker build -t movil-frontend --build-arg AZ_DEVOPS_PAT=<token del registro npm> frontend
+```
+
+Sin `INDEX_URL`, el backend usa los reemplazos de `backend/local_shims` en vez de las
+librerías `nbra-*` (nunca las busca en el índice público). Sin `AZ_DEVOPS_PAT`, el
+front instala desde el registro público.
+
+```bash
+docker network create movil
+docker run --rm --network movil -e DATABASE_URL=<url de Postgres> --entrypoint /venv/bin/alembic movil-backend upgrade head
+docker run -d --name backend --network movil -e DATABASE_URL=<url de Postgres> -e IS_LOCAL=false movil-backend
+docker run -d --name movil-frontend --network movil -p 8080:80 movil-frontend
+```
+
+- `DATABASE_URL`: `postgresql://usuario:clave@host:5432/base`. La primera línea crea
+  las tablas; se corre de nuevo con cada versión nueva. Sin `DATABASE_URL`, todo vive
+  en memoria y se pierde al reiniciar.
+- **El contenedor de la API se tiene que llamar `backend`**: la pantalla (nginx) le
+  pasa `/api` a `http://backend:3000`.
+- `IS_LOCAL=false`: sin recarga automática ni "Empezar de cero". Con las `nbra-*`
+  reales, además carga la configuración de Key Vault.
+- La pantalla queda en el puerto 8080. Acepta archivos de hasta 50 MB.
+- Hasta que haya login con Entra, todos entran como un usuario de prueba.
+
 ## Estructura
 
 ```
@@ -121,5 +151,4 @@ El repo parte del scaffold de Backstage
   build del front. `ci.yaml` es el del template: llama al workflow de plataforma de
   Nestlé, que desde acá no corre. Cuando llegue el repo real, cada merge despliega
   con ArgoCD.
-- **Docker**: cada parte tiene su `Dockerfile`, y necesita las credenciales de los
-  registros privados.
+- **Docker**: ver "Desplegarlo con Docker", arriba.
