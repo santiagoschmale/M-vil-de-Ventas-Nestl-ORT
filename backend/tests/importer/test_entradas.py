@@ -369,3 +369,18 @@ def test_muchos_skus_en_cero_van_en_un_solo_aviso():
     assert "8 SKUs tienen objetivo en cero (obsoletos o estacionales): no se reparten." in avisos
     assert "Kilos: 1 SKU tiene más de 3 decimales; se redondean al gramo." in avisos
     assert objetivos["2000"].kilos == D("10.123")
+
+
+def test_la_fila_de_totales_al_pie_no_es_un_sku():
+    """El móvil de octubre trae "TOTAL" en la columna del SKU: sumado como SKU, duplicaba el objetivo."""
+    libro = Workbook()
+    hoja = libro.active
+    hoja.append(["SKU", "Descripción", "Kgs", "NNS"])
+    hoja.append([1001, "Producto", 10, 100])
+    hoja.append(["TOTAL", None, 10, 100])
+    hoja.append(["Total general", None, 10, 100])
+    archivo = BytesIO()
+    libro.save(archivo)
+    archivo.seek(0)
+    objetivos, _ = leer_input1(archivo)
+    assert set(objetivos) == {"1001"}

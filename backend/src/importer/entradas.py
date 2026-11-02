@@ -124,6 +124,9 @@ def _codigo(valor) -> str | None:
     if isinstance(valor, float) and valor.is_integer():
         valor = int(valor)
     texto = str(valor).strip()
+    # La fila de totales al pie ("TOTAL", "Total general") no es un SKU: el móvil de octubre la trae.
+    if normalizar(texto).startswith("total"):
+        return None
     # Solo dígitos: 00123 y 123 son el mismo SKU (un archivo lo guarda como texto y otro como número).
     if texto.isdigit():
         texto = str(int(texto))

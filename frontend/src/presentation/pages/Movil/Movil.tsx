@@ -54,7 +54,7 @@ export const Subir = ({ cargado, etiqueta, alElegir, texto }: {
     <Button component="label" variant="outlined" size="small" startIcon={<UploadFileRoundedIcon />} disabled={ocupado || soloLectura}>
       {texto ?? (cargado ? 'Reemplazar' : 'Subir Excel')}
       <input
-        hidden type="file" accept=".xlsx" aria-label={etiqueta}
+        hidden type="file" accept=".xlsx,.xlsb" aria-label={etiqueta}
         onChange={e => { const f = e.target.files?.[0]; if (f) alElegir(f); e.target.value = ''; }}
       />
     </Button>
