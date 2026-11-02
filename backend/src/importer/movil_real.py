@@ -113,6 +113,18 @@ def base(hojas: dict[str, list[list]]) -> tuple[dict[tuple[str, str], Decimal], 
     return reparto, problemas
 
 
+def plata_por_canal(hojas: dict[str, list[list]]) -> dict[str, Decimal]:
+    """Los pesos (NNS) de cada canal en el reparto: para proponer los totales por canal del mes siguiente."""
+    por_canal: dict[str, Decimal] = {}
+    for nombre in ("ingredientes", "soluciones"):
+        encontradas = tablas(_hoja(hojas, nombre))
+        for bloques in (encontradas[0].filas.values() if encontradas else []):
+            for canal, (_, nns) in bloques.items():
+                if nns:
+                    por_canal[canal] = por_canal.get(canal, Decimal(0)) + nns
+    return por_canal
+
+
 def apertura(hojas: dict[str, list[list]]) -> tuple[dict[tuple[str, str], dict[str, Decimal]], list[Problema]]:
     """
     {(sku, canal): {entidad: kilos}}: los distribuidores (hoja Distribuidores) y los asesores

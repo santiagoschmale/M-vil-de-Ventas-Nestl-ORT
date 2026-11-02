@@ -54,6 +54,7 @@ export type Problema = {
   bloque: string | null;
   tipo?: string | null; // p. ej. 'sku_repetido': la pantalla ofrece resolverlo
   canal?: string | null; // si es de una celda SKU × canal
+  descripcion?: string | null; // del objetivo: el código solo no le dice nada al planner
 };
 
 /** Un SKU repetido en el objetivo de Contraloría: sus filas del Excel y cuál vale. */
@@ -78,7 +79,7 @@ export type Estado = {
       detalle: { canal: string; kilos: Monto; plata: Monto | null }[];
     } | null;
     // canales: kilos por canal del mes anterior, para arrancar los totales en la pantalla.
-    base: { archivo: string; celdas: number; aperturas: number; canales: { canal: string; kilos: Monto }[] } | null;
+    base: { archivo: string; celdas: number; aperturas: number; canales: { canal: string; kilos: Monto; plata: Monto | null }[] } | null;
   };
   cierra: Record<Unidad, boolean>;
   inconsistencias: Record<Unidad, Inconsistencia[]>;
@@ -174,6 +175,7 @@ export type TUseMovil = {
   // Sin valores, la sugerencia; con valores, cuánto falta o sobra con ellos (no cambia nada).
   diferencia: (unidad: Unidad, valores?: Record<string, string>) => Promise<Diferencia>;
   repartirDiferencia: (unidad: Unidad, valores: Record<string, string>, motivo: string) => Resultado;
+  proponerPesos: (motivo: string) => Resultado; // pesos por canal según los kilos repartidos
   agregarRegla: (datos: DatosRegla, motivo: string) => Resultado;
   editarRegla: (id: string, datos: DatosRegla, motivo: string) => Resultado;
   eliminarRegla: (id: string, motivo: string) => Resultado;

@@ -33,6 +33,7 @@ from src.importer.entradas import (
     ErrorDeEntrada,
     leer_apertura,
     leer_base,
+    leer_base_plata,
     leer_categorias,
     leer_input1,
     leer_input2,
@@ -94,6 +95,7 @@ class _Entradas:
     apertura: dict = field(default_factory=dict)
     problemas_base: list[Problema] = field(default_factory=list)
     archivo_base: str | None = None
+    base_plata: dict | None = None  # pesos por canal del mes anterior, si el archivo los trae
 
 
 class Sesion:
@@ -222,6 +224,36 @@ class Sesion:
             return Ajuste("repartir_diferencia", detalle, autor, cuando, motivo)
         self._aplicar(cambio)
 
+    def pesos_segun_kilos(self) -> dict[str, Decimal]:
+        """
+        Los pesos de cada canal que van con los kilos ya repartidos: cada SKU factura sus kilos al precio de
+        Contraloría (su NNS sobre sus kilos). Suman exacto lo que pide Contraloría en pesos.
+        """
+        r = self._exigir_recorrido()
+        if r.kilos.celdas is None:
+            raise ErrorDeAjuste("Primero tienen que cerrar los kilos: los pesos se proponen según cómo se repartieron.")
+        objetivos = self.objetivos_vigentes()
+        pesos = {c: Decimal(0) for c in self._e.canales}
+        for (sku, canal), kilos in r.kilos.celdas.items():
+            o = objetivos.get(sku)
+            if kilos and o and o.kilos and o.nns:
+                pesos[canal] += kilos * o.nns / o.kilos
+        pide = self._pide("plata")
+        if pide <= 0 or not any(pesos.values()):
+            raise ErrorDeAjuste("El objetivo de Contraloría no tiene pesos: no hay de dónde proponerlos.")
+        return repartir(pide, pesos, UNIDADES["plata"])
+
+    def proponer_pesos(self, autor: str, cuando: datetime, motivo: str) -> None:
+        """Pone en los totales por canal los pesos que van con los kilos repartidos (`pesos_segun_kilos`)."""
+        motivo = _motivo(motivo)
+        pesos = self.pesos_segun_kilos()
+
+        def cambio():
+            self._e.canales = {c: replace(t, plata=pesos[c]) for c, t in self._e.canales.items()}
+            self._e.archivo2 = None
+            return Ajuste("proponer_pesos", "Pesos por canal según los kilos repartidos", autor, cuando, motivo)
+        self._aplicar(cambio)
+
     def _pide(self, unidad: str) -> Decimal:
         """Lo que el cruce compara contra los totales por canal: los SKUs que se reparten."""
         if self._e.objetivos is None or self._e.canales is None:
@@ -249,6 +281,9 @@ class Sesion:
         base, problemas = _leer(leer_base, origen)
         if hasattr(origen, "seek"):
             origen.seek(0)
+        base_plata = leer_base_plata(origen)
+        if hasattr(origen, "seek"):
+            origen.seek(0)
         try:
             apertura, problemas_apertura = leer_apertura(origen)
         except ErrorDeEntrada:
@@ -257,7 +292,7 @@ class Sesion:
                 bloque="apertura")]
 
         def cambio():
-            self._e.base, self._e.apertura = base, apertura
+            self._e.base, self._e.apertura, self._e.base_plata = base, apertura, base_plata
             self._e.problemas_base, self._e.archivo_base = problemas + problemas_apertura, nombre
             return Ajuste("cargar_base", nombre, autor, cuando)
         self._aplicar(cambio)

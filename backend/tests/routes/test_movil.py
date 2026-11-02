@@ -367,6 +367,14 @@ def test_repartir_la_diferencia_por_http():
     assert c.get("/api/movil/diferencia/litros").status_code == 422
 
 
+def test_las_alertas_dicen_la_descripcion_del_sku():
+    estado = _cargado().get("/api/movil").json()
+    nuevo = next(i for i in estado["inconsistencias"]["kilos"] if i["tipo"] == "sku_sin_canal")
+    assert nuevo["mensaje"].startswith(f"El SKU {NUEVO} (")
+    con_sku = [p for p in estado["problemas"] if p["sku"]]
+    assert con_sku and all(p["descripcion"] for p in con_sku)
+
+
 def test_empezar_de_cero_solo_en_local():
     import os
     c = _cerrado()

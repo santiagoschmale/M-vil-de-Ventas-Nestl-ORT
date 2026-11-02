@@ -194,6 +194,9 @@ export const useMovil = create<TUseMovil>((set, get) => {
       () => api.put(conMes(`/movil/diferencia/${unidad}`), { valores, motivo }),
       { ...enDialogo, aviso: 'Totales por canal actualizados.' }),
 
+    proponerPesos: motivo => cambiar(() => api.post(conMes('/movil/totales/pesos'), { motivo }),
+      { ...enDialogo, aviso: 'Pesos por canal propuestos según los kilos.' }),
+
     apertura: async (sku, canal) => {
       try {
         return (await api.get<Apertura>(conMes(`/movil/apertura/${ruta(sku, canal)}`))).data;

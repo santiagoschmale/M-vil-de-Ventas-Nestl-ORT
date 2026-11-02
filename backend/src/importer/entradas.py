@@ -424,6 +424,13 @@ def leer_base(origen) -> tuple[dict[tuple[str, str], Decimal], list[Problema]]:
 
 
 
+def leer_base_plata(origen) -> dict[str, Decimal] | None:
+    """Los pesos de cada canal del mes anterior, si el archivo los trae (el móvil real sí; la muestra no)."""
+    from src.importer import movil_real
+    hojas = libro(origen)
+    return movil_real.plata_por_canal(hojas) if movil_real.es_movil(hojas) else None
+
+
 # ---------------------------------------------------------------------------
 # Apertura debajo del canal
 # ---------------------------------------------------------------------------

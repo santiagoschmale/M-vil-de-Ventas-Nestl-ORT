@@ -42,6 +42,7 @@ const ACCIONES: Record<string, string> = {
   porcentaje: 'Cambió la base de cálculo', quitar_input2: 'Sacó los totales por canal',
   asignar_categorias: 'Asignó categorías', heredar: 'Arrancó desde el mes anterior aprobado',
   agregar_entidad: 'Agregó un distribuidor o vendedor', eliminar_entidad: 'Eliminó un distribuidor o vendedor',
+  proponer_pesos: 'Propuso los pesos por canal según los kilos',
   abrir_canal: 'Abrió un canal entre distribuidores o vendedores', cerrar_canal: 'Dejó un canal sin abrir debajo', repartir_diferencia: 'Repartió la diferencia entre los canales',
 };
 
@@ -93,8 +94,14 @@ const TotalesDialog = ({ totales, sugerencia, objetivo, onCerrar }: {
 }) => {
   const { editarTotales, ocupado } = useMovil();
   const [iniciales] = useState<Fila[]>(() => {
-    if (totales) return totales.detalle.map(t => fila({ canal: t.canal, kilos: aTexto(t.kilos), plata: aTexto(t.plata) }));
-    if (sugerencia?.length) return sugerencia.map(t => fila({ canal: t.canal, kilos: aTexto(t.kilos) }));
+    // Pesos vacíos: los del mes anterior, si su archivo los trae.
+    const pesosAnteriores = new Map((sugerencia ?? []).map(t => [claveDeCanal(t.canal), aTexto(t.plata)]));
+    if (totales) {
+      return totales.detalle.map(t => fila({
+        canal: t.canal, kilos: aTexto(t.kilos), plata: aTexto(t.plata) || (pesosAnteriores.get(claveDeCanal(t.canal)) ?? ''),
+      }));
+    }
+    if (sugerencia?.length) return sugerencia.map(t => fila({ canal: t.canal, kilos: aTexto(t.kilos), plata: aTexto(t.plata) }));
     return [fila({ nueva: true })];
   });
   // Lo cargado, por fila, para mostrar "antes: …" y qué canales se sacan (se compara texto: el front no calcula).
@@ -138,7 +145,9 @@ const TotalesDialog = ({ totales, sugerencia, objetivo, onCerrar }: {
       <DialogContent>
         {!totales && (
           <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-            {sugerencia?.length
+            {sugerencia?.some(t => t.plata)
+              ? 'Arranca con los canales, los kilos y los pesos que se repartieron el mes anterior. Ajustalos a este mes.'
+              : sugerencia?.length
               ? 'Arranca con los canales y los kilos que se repartieron el mes anterior, del archivo que cargaste. ' +
                 'Ajustalos a este mes y completá los pesos: ese archivo no los trae.'
               : 'Una fila por canal, con sus kilos y sus pesos, como en el Excel. Si primero cargás el mes anterior, ' +
@@ -292,7 +301,8 @@ const Entradas = ({ estado }: { estado: Estado }) => {
   );
 };
 
-const conSku = (p: Estado['problemas'][number]) => (p.sku ? `SKU ${p.sku} · ${p.mensaje}` : p.mensaje);
+const conSku = (p: Estado['problemas'][number]) =>
+  (p.sku ? `SKU ${p.sku}${p.descripcion ? ` (${p.descripcion})` : ''} · ${p.mensaje}` : p.mensaje);
 
 /** "Ir a R1", "Ir al SKU 900…": de un problema al lugar donde se mira. Solo lleva: por eso va sin borde y con flecha. */
 const Ir = ({ destinos }: { destinos: [Foco['tipo'], string][] }) => {
@@ -368,7 +378,8 @@ const Pendientes = ({ estado, unidad, enMatriz }: { estado: Estado; unidad: Unid
   const [repartiendo, setRepartiendo] = useState(false);
   const soloLectura = useSoloLectura();
   const repetido = (sku: string | null) => estado.repetidos.find(r => r.sku === sku);
-  const { enfocar } = useMovil();
+  const { enfocar, elegirUnidad, proponerPesos } = useMovil();
+  const [proponiendo, setProponiendo] = useState(false);
   const acciones = (p: Estado['problemas'][number]) => {
     const r = p.tipo === 'sku_repetido' ? repetido(p.sku) : undefined;
     const celda = p.bloque === 'apertura' && p.sku && p.canal && enMatriz.has(p.sku) ? `${p.sku} · ${p.canal}` : null;
@@ -390,11 +401,44 @@ const Pendientes = ({ estado, unidad, enMatriz }: { estado: Estado; unidad: Unid
   const inconsistencias = estado.inconsistencias[unidad];
   const errores = estado.problemas.filter(p => p.severidad === 'error');
   const avisos = estado.problemas.filter(p => p.severidad !== 'error');
+  // Lo de esta lista es de la unidad elegida en "Ver en": si la otra no cierra, se avisa acá para que no pase de largo.
+  const otra: Unidad = unidad === 'kilos' ? 'plata' : 'kilos';
+  const sinPesos = otra === 'plata' && !!estado.entradas.input2?.detalle.some(t => t.plata == null);
+  const cuantasOtra = estado.inconsistencias[otra].length;
+  // Kilos cerrados y pesos no: los pesos se pueden proponer según los kilos (lo pidieron: armarlos a mano "es un chino").
+  const proponer = estado.cierra.kilos && !estado.cierra.plata && !estado.faltan.length && !soloLectura;
+  const avisoPesos = proponer && (
+    <Alert severity="error" sx={enLinea} action={
+      <Box sx={ACCIONES_SX}>
+        <Resolver onClick={() => setProponiendo(true)}>Proponer pesos según los kilos</Resolver>
+        {unidad === 'kilos' && !sinPesos && <Resolver onClick={() => elegirUnidad('plata')}>Ver en pesos</Resolver>}
+      </Box>
+    }>
+      {sinPesos ? 'Pesos no cierra: faltan los pesos de algún canal.' : 'Pesos no cierra.'} La herramienta los puede
+      proponer: cada canal se lleva lo que facturan sus kilos, al precio de Contraloría de cada SKU.
+    </Alert>
+  );
+  const avisoOtra = proponer ? (unidad === 'kilos' && avisoPesos) : !estado.cierra[otra] && !estado.faltan.length && (
+    <Alert severity="error" sx={enLinea} action={!sinPesos && (
+      <Resolver onClick={() => elegirUnidad(otra)}>Ver en {UNIDADES[otra].nombre.toLowerCase()}</Resolver>
+    )}>
+      {UNIDADES[otra].nombre} no cierra{sinPesos ? ': faltan los pesos de algún canal en Totales por canal.'
+        : cuantasOtra ? `: ${cuantasOtra} ${cuantasOtra === 1 ? 'cosa' : 'cosas'} para resolver.` : '.'}
+    </Alert>
+  );
+  const dialogoPesos = proponiendo && (
+    <MotivoDialog titulo="Proponer pesos según los kilos"
+      descripcion="Los pesos de cada canal pasan a ser lo que facturan sus kilos al precio de Contraloría de cada SKU. Reemplaza los pesos cargados en Totales por canal; se puede deshacer."
+      confirmar="Proponer pesos" onConfirmar={proponerPesos} onCerrar={() => setProponiendo(false)} />
+  );
   if (!inconsistencias.length && !estado.problemas.length && !estado.avisos[unidad].length) {
-    return <Typography color={CIERRA}>Nada para revisar en {UNIDADES[unidad].nombre.toLowerCase()}.</Typography>;
+    return <>{avisoOtra || <Typography color={CIERRA}>Nada para revisar en {UNIDADES[unidad].nombre.toLowerCase()}.</Typography>}{dialogoPesos}</>;
   }
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+      {avisoOtra}
+      {unidad === 'plata' && avisoPesos}
+      {dialogoPesos}
       {inconsistencias.map((i, n) => (
         <Alert key={`i${n}`} severity="error" sx={enLinea}
           action={
@@ -621,13 +665,16 @@ export const MovilPage = () => {
   }
 
   const bloquean = estado.inconsistencias[unidad].length;
+  const otraUnidad: Unidad = unidad === 'kilos' ? 'plata' : 'kilos';
+  const otraNoCierra = !estado.cierra[otraUnidad] && !estado.faltan.length;
   const paraRevisar = estado.problemas.length + estado.avisos[unidad].length;
   // Se abre sola si algo bloquea o si hay un aviso que pide una decisión (no solo mirar).
   const decidir = !estado.aprobado && estado.es_ultimo
     && estado.problemas.some(p => p.tipo === 'sku_repetido' || p.tipo === 'sin_categoria');
-  const resumen = !bloquean && !paraRevisar ? <Dato>Nada</Dato> : (
+  const resumen = !bloquean && !paraRevisar && !otraNoCierra ? <Dato>Nada</Dato> : (
     <>
       {bloquean > 0 && <Typography variant="body2" sx={{ color: NO_CIERRA }}>{UNIDADES[unidad].nombre} no cierra</Typography>}
+      {otraNoCierra && <Typography variant="body2" sx={{ color: NO_CIERRA }}>{UNIDADES[otraUnidad].nombre} no cierra</Typography>}
       {paraRevisar > 0 && (
         <Chip size="small" color="warning" variant="outlined" label={`${paraRevisar} ${paraRevisar === 1 ? 'aviso' : 'avisos'}`} />
       )}
@@ -817,7 +864,7 @@ export const MovilPage = () => {
         </Seccion>
 
         {estado.faltan.length === 0 && (
-          <Seccion titulo="Para revisar" abierta={bloquean > 0 || decidir} ayuda={AYUDA.revisar} resumen={resumen}>
+          <Seccion titulo="Para revisar" abierta={bloquean > 0 || otraNoCierra || decidir} ayuda={AYUDA.revisar} resumen={resumen}>
             <Pendientes estado={estado} unidad={unidad} enMatriz={new Set(cruce?.skus.map(x => x.codigo))} />
           </Seccion>
         )}

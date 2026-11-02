@@ -112,3 +112,25 @@ def test_sin_entradas_no_hay_diferencia_que_repartir():
         assert False
     except ErrorDeAjuste:
         pass
+
+
+def test_los_pesos_se_proponen_segun_los_kilos_y_cierran():
+    """El cliente no podía armar pesos coherentes con los kilos: la herramienta los propone."""
+    s = _sesion()
+    s.cambiar_sku("90020900", activo=False, autor=P, cuando=CUANDO, motivo="nuevo")
+    texto = (MUESTRA / "input2_sin_sku_nuevo.tsv").read_text(encoding="utf-8").splitlines()
+    # Pesos parejos entre canales: suman lo de Contraloría pero no van con los kilos de cada canal.
+    pide = s._pide("plata")
+    parejo = (pide / (len(texto) - 1)).quantize(D("0.01"))
+    filas = [f"{l.split(chr(9))[0]}\t{l.split(chr(9))[1]}\t{a_texto(parejo)}" for l in texto[1:]]
+    s.cargar_input2("Canal\tKilos\tPlata\n" + "\n".join(filas), P, CUANDO)
+    assert s.recorrido.kilos.celdas is not None and s.recorrido.plata.celdas is None
+    s.proponer_pesos(P, CUANDO, "según los kilos")
+    assert s.recorrido.plata.celdas is not None  # cierra
+    assert sum(t.plata for t in s.entradas.canales.values()) == pide
+    assert s.historial[-1].accion == "proponer_pesos"
+
+
+def test_sin_kilos_cerrados_no_se_proponen_pesos():
+    s = _corta()  # los kilos no cierran
+    assert _falla(s.proponer_pesos, P, CUANDO, "x")

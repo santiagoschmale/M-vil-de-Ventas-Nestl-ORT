@@ -209,10 +209,10 @@ def cruzar(
                     f"faltan {a_texto(_a_decimal(falta, decimales))}.")
         if que == "SKU":
             # Caso A4 (SKU sin reparto previo): la regla está pendiente con el cliente.
-            cuanto = a_texto(_a_decimal(falta, decimales))
+            cuanto = cantidad(_a_decimal(falta, decimales), decimales)
             return (f"El SKU {nombre} tiene objetivo ({cuanto}) pero no se vendió el mes anterior: no hay de dónde "
-                    f"copiar el reparto. Podés apagarlo y, si lo contaste en los totales por canal, descontar esos "
-                    f"{cuanto}.")
+                    f"copiar el reparto. Elegí en qué canales se vende, o apagalo y descontá esos {cuanto} de los "
+                    f"totales por canal.")
         return (f"El canal {nombre} tiene total pero no vendió ningún SKU el mes anterior: no hay de dónde copiar "
                 f"el reparto. Conviene revisar su total.")
 
@@ -558,8 +558,9 @@ def _deficits(red: FlujoMaximo, r, c, soporte, decimales: int) -> list[Inconsist
         dif = _a_decimal(necesitan - pueden, decimales)
         inconsistencias.append(Inconsistencia(
             "canales_sin_volumen",
-            f"{', '.join(ks)} {'necesita' if len(ks) == 1 else 'necesitan'} {a_texto(_a_decimal(necesitan, decimales))}, "
-            f"pero los SKUs que se venden ahí suman {a_texto(_a_decimal(pueden, decimales))} en total: faltan {a_texto(dif)}.",
+            f"A {_lista(list(ks))} les piden {cantidad(_a_decimal(necesitan, decimales), decimales)}, pero los SKUs que "
+            f"se vendieron ahí el mes anterior suman {cantidad(_a_decimal(pueden, decimales), decimales)}: faltan "
+            f"{cantidad(dif, decimales)}. En Totales por canal, pasá esa diferencia a otros canales.",
             skus=skus,
             canales=tuple(ks),
             diferencia=dif,

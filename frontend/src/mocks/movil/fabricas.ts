@@ -44,7 +44,7 @@ export const estadoFactory = Factory.define<Estado>(() => ({
                 { canal: 'Directa (BA)', kilos: '500.000', plata: '40.00' }],
     },
     base: { archivo: 'reparto_agosto.xlsx', celdas: 3, aperturas: 1,
-      canales: [{ canal: 'Catering', kilos: '950.000' }, { canal: 'Directa (BA)', kilos: '480.000' }] },
+      canales: [{ canal: 'Catering', kilos: '950.000', plata: null }, { canal: 'Directa (BA)', kilos: '480.000', plata: null }] },
   },
   cierra: { kilos: true, plata: true },
   inconsistencias: vacio(),

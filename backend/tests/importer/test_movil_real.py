@@ -9,7 +9,7 @@ from io import BytesIO
 from openpyxl import Workbook
 
 from src.importer import movil_real
-from src.importer.entradas import leer_apertura, leer_base, leer_input1, libro
+from src.importer.entradas import leer_apertura, leer_base, leer_base_plata, leer_input1, libro
 
 KG3 = ["Kgs", "NNS", "NNS C/IIBB"]
 
@@ -108,3 +108,17 @@ def test_en_participaciones_solo_cuentan_los_bloques_de_venta_no_los_de_porcenta
     (tabla,) = movil_real.tablas(hojas["Participaciones"])
     assert tabla.titulos == ["Catering", "Vending"]
     assert tabla.filas["1001"]["Vending"][0] == D("30")
+
+
+def test_los_pesos_por_canal_del_mes_anterior_salen_del_reparto():
+    # En el archivo de prueba, el NNS de cada bloque es diez veces los kilos.
+    assert leer_base_plata(_movil()) == {"Catering": D("705"), "Call Center": D("250"), "Distribuidores": D("150")}
+
+
+def test_un_archivo_que_no_es_el_movil_no_trae_pesos_del_mes_anterior():
+    otro = Workbook()
+    otro.active.append(["SKU", "Catering"])
+    archivo = BytesIO()
+    otro.save(archivo)
+    archivo.seek(0)
+    assert leer_base_plata(archivo) is None

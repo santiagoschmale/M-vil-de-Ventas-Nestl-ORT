@@ -8,6 +8,7 @@ pasa por float en JavaScript. El front muestra, el backend calcula.
 
 from __future__ import annotations
 
+import re
 from collections import defaultdict
 from datetime import datetime
 from os import environ
@@ -146,8 +147,14 @@ def _suma(valores) -> Decimal:
     return sum(valores, Decimal(0))
 
 
-def _inconsistencia(i: Inconsistencia) -> dict:
-    return {"tipo": i.tipo, "mensaje": i.mensaje, "skus": list(i.skus), "canales": list(i.canales),
+def _con_descripcion(texto: str, descripciones: dict[str, str]) -> str:
+    """ "El SKU 12583668 tiene…" -> "El SKU 12583668 (Café en cápsulas) tiene…": el código solo no le dice nada al planner. """
+    return re.sub(r"\bSKU (\d+)\b", lambda m: f"SKU {m[1]} ({d})" if (d := descripciones.get(m[1])) else m[0], texto)
+
+
+def _inconsistencia(i: Inconsistencia, descripciones: dict[str, str]) -> dict:
+    return {"tipo": i.tipo, "mensaje": _con_descripcion(i.mensaje, descripciones), "skus": list(i.skus),
+            "canales": list(i.canales),
             "diferencia": None if i.diferencia is None else str(i.diferencia), "reglas": list(i.reglas)}
 
 
@@ -174,6 +181,7 @@ def _estado(s: Sesion) -> dict:
     e, r = s.entradas, s.recorrido
     input1 = input2 = base = None
     vigentes = s.objetivos_vigentes()
+    descripciones = {k: o.descripcion.strip() for k, o in (vigentes or {}).items() if o.descripcion and o.descripcion.strip()}
     if vigentes is not None:
         activos = [o for k, o in vigentes.items() if k not in s.apagados_skus]
         input1 = {"archivo": e.archivo1, "skus": len(e.objetivos),
@@ -191,7 +199,9 @@ def _estado(s: Sesion) -> dict:
         for (_, canal), kilos in e.base.items():
             por_canal[canal] += kilos
         base = {"archivo": e.archivo_base, "celdas": len(e.base), "aperturas": len(e.apertura),
-                "canales": [{"canal": c, "kilos": _texto(k, "kilos")} for c, k in por_canal.items()]}
+                "canales": [{"canal": c, "kilos": _texto(k, "kilos"),
+                             "plata": _texto(e.base_plata.get(c), "plata") if e.base_plata else None}
+                            for c, k in por_canal.items()]}
     cruces = {"kilos": r.kilos if r else None, "plata": r.plata if r else None}
     return {
         "mes": s.mes,
@@ -201,10 +211,11 @@ def _estado(s: Sesion) -> dict:
         "faltan": s.faltan(),
         "entradas": {"input1": input1, "input2": input2, "base": base},
         "cierra": {u: _cierra(c) for u, c in cruces.items()},
-        "inconsistencias": {u: [_inconsistencia(i) for i in (c.inconsistencias if c else [])]
+        "inconsistencias": {u: [_inconsistencia(i, descripciones) for i in (c.inconsistencias if c else [])]
                             for u, c in cruces.items()},
         "avisos": {u: list(c.avisos) if c else [] for u, c in cruces.items()},
-        "problemas": [{"severidad": p.severidad, "mensaje": p.mensaje, "sku": p.sku, "bloque": p.bloque, "tipo": p.tipo, "canal": p.canal}
+        "problemas": [{"severidad": p.severidad, "mensaje": p.mensaje, "sku": p.sku, "bloque": p.bloque, "tipo": p.tipo,
+                       "canal": p.canal, "descripcion": descripciones.get(p.sku) if p.sku else None}
                       for p in (r.problemas if r else e.problemas1 + e.problemas2 + e.problemas_base)],
         "apagados": {
             "skus": [{"codigo": k, **_ajuste(a)} for k, a in sorted(s.apagados_skus.items())],
@@ -554,6 +565,13 @@ def revisar_diferencia(unidad: str, cuerpo: ValoresIn, s: Sesion = Depends(sesio
 @router.put("/diferencia/{unidad}", summary="Aplicar los totales por canal revisados: solo si cierran con Contraloría")
 def repartir_diferencia(unidad: str, cuerpo: RepartoIn, s: Sesion = Depends(sesion), quien: str = Depends(autor)):
     _aplicar(s.repartir_diferencia, unidad, cuerpo.valores, autor=quien, cuando=_ahora(), motivo=cuerpo.motivo)
+    return _estado(s)
+
+
+@router.post("/totales/pesos", summary="Proponer los pesos por canal según los kilos repartidos, al precio de "
+                                       "Contraloría de cada SKU")
+def proponer_pesos(cuerpo: MotivoIn, s: Sesion = Depends(sesion), quien: str = Depends(autor)):
+    _aplicar(s.proponer_pesos, autor=quien, cuando=_ahora(), motivo=cuerpo.motivo)
     return _estado(s)
 
 
