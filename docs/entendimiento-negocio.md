@@ -381,6 +381,9 @@ inicial]
 - **Cierra exacto, sin margen.** [confirmado, 19/10] El reparto termina siendo el
   objetivo variable de cada vendedor, del que depende su premio: si no suma 100,
   alguien cobra de menos.
+- **Una diferencia chica con Contraloría no frena**: la herramienta la reparte sola
+  entre los canales, según el peso de cada uno, y avisa. Así sigue cerrando exacto.
+  [confirmado, 02/11] Topes: $ 10.000 y 1 kg (A19).
 - Errores que frenan y avisos que se pueden pasar por alto, como en un sistema de
   rendición de gastos: lo validaron en la demo. [confirmado, 19/10]
 - Cuando no cierra, preguntaron si la herramienta sugiere dónde poner la diferencia.

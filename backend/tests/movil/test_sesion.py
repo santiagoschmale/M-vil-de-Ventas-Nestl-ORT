@@ -7,6 +7,7 @@ from datetime import datetime
 from decimal import Decimal as D
 from pathlib import Path
 
+from src.domain.formato import a_texto
 from src.movil.sesion import ErrorDeAjuste, Sesion
 
 MUESTRA = Path(__file__).parents[3] / "data" / "sample"
@@ -208,3 +209,28 @@ def test_donde_se_vende_rechaza_lo_que_no_es_valido():
     assert _falla(s.elegir_canales, "no-existe", ["Catering"], autor=P, cuando=CUANDO, motivo="x")
     assert _falla(s.elegir_canales, NUEVO, ["Catering"], autor=P, cuando=CUANDO, motivo=" ")
     assert _falla(s.quitar_canales, NUEVO, autor=P, cuando=CUANDO, motivo="x")  # no tenía
+
+
+def test_una_diferencia_chica_se_reparte_sola_y_avisa():
+    """Lo pidió el cliente: unos centavos (o gramos) de diferencia con Contraloría no frenan."""
+    texto = (MUESTRA / "input2_sin_sku_nuevo.tsv").read_text(encoding="utf-8").splitlines()
+    canal, kilos, plata = texto[1].split("\t")
+    a_dec = lambda t: D(t.replace(".", "").replace(",", "."))
+    # 0,5 kg y $ 3,50 de más en el primer canal: dentro de los topes.
+    texto[1] = "\t".join([canal, a_texto(a_dec(kilos) + D("0.5")), a_texto(a_dec(plata) + D("3.50"))])
+    s = _sesion()
+    s.cargar_input2("\n".join(texto), P, CUANDO)
+    s.cambiar_sku(NUEVO, activo=False, autor=P, cuando=CUANDO, motivo="nuevo")
+    r = s.recorrido
+    assert r.kilos.inconsistencias == [] and r.plata.inconsistencias == []
+    avisos = [p.mensaje for p in r.problemas if p.severidad == "aviso" and p.bloque == "input2"]
+    assert any("sobraban 0,500 kg" in a for a in avisos) and any("sobraban $ 3,50" in a for a in avisos)
+    # Los totales cargados no se tocan: lo ajustado es lo que usa el reparto.
+    assert s.entradas.canales[canal].kilos == a_dec(kilos) + D("0.5")
+    assert sum(v for (_, c), v in r.kilos.celdas.items() if c == canal) < s.entradas.canales[canal].kilos
+
+
+def test_una_diferencia_grande_sigue_frenando():
+    s = _sesion()
+    s.cambiar_sku(NUEVO, activo=False, autor=P, cuando=CUANDO, motivo="nuevo")
+    assert [i.tipo for i in s.recorrido.kilos.inconsistencias] == ["totales_distintos"]  # 10 kg: más que el tope

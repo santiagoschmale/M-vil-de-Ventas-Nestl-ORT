@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import argparse
 import sys
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from decimal import Decimal
 from pathlib import Path
 
@@ -29,6 +29,8 @@ from openpyxl.styles import Font
 from src.domain.apertura import Nodo, recalcular
 from src.domain.problema import Problema
 from src.domain.cruce import Celda, Grupo, ResultadoCruce, cruzar
+from src.domain.formato import cantidad
+from src.domain.reparto import repartir
 from src.importer.entradas import (
     KILOS,
     PLATA,
@@ -68,6 +70,28 @@ class Recorrido:
     # Debajo del canal: {(sku, canal): raíz con el valor del cruce y sus entidades}.
     aperturas: dict[Celda, Nodo] = field(default_factory=dict)
     entidades_apagadas: frozenset[str] = frozenset()
+
+
+# Una diferencia chica con Contraloría no frena: la herramienta la reparte entre los canales, según el
+# peso de cada uno, y avisa. Así el móvil sigue cerrando exacto. Lo pidió el cliente (02/11).
+# Topes: en pesos, los $ 10.000 que sugirió el cliente; en kilos, 1 kg, que cubre el redondeo de sus archivos
+# (36 g en septiembre) sin tapar un SKU entero que faltó descontar.
+# ponytail: topes fijos, el cliente aceptó la idea sin confirmar el número; si lo quieren ajustar, va a formato.json.
+TOPE_DIFERENCIA = {KILOS: Decimal("1"), PLATA: Decimal("10000")}
+
+
+def _absorber_diferencia(pide: Decimal, totales: dict[str, Decimal], decimales: int,
+                         problemas: list[Problema]) -> dict[str, Decimal]:
+    suman = sum(totales.values(), Decimal(0))
+    dif = pide - suman
+    if dif == 0 or abs(dif) > TOPE_DIFERENCIA[decimales] or suman <= 0 or any(v < 0 for v in totales.values()):
+        return totales
+    parte = repartir(abs(dif), totales, decimales)
+    que = "faltaban" if dif > 0 else "sobraban"
+    problemas.append(Problema("aviso", f"A los totales por canal les {que} {cantidad(abs(dif), decimales)} respecto de lo "
+                                       f"que pide Contraloría: se repartieron entre los canales, según el peso de cada "
+                                       f"uno, para que cierre.", bloque="input2"))
+    return {c: v + (parte[c] if dif > 0 else -parte[c]) for c, v in totales.items()}
 
 
 def armar(
@@ -118,6 +142,14 @@ def armar(
     for c in sorted({c for _, c in base} - set(canales)):
         problemas.append(Problema("aviso", f"El canal {c} está en la base del mes anterior pero no en los totales por canal: "
                                            f"no se reparte.", bloque="base"))
+
+    kilos_canal = _absorber_diferencia(sum((o.kilos for o in activos.values()), Decimal(0)),
+                                       {c: t.kilos for c, t in canales.items()}, KILOS, problemas)
+    canales = {c: replace(t, kilos=kilos_canal[c]) for c, t in canales.items()}
+    if all(o.nns is not None for o in activos.values()) and all(t.plata is not None for t in canales.values()):
+        plata_canal = _absorber_diferencia(sum((o.nns for o in activos.values() if o.nns > 0), Decimal(0)),
+                                           {c: t.plata for c, t in canales.items()}, PLATA, problemas)
+        canales = {c: replace(t, plata=plata_canal[c]) for c, t in canales.items()}
 
     grupos_kilos, grupos_plata = _grupos(reglas, activos, por_nombre, problemas)
     kilos = cruzar(

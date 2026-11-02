@@ -47,6 +47,7 @@ código: no se renumeran.
 | B9 | **NNS c/IIBB en la salida.** El equipo de ventas recibe la plata con y sin Ingresos Brutos. El objetivo del móvil real lo trae por SKU; el template propuesto (B6) no. ¿Lo suman al template? | No se genera |
 | B6 | **Formato de entrada**: proponen un template estándar `SKU \| Descripción \| kg \| NNS / KG \| NNS` para el objetivo del mes. Lo están validando con Finanzas. | El objetivo se lee por nombre de columna: ese template se lee sin cambios |
 | A4 | SKU nuevo sin historia: ¿el planner dice en qué canales va y se reparte en proporción al total de cada uno? | Supuesto: así ("Dónde se vende") |
+| A19 | **Tope de la diferencia que se reparte sola.** Aceptaron que una diferencia chica con Contraloría se reparta sola entre los canales (02/11), sin dar el número. ¿Hasta cuánto? | $ 10.000 en pesos y 1 kg en kilos |
 | A12 | Editar el mes anterior: ¿qué se edita, cuánto vendió un SKU en un canal o dónde se vende? | No se edita |
 | A18 | **Base del reparto.** El móvil de septiembre reparte con el peso de la venta de enero a diciembre de 2025 (hoja Participaciones). En la demo (19/10): mes anterior por ahora, mismo mes del año anterior a futuro, por estacionalidad. ¿Cuál usan: el año, el mes anterior o el mismo mes del año anterior? | Mes anterior |
 
