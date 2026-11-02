@@ -182,11 +182,14 @@ def cruzar(
         c[k] -= v
     total_filas -= sum(fijadas.values())
     inconsistencias += [
-        Inconsistencia("fijado_excede", f"Lo fijado en el SKU {s} supera su objetivo en {a_texto(_a_decimal(-v, decimales))}.",
+        Inconsistencia("fijado_excede", f"Lo fijado a mano en el SKU {s} supera su objetivo en "
+                                        f"{cantidad(_a_decimal(-v, decimales), decimales)}: bajá alguno de esos valores.",
                        skus=(s,), diferencia=_a_decimal(-v, decimales))
         for s, v in sorted(r.items()) if v < 0
     ] + [
-        Inconsistencia("fijado_excede", f"Lo fijado en el canal {k} supera su total en {a_texto(_a_decimal(-v, decimales))}.",
+        Inconsistencia("fijado_excede", f"Lo fijado a mano en {k} supera el total del canal en "
+                                        f"{cantidad(_a_decimal(-v, decimales), decimales)}: bajá alguno de esos valores "
+                                        f"o subí el total en Totales por canal.",
                        canales=(k,), diferencia=_a_decimal(-v, decimales))
         for k, v in sorted(c.items()) if v < 0
     ]
@@ -205,8 +208,9 @@ def cruzar(
 
     def sin_celdas_libres(que: str, nombre: str, falta: int, fijado: bool) -> str:
         if fijado:
-            return (f"Lo fijado en el {que} {nombre} no alcanza su total y no le quedan celdas libres: "
-                    f"faltan {a_texto(_a_decimal(falta, decimales))}.")
+            return (f"Lo fijado a mano en el {que} {nombre} no llega a su total y no le quedan celdas sin fijar: "
+                    f"faltan {cantidad(_a_decimal(falta, decimales), decimales)}. Subí alguno de esos valores o "
+                    f"soltá uno para que se recalcule.")
         if que == "SKU":
             # Caso A4 (SKU sin reparto previo): la regla está pendiente con el cliente.
             cuanto = cantidad(_a_decimal(falta, decimales), decimales)
@@ -214,7 +218,7 @@ def cruzar(
                     f"copiar el reparto. Elegí en qué canales se vende, o apagalo y descontá esos {cuanto} de los "
                     f"totales por canal.")
         return (f"El canal {nombre} tiene total pero no vendió ningún SKU el mes anterior: no hay de dónde copiar "
-                f"el reparto. Conviene revisar su total.")
+                f"el reparto. Pasá su total a otros canales en Totales por canal.")
 
     inconsistencias += [
         Inconsistencia("sku_sin_canal", sin_celdas_libres("SKU", s, r[s], s in filas_fijadas), skus=(s,),

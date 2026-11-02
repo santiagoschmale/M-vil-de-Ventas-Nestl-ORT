@@ -172,7 +172,7 @@ describe('MovilPage', { timeout: 15000 }, () => {
     const user = userEvent.setup({ delay: null });
     render(<MovilPage />);
     await user.click(await screen.findByRole('button', { name: /^Para revisar/ }));
-    expect(screen.getByText(/Producto de otro país/)).toBeVisible();
+    expect(screen.getByText('Producto de otro país.')).toBeVisible();
     expect(screen.queryByRole('button', { name: 'Ir al SKU 999' })).not.toBeInTheDocument();
   });
 
@@ -366,8 +366,9 @@ describe('MovilPage', { timeout: 15000 }, () => {
       problemas: [{ severidad: 'error', mensaje: 'Rosario no se puede abrir.', sku: '100', bloque: 'apertura', canal: 'Catering' }],
     }))));
     render(<MovilPage />);
-    expect((await screen.findByText('No cierra por esto.')).closest('.MuiAlert-standardError')).not.toBeNull();
-    expect(screen.getByText(/Rosario no se puede abrir/).closest('.MuiAlert-standardWarning')).not.toBeNull();
+    // Frena: tarjeta de alerta (borde rojo). Lo del archivo es aviso: no se anuncia como alerta.
+    expect((await screen.findByText('No cierra por esto.')).closest('[role="alert"]')).not.toBeNull();
+    expect(screen.getByText(/Rosario no se puede abrir/).closest('[role="alert"]')).toBeNull();
   });
 
   it('exportar con cosas para revisar pide confirmar y las muestra', async () => {
@@ -630,7 +631,7 @@ describe('MovilPage', { timeout: 15000 }, () => {
     }))));
     const user = userEvent.setup({ delay: null });
     render(<MovilPage />);
-    expect(await screen.findByText(/Pesos no cierra\. La herramienta los puede proponer/)).toBeInTheDocument();
+    expect(await screen.findByText(/La herramienta los puede proponer/)).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Ver en pesos' }));
     expect(await screen.findByText(mensaje)).toBeInTheDocument();
   });
