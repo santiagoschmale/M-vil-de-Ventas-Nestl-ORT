@@ -314,7 +314,7 @@ const Ir = ({ destinos }: { destinos: [Foco['tipo'], string][] }) => {
     <>
       {destinos.map(([tipo, id]) => (
         <Button key={`${tipo}-${id}`} size="small" color="inherit" onClick={() => enfocar(tipo, id)}
-          endIcon={<ArrowForwardRoundedIcon fontSize="small" />} sx={{ whiteSpace: 'nowrap' }}>
+          endIcon={<ArrowForwardRoundedIcon fontSize="small" />} sx={{ whiteSpace: 'nowrap', fontWeight: 400, color: 'text.secondary' }}>
           {tipo === 'sku' ? `Ir al SKU ${id}` : `Ir a ${id}`}
         </Button>
       ))}
@@ -322,28 +322,18 @@ const Ir = ({ destinos }: { destinos: [Foco['tipo'], string][] }) => {
   );
 };
 
-// Los botones de las alertas: misma altura, borde y peso. El principal va lleno; el resto, con borde oscuro.
-const BOTON_ALERTA = {
-  whiteSpace: 'nowrap', height: 30, px: 1.5, borderRadius: '6px', fontWeight: 600, fontSize: '0.8125rem',
-  textTransform: 'none', boxShadow: 'none', transition: 'background-color 120ms ease-out, border-color 120ms ease-out',
-} as const;
-
-/** Lo que resuelve el aviso: con borde, para que se distinga de "Ir a…" y del texto del aviso. */
+/** Lo que resuelve el aviso: con borde (el tema le da la tinta), para que se distinga de "Ir a…" y del texto. */
 const Resolver = (props: React.ComponentProps<typeof Button>) => (
-  <Button size="small" variant="outlined" {...props} sx={{
-    ...BOTON_ALERTA, color: 'text.primary', borderColor: 'text.primary', bgcolor: 'background.paper',
-    '&:hover': { borderColor: 'text.primary', bgcolor: 'action.hover' },
-  }} />
+  <Button size="small" variant="outlined" color="primary" {...props} sx={{ whiteSpace: 'nowrap', bgcolor: 'background.paper' }} />
 );
 
 /** La acción principal de una alerta que frena: llena, para que se vea qué hacer primero. */
 const Principal = (props: React.ComponentProps<typeof Button>) => (
-  <Button size="small" variant="contained" disableElevation {...props}
-    sx={{ ...BOTON_ALERTA, bgcolor: 'text.primary', color: 'background.paper', '&:hover': { bgcolor: 'text.secondary', boxShadow: 'none' } }} />
+  <Button size="small" variant="contained" {...props} sx={{ whiteSpace: 'nowrap' }} />
 );
 
 const ACCIONES_SX = { display: 'flex', alignItems: 'center', flexWrap: 'nowrap', gap: 0.5 } as const;
-const AMBAR = '#B7791F';
+const AMBAR = '#D69E2E';
 
 // El título corto de cada alerta: qué pasa, en dos o tres palabras. El detalle (qué hacer) va abajo.
 const TITULO_INCONSISTENCIA: Record<string, string> = {

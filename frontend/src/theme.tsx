@@ -2,14 +2,36 @@ import { createTheme } from '@mui/material/styles';
 import { red, grey } from '@mui/material/colors';
 
 // A custom theme for this app
+// Una sola tinta para la acción principal, una sola esquina y un solo peso: lo de MUI y lo propio de la
+// pantalla salen de acá, así no conviven dos estilos.
+const TINTA = '#22272E';
+const ESQUINA = 6;
+
 const theme = createTheme({
   typography: {
-    fontFamily: 'Nestle'
+    fontFamily: 'Nestle',
+    button: { fontWeight: 700 },
   },
+  shape: { borderRadius: ESQUINA },
   components: {
     // Botones en minúscula normal: en mayúsculas los textos se leen peor y se cortan antes.
-    MuiButton: { styleOverrides: { root: { textTransform: 'none' } } },
+    MuiButton: {
+      defaultProps: { disableElevation: true },
+      styleOverrides: {
+        root: {
+          textTransform: 'none',
+          // Solo lo que cambia, y apretar se siente: escala apenas al presionar.
+          transition: 'background-color 120ms ease-out, border-color 120ms ease-out, color 120ms ease-out, transform 120ms ease-out',
+          '&:active': { transform: 'scale(0.97)' },
+          '@media (prefers-reduced-motion: reduce)': { '&:active': { transform: 'none' } },
+        },
+        sizeSmall: { minHeight: 30, paddingLeft: 12, paddingRight: 12 },
+        outlined: { borderColor: 'currentColor' },
+      },
+    },
     MuiToggleButton: { styleOverrides: { root: { textTransform: 'none' } } },
+    MuiChip: { styleOverrides: { root: { borderRadius: ESQUINA, fontWeight: 700 } } },
+    MuiAccordion: { styleOverrides: { root: { borderRadius: ESQUINA, '&:first-of-type, &:last-of-type': { borderRadius: ESQUINA } } } },
     MuiCssBaseline: {
       styleOverrides: `
         body {
@@ -56,7 +78,7 @@ const theme = createTheme({
   },
   palette: {
     primary: {
-      main: '#556cd6',
+      main: TINTA,
     },
     secondary: {
       main: grey[300],
