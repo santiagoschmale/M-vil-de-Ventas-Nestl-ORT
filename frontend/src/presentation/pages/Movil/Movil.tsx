@@ -30,6 +30,7 @@ import { CanalesDialog } from './CanalesDialog';
 import { CategoriasDialog } from './CategoriasDialog';
 import { MotivoDialog } from './MotivoDialog';
 import { DiferenciaDialog } from './DiferenciaDialog';
+import { Historial } from './Historial';
 
 const ACCIONES: Record<string, string> = {
   agregar_regla: 'Agregó una regla', editar_regla: 'Editó una regla', eliminar_regla: 'Eliminó una regla',
@@ -942,18 +943,7 @@ export const MovilPage = () => {
         <Seccion titulo="Historial" ayuda={AYUDA.historial} resumen={<Dato>{estado.historial.length} {estado.historial.length === 1 ? 'cambio' : 'cambios'}</Dato>}>
           {estado.historial.length === 0
             ? <Dato>Todavía no hay cambios. Cada carga y cada ajuste aparece acá con quién, cuándo y por qué.</Dato>
-            : (
-              <List dense sx={{ background: AVENA, borderRadius: 1 }}>
-                {[...estado.historial].reverse().map((a, n) => (
-                  <ListItem key={n}>
-                    <ListItemText
-                      primary={`${ACCIONES[a.accion] ?? a.accion}: ${a.detalle}${a.motivo ? ` — «${a.motivo}»` : ''}`}
-                      secondary={`${a.autor} · ${new Date(a.cuando).toLocaleString('es-AR')}`}
-                    />
-                  </ListItem>
-                ))}
-              </List>
-            )}
+            : <Historial historial={estado.historial} acciones={ACCIONES} />}
         </Seccion>
     </Box>
   );

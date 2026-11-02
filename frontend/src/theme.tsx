@@ -4,7 +4,8 @@ import { red, grey } from '@mui/material/colors';
 // A custom theme for this app
 // Una sola tinta para la acción principal, una sola esquina y un solo peso: lo de MUI y lo propio de la
 // pantalla salen de acá, así no conviven dos estilos.
-const TINTA = '#22272E';
+// El azul de lo fijado a mano (estilo.ts): una sola tinta, amable en switches y checkboxes.
+const TINTA = '#1F4E9A';
 const ESQUINA = 6;
 
 const theme = createTheme({
