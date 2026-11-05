@@ -51,7 +51,7 @@ make deps
 python3 app.py
 ```
 
-Starts the Uvicorn server on port 3000. When running locally (`IS_LOCAL=true`, the default), Key Vault initialization is skipped.
+Starts the Uvicorn server on port 3000. With `IS_LOCAL=true` (local development only), Key Vault initialization is skipped. Without it, the app behaves as in a container: Key Vault first, and it does not start unless Entra ID is configured (or `PERMITIR_SIN_LOGIN=true`, on purpose).
 
 ### Testing
 
@@ -79,7 +79,9 @@ black --check .
 
 | Variable | Default | Description |
 |---|---|---|
-| `IS_LOCAL` | `true` | Set to `false` in production to enable Key Vault config loading |
+| `IS_LOCAL` | `false` | Set to `true` for local development: auto-reload, no Key Vault, no login |
+| `ENTRA_TENANT_ID`, `ENTRA_CLIENT_ID` | | Microsoft Entra ID login. Outside local, the app does not start without them |
+| `PERMITIR_SIN_LOGIN` | `false` | `true`, on purpose, for a test environment without Entra ID: no login, everyone is Admin, logged as a warning |
 
 ## Docker
 
