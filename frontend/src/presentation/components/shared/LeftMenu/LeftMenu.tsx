@@ -66,7 +66,7 @@ const LeftMenu = () => {
           <IconMenu
             id="profile-menu"
             links={conEntra() ? [] : [{ name: 'Logout', location: '/signout' }]}
-            // Solo en la instalación local: para practicar la demo desde un mes vacío.
+            // Empezar de cero: en local o en un entorno de prueba que lo permite (PERMITIR_REINICIAR).
             acciones={[
               ...(conEntra() ? [{ name: 'Cerrar sesión', onClick: () => cerrarSesion() }] : []),
               ...(puedeReiniciar() ? [{ name: 'Empezar de cero', onClick: () => setReiniciando(true) }] : []),

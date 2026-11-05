@@ -19,6 +19,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
+from src.routes.cuenta import puede_reiniciar
 from src.domain.cruce import Inconsistencia, ResultadoCruce
 from src.movil.recorrido import exportar, por_que_no_abre
 from src.movil.sesion import UNIDADES as DECIMALES, Ajuste, ErrorDeAjuste, Sesion
@@ -589,7 +590,6 @@ def sugerir_pesos(cuerpo: ValoresIn, s: Sesion = Depends(sesion)):
 @router.post("/reiniciar", summary="Empezar de cero: borra todos los meses (en local o en un entorno de prueba con "
                                    "PERMITIR_REINICIAR=true)")
 def reiniciar(request: Request):
-    from src.routes.cuenta import puede_reiniciar
     if not puede_reiniciar():
         raise HTTPException(403, "Empezar de cero solo se puede en un entorno de prueba.")
     request.app.state.repositorio.reiniciar()
