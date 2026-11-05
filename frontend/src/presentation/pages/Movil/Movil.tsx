@@ -152,7 +152,6 @@ const TotalesDialog = ({ totales, sugerencia, objetivo, aviso, onCerrar }: {
   };
   // Los pesos salen de los kilos: se sugieren cuando los kilos ya cierran, a pedido del planner.
   const kilosListos = !objetivo || !!revision?.kilos.cierra || !!revision?.kilos.se_reparte_solo;
-  const pesosListos = !objetivo || !!revision?.plata?.cierra || !!revision?.plata?.se_reparte_solo;
   const conPesos = /[1-9]/.test(objetivo?.nns ?? '');  // un monto no pasa por número de JavaScript
   const [sugiriendo, setSugiriendo] = useState(false);
   // Completar llena solo los vacíos; recalcular reemplaza todos los pesos por los sugeridos.
@@ -215,7 +214,7 @@ const TotalesDialog = ({ totales, sugerencia, objetivo, aviso, onCerrar }: {
             <EstadoTotal r={revision.kilos} unidad="kilos" acciones={
               <ConAyuda ayuda="En proporción a los kilos de cada canal">
                 <Principal onClick={() => ajustar('kilos', revision.kilos)}>
-                  {revision.kilos.falta?.startsWith('-') ? 'Sacar lo que sobra' : 'Sumar lo que falta'}
+                  {revision.kilos.falta?.startsWith('-') ? 'Repartir lo que sobra' : 'Repartir lo que falta'}
                 </Principal>
               </ConAyuda>} />
           )}
@@ -240,9 +239,9 @@ const TotalesDialog = ({ totales, sugerencia, objetivo, aviso, onCerrar }: {
         <Table size="small">
           <TableHead>
             <TableRow>
-              <TableCell>Canal</TableCell>
-              <TableCell sx={numeros}>Kilos (kg)</TableCell>
-              <TableCell sx={numeros}>{UNIDADES.plata.nombre} ($)</TableCell>
+              <TableCell sx={{ fontWeight: 700 }}>Canal</TableCell>
+              <TableCell sx={{ ...numeros, fontWeight: 700 }}>Kilos (kg)</TableCell>
+              <TableCell sx={{ ...numeros, fontWeight: 700 }}>{UNIDADES.plata.nombre} ($)</TableCell>
               <TableCell />
             </TableRow>
           </TableHead>
@@ -299,11 +298,6 @@ const TotalesDialog = ({ totales, sugerencia, objetivo, aviso, onCerrar }: {
         {error && <Box sx={{ mt: 2 }}><Alerta tono="frena">{error}</Alerta></Box>}
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2, gap: 1, flexWrap: 'wrap' }}>
-        {revision && !(kilosListos && pesosListos && sinPesos === 0) && (
-          <Typography variant="body2" color="text.secondary" sx={{ mr: 'auto' }}>
-            Si guardás así, queda pendiente en Para revisar.
-          </Typography>
-        )}
         <Button onClick={onCerrar}>Cancelar</Button>
         <Button type="submit" variant="contained" disabled={ocupado || !puedeGuardar}>Guardar</Button>
       </DialogActions>

@@ -18,7 +18,7 @@ export const AYUDA = {
           <b>Totales por canal</b>: cuánto tiene que vender cada canal, en kilos y en pesos. Lo define el planner. Se
           sube en Excel o se arma en la pantalla («Armar en pantalla»): si ya cargaste el mes anterior, arranca con sus
           canales y sus kilos, y con sus pesos si el archivo los trae. Mientras escribís ves cuánto falta o sobra en
-          kilos, y «Sacar lo que sobra» o «Sumar lo que falta» lo reparte entre los canales en proporción a los kilos de cada uno. Si faltan pesos, «Completar con los
+          kilos, y «Repartir lo que sobra» o «Repartir lo que falta» lo reparte entre los canales en proporción a los kilos de cada uno. Si faltan pesos, «Completar con los
           sugeridos» los calcula con los kilos y el precio de cada SKU en cada canal.
         </P>
         <P>

@@ -283,7 +283,7 @@ describe('MovilPage', { timeout: 15000 }, () => {
     const dialogo = screen.getByRole('dialog', { name: 'Armar totales por canal' });
     expect(await within(dialogo).findByText(/Kilos: faltan 200,000 kg/)).toBeInTheDocument();
     expect(within(dialogo).getByRole('button', { name: 'Completar con los sugeridos' })).toBeDisabled();  // los pesos salen de los kilos
-    await user.click(within(dialogo).getByRole('button', { name: 'Sumar lo que falta' }));
+    await user.click(within(dialogo).getByRole('button', { name: 'Repartir lo que falta' }));
     expect(within(dialogo).getByLabelText('Kilos de Córdoba')).toHaveValue('450,000');
     expect(await within(dialogo).findByText(/Kilos: cierran con Contraloría/)).toBeInTheDocument();
     expect(within(dialogo).getByRole('button', { name: 'Completar con los sugeridos' })).toBeEnabled();
@@ -751,12 +751,11 @@ describe('MovilPage', { timeout: 15000 }, () => {
     await user.click(await screen.findByRole('button', { name: /^Entradas/ }));
     await user.click(screen.getByRole('button', { name: 'Editar totales por canal' }));
     const dialogo = screen.getByRole('dialog', { name: 'Editar totales por canal' });
-    expect(await within(dialogo).findByRole('button', { name: 'Sacar lo que sobra' })).toBeInTheDocument();
+    expect(await within(dialogo).findByRole('button', { name: 'Repartir lo que sobra' })).toBeInTheDocument();
     expect(within(dialogo).getByText('En proporción a los kilos de cada canal')).toBeInTheDocument();
     expect(within(dialogo).getByRole('button', { name: 'Recalcular según los kilos' })).toBeDisabled();
     expect(within(dialogo).getByText('Primero cerrá los kilos')).toBeInTheDocument();
     expect(within(dialogo).queryByRole('button', { name: 'Ajustar a Contraloría' })).not.toBeInTheDocument();  // en pesos, solo recalcular
-    expect(within(dialogo).getByText('Si guardás así, queda pendiente en Para revisar.')).toBeInTheDocument();
   });
 
   it('al armar los totales, si el mes anterior trae pesos, también arranca con ellos', async () => {

@@ -74,7 +74,7 @@ de la siguiente. Eso define lo que sigue (§3, "Lo que sigue").
 | Leer el móvil real | 🟡 | Se lee el `.xlsb` del planner: el objetivo de Móvil Mes y el mes anterior de las hojas de reparto (`importer/movil_real.py`). Soluciones entra como Call Center y Distribuidores mientras A17 siga abierta; un cero en el reparto no aplica. Del mismo archivo salen los kilos y pesos por canal con que arrancan los totales, el precio de cada SKU en cada canal (mes anterior y Participaciones) y las categorías que el objetivo trae vacías |
 | Tests en CI | ✅ | Backend y front |
 | Deshacer el último cambio | ✅ | Una vez. Con login: solo el propio |
-| Totales por canal sin Excel | ✅ | Se arman en la pantalla con los canales, kilos y pesos del mes anterior. Arriba se ve en vivo cuánto falta o sobra en kilos y en pesos contra Contraloría. Los kilos se corrigen con "Sacar lo que sobra" o "Sumar lo que falta" (en proporción a los kilos de cada canal); con los kilos cerrados, los pesos se completan o recalculan al precio de cada SKU en cada canal |
+| Totales por canal sin Excel | ✅ | Se arman en la pantalla con los canales, kilos y pesos del mes anterior. Arriba se ve en vivo cuánto falta o sobra en kilos y en pesos contra Contraloría. Los kilos se corrigen con "Repartir lo que sobra" o "Repartir lo que falta" (en proporción a los kilos de cada canal); con los kilos cerrados, los pesos se completan o recalculan al precio de cada SKU en cada canal |
 | Revisión de seguridad | ✅ | Dependencias sin vulnerabilidades altas (npm y pip). Excel exportado sin fórmulas, tope a lo que un Excel ocupa descomprimido, rol Admin para empezar de cero, solo tokens de acceso, cabeceras de seguridad en nginx. Quedan vulnerabilidades moderadas en react-router-dom 6 (no aplican: sin SSR ni rutas que escriba el usuario) y en vitest 3 (desarrollo); se cierran subiendo a react-router 7 y vitest 4 |
 
 ### SHOULD
@@ -86,7 +86,7 @@ de la siguiente. Eso define lo que sigue (§3, "Lo que sigue").
 | Profundidad de apertura configurable por canal desde la herramienta | ✅ En Reglas, "Cómo se abre cada canal" |
 | Simulación de escenarios | ⬜ |
 | Cuadratura automática de totales | ✅ |
-| Sugerir dónde poner la diferencia cuando los totales no coinciden | ✅ En Totales por canal, en vivo: cuánto falta o sobra en kilos y en pesos, con "Sacar lo que sobra" o "Sumar lo que falta" para los kilos (en proporción a los kilos de cada canal) y "Recalcular según los kilos" para los pesos. Las tarjetas rojas de Para revisar abren ese diálogo; corregir totales cargados pide motivo |
+| Sugerir dónde poner la diferencia cuando los totales no coinciden | ✅ En Totales por canal, en vivo: cuánto falta o sobra en kilos y en pesos, con "Repartir lo que sobra" o "Repartir lo que falta" para los kilos (en proporción a los kilos de cada canal) y "Recalcular según los kilos" para los pesos. Las tarjetas rojas de Para revisar abren ese diálogo; corregir totales cargados pide motivo |
 
 ### COULD
 
