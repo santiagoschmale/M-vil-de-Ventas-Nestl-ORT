@@ -182,10 +182,9 @@ celda. El cruce no cambia al apagar un distribuidor.
     vendió el mes anterior, sus pesos). Kilos y pesos siguen cada uno su historia.
   - "Proponer pesos": el objetivo en pesos de cada SKU se reparte entre sus canales
     según kilos × precio, así cada SKU y cada segmento suman exacto.
-  - los pesos sugeridos al armar los totales: los kilos de cada canal por el precio
-    promedio que tuvo ese canal el mes anterior (sin historia, el promedio de
-    Contraloría), llevados al total de Contraloría. Suman exacto el total, no cada
-    segmento: si un segmento no cierra, "Proponer pesos" lo corrige.
+  - los pesos sugeridos al armar los totales: lo mismo, con el objetivo de cada SKU
+    repartido como el mes anterior y ajustado a los kilos que escribe el planner en cada
+    canal. Un canal sin mes anterior va al precio promedio de Contraloría.
 
   El mes siguiente hereda lo que valió cada kilo en el aprobado.
   `importer/movil_real.py::precios`, `Sesion._precios`, `Sesion._por_canal`.
