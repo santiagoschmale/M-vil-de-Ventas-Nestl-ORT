@@ -1,7 +1,7 @@
 """
 Prepara Postgres para una demo: borra todo, deja dos años de móviles aprobados con la
 muestra (nov 2024 a oct 2026) y el mes siguiente con el objetivo y el mes anterior,
-sin los totales por canal, para armarlos en vivo.
+sin los totales por canal, para armarlos en vivo, y el SKU nuevo apagado.
 
     make demo      (después: make dev-db)
 
@@ -68,6 +68,8 @@ def main() -> None:
     # El de la demo: objetivo y mes anterior, sin totales por canal.
     mes = ok(c.post("/api/movil/meses/siguiente"))["mes"]
     ok(c.post(f"/api/movil/muestra?totales=false&mes={mes}"))
+    # El SKU nuevo ya se mostró en otra demo: apagado, no aparece en Para revisar.
+    ok(c.put(f"/api/movil/skus/90020900?mes={mes}", json={"activo": False, "motivo": "Entra el mes que viene"}))
     print(mes, "listo para la demo")
 
 
