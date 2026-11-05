@@ -89,7 +89,7 @@ export const AYUDA = {
           y quedan en la hoja Problemas del Excel.
         </P>
         <P>
-          Los botones lo resuelven ahí mismo (repartir la diferencia, elegir canales, elegir la fila, ver la celda).
+          Los botones lo resuelven ahí mismo (corregir los totales, elegir canales, elegir la fila, ver la celda).
           «Ir a…» solo te lleva a donde mirarlo: la regla o la fila del SKU en la tabla.
         </P>
       </>
@@ -116,7 +116,7 @@ export const AYUDA = {
         <P>
           Tocá una celda para fijarla a mano (queda en azul con un pin y el resto se reacomoda) o para ver cómo se
           abre entre distribuidores y vendedores. El interruptor de cada fila saca al SKU del mes: sus kilos y pesos
-          dejan de sumar, y hay que repartir esa diferencia entre los canales.
+          dejan de sumar, y los totales por canal se corrigen con «Ajustar a Contraloría».
         </P>
       </>
     ),

@@ -68,12 +68,14 @@ class ValoresIn(BaseModel):
     valores: dict[str, str] = Field(description="Canal -> monto escrito por el planner ('1.234,5' o '1234.5')")
 
 
-class RepartoIn(ValoresIn):
-    motivo: str
-
-
 class TextoIn(BaseModel):
     texto: str = Field(description="Totales por canal como tabla de texto (canal, kilos, plata), p. ej. editada en la pantalla")
+    motivo: str | None = Field(default=None, description="Al corregir totales ya cargados: queda en el historial")
+
+
+class TotalesIn(BaseModel):
+    kilos: dict[str, str] = Field(description="Canal -> kilos escritos")
+    plata: dict[str, str] = Field(default_factory=dict, description="Canal -> pesos escritos (vacío si faltan)")
 
 
 class ActivoIn(BaseModel):
@@ -291,7 +293,7 @@ def subir_input2(archivo: UploadFile = File(...), s: Sesion = Depends(sesion), q
 
 @router.put("/input2", summary="Cargar los totales por canal como tabla de texto (editados en la pantalla)")
 def cargar_input2(cuerpo: TextoIn, s: Sesion = Depends(sesion), quien: str = Depends(autor)):
-    _aplicar(s.cargar_input2, cuerpo.texto, quien, _ahora())
+    _aplicar(s.cargar_input2, cuerpo.texto, quien, _ahora(), motivo=cuerpo.motivo)
     return _estado(s)
 
 
@@ -551,34 +553,13 @@ def cambiar_apertura_canal(canal: str, cuerpo: AperturaCanalIn, s: Sesion = Depe
     return _estado(s)
 
 
-@router.get("/diferencia/{unidad}", summary="Sugerencia para repartir entre los canales la diferencia con Contraloría")
-def sugerir_diferencia(unidad: str, s: Sesion = Depends(sesion)):
-    return _aplicar(s.diferencia, unidad)
-
-
-@router.post("/diferencia/{unidad}/revisar", summary="Cuánto falta o sobra con los valores que escribió el planner. "
-                                                     "No cambia nada")
-def revisar_diferencia(unidad: str, cuerpo: ValoresIn, s: Sesion = Depends(sesion)):
-    return _aplicar(s.diferencia, unidad, cuerpo.valores)
-
-
-@router.put("/diferencia/{unidad}", summary="Aplicar los totales por canal revisados: solo si cierran con Contraloría")
-def repartir_diferencia(unidad: str, cuerpo: RepartoIn, s: Sesion = Depends(sesion), quien: str = Depends(autor)):
-    _aplicar(s.repartir_diferencia, unidad, cuerpo.valores, autor=quien, cuando=_ahora(), motivo=cuerpo.motivo)
-    return _estado(s)
-
-
-@router.post("/totales/pesos", summary="Proponer los pesos por canal según los kilos repartidos, al precio de "
-                                       "Contraloría de cada SKU")
-def proponer_pesos(cuerpo: MotivoIn, s: Sesion = Depends(sesion), quien: str = Depends(autor)):
-    _aplicar(s.proponer_pesos, autor=quien, cuando=_ahora(), motivo=cuerpo.motivo)
-    return _estado(s)
-
-
-@router.post("/totales/kilos/revisar", summary="Los kilos por canal que se están armando en la pantalla contra lo que "
-                                              "pide Contraloría, y cómo quedarían ajustados. No cambia nada")
-def revisar_kilos(cuerpo: ValoresIn, s: Sesion = Depends(sesion)):
-    return _aplicar(s.revisar_kilos, cuerpo.valores)
+@router.post("/totales/revisar", summary="Los totales por canal que se están armando en la pantalla, en kilos y en "
+                                         "pesos, contra lo que pide Contraloría, y cómo quedarían ajustados. No cambia nada")
+def revisar_totales(cuerpo: TotalesIn, s: Sesion = Depends(sesion)):
+    # Sin pesos (o con alguno vacío) no hay qué comparar en pesos: la pantalla pide completarlos.
+    plata = None if not cuerpo.plata or any(not v.strip() for v in cuerpo.plata.values()) \
+        else _aplicar(s.revisar_totales, "plata", cuerpo.plata)
+    return {"kilos": _aplicar(s.revisar_totales, "kilos", cuerpo.kilos), "plata": plata}
 
 
 @router.post("/totales/pesos/sugeridos", summary="Pesos sugeridos para los kilos de cada canal, al armar los totales "

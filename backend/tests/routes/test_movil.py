@@ -353,18 +353,20 @@ def test_muestra_solo_objetivo():
     assert r["faltan"] == ["totales por canal", "mes anterior"]
 
 
-def test_repartir_la_diferencia_por_http():
-    c = _cargado("input2_sin_sku_nuevo.tsv")
-    d = c.get("/api/movil/diferencia/kilos").json()
-    valores = {x["canal"]: x["sugerido"] for x in d["canales"]}
-    canal = next(iter(valores))
-    r = c.post("/api/movil/diferencia/kilos/revisar", json={"valores": dict(valores, **{canal: "0"})}).json()
-    assert r["cierra"] is False and D(r["falta"]) > 0
-    assert c.put("/api/movil/diferencia/kilos", json={"valores": dict(valores, **{canal: "0"}), "motivo": "x"}).status_code == 422
-    r = c.put("/api/movil/diferencia/kilos", json={"valores": valores, "motivo": "Contraloría ajustó"}).json()
-    assert r["historial"][-1]["accion"] == "repartir_diferencia"
-    assert not any(i["tipo"] == "totales_distintos" for i in r["inconsistencias"]["kilos"])
-    assert c.get("/api/movil/diferencia/litros").status_code == 422
+def test_los_totales_se_revisan_en_vivo_y_corregirlos_pide_motivo():
+    c = _cerrado()
+    totales = c.get("/api/movil").json()["entradas"]["input2"]["detalle"]
+    kilos = {t["canal"]: t["kilos"] for t in totales}
+    plata = {t["canal"]: t["plata"] for t in totales}
+    canal = next(iter(kilos))
+    r = c.post("/api/movil/totales/revisar", json={"kilos": dict(kilos, **{canal: "0"}), "plata": plata}).json()
+    assert not r["kilos"]["cierra"] and r["plata"]["cierra"]
+    assert c.post("/api/movil/totales/revisar", json={"kilos": kilos, "plata": dict(plata, **{canal: ""})}).json()["plata"] is None
+    texto = "Canal\tKilos\tPlata\n" + "\n".join(f"{c_}\t{kilos[c_]}\t{plata[c_]}" for c_ in kilos)
+    assert c.put("/api/movil/input2", json={"texto": texto, "motivo": " "}).status_code == 422  # motivo vacío
+    r = c.put("/api/movil/input2", json={"texto": texto, "motivo": "Contraloría ajustó"}).json()
+    assert r["historial"][-1]["motivo"] == "Contraloría ajustó"
+    assert c.get("/api/movil/diferencia/kilos").status_code == 404  # se corrige en los totales
 
 
 def test_las_alertas_dicen_la_descripcion_del_sku():

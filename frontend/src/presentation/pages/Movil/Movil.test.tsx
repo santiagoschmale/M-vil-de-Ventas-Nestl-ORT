@@ -30,9 +30,11 @@ beforeEach(() => {
     http.get('*/api/movil/cruce/kilos', () => HttpResponse.json(cruce)),
     http.get('*/api/movil/meses', () => HttpResponse.json([{ mes: '2026-10', aprobado: false }])),
     http.get('*/api/movil/apertura/*', () => HttpResponse.json({ detail: 'no se abre' }, { status: 404 })),
-    // Los kilos que se arman en la pantalla cierran con Contraloría, salvo que un test diga otra cosa.
-    http.post('*/api/movil/totales/kilos/revisar', () => HttpResponse.json(
-      { pide: '1300.000', suman: '1300.000', falta: '0.000', cierra: true, se_reparte_solo: false, ajustados: {}, errores: {} })),
+    // Los totales que se arman en la pantalla cierran con Contraloría, salvo que un test diga otra cosa.
+    http.post('*/api/movil/totales/revisar', () => HttpResponse.json({
+      kilos: { pide: '1300.000', suman: '1300.000', falta: '0.000', cierra: true, se_reparte_solo: false, ajustados: {}, errores: {} },
+      plata: { pide: '100.00', suman: '100.00', falta: '0.00', cierra: true, se_reparte_solo: false, ajustados: {}, errores: {} },
+    })),
     // Pesos sugeridos: 100 por canal.
     http.post('*/api/movil/totales/pesos/sugeridos', async ({ request }) => {
       const { valores } = await request.json() as { valores: Record<string, string> };
@@ -229,12 +231,13 @@ describe('MovilPage', { timeout: 15000 }, () => {
     expect(kilos).toHaveValue('500,000');
     await user.clear(kilos);
     await user.type(kilos, '490,5');
+    await user.type(within(dialogo).getByRole('textbox', { name: /Motivo/ }), 'cambio de cartera');
     await user.click(within(dialogo).getByRole('button', { name: 'Guardar' }));
 
     await waitFor(() => expect(pedidos).toHaveLength(1));
     expect(pedidos[0]).toEqual({
       metodo: 'PUT', url: '/api/movil/input2',
-      cuerpo: { texto: 'Canal\tKilos\tPlata\nCatering\t1.000,000\t60,00\nDirecta (BA)\t490,5\t40,00' },
+      cuerpo: { texto: 'Canal\tKilos\tPlata\nCatering\t1.000,000\t60,00\nDirecta (BA)\t490,5\t40,00', motivo: 'cambio de cartera' },
     });
   });
 
@@ -266,12 +269,12 @@ describe('MovilPage', { timeout: 15000 }, () => {
     server.use(
       http.get('*/api/movil', () => HttpResponse.json(estado({
         faltan: ['totales por canal'], entradas: { ...estado().entradas, input2: null, base } }))),
-      http.post('*/api/movil/totales/kilos/revisar', async ({ request }) => {
-        const { valores } = await request.json() as { valores: Record<string, string> };
-        const ajustado = valores.Catering === '1.050,000';
-        return HttpResponse.json({ pide: '1500.000', suman: ajustado ? '1500.000' : '1300.000',
+      http.post('*/api/movil/totales/revisar', async ({ request }) => {
+        const { kilos } = await request.json() as { kilos: Record<string, string> };
+        const ajustado = kilos.Catering === '1.050,000';
+        return HttpResponse.json({ kilos: { pide: '1500.000', suman: ajustado ? '1500.000' : '1300.000',
           falta: ajustado ? '0.000' : '200.000', cierra: ajustado, se_reparte_solo: false,
-          ajustados: { Catering: '1050.000', Córdoba: '450.000' }, errores: {} });
+          ajustados: { Catering: '1050.000', Córdoba: '450.000' }, errores: {} }, plata: null });
       }),
     );
     const user = userEvent.setup({ delay: null });
@@ -307,13 +310,13 @@ describe('MovilPage', { timeout: 15000 }, () => {
     server.use(
       http.get('*/api/movil', () => HttpResponse.json(estado({
         faltan: ['totales por canal'], entradas: { ...estado().entradas, input2: null, base } }))),
-      http.post('*/api/movil/totales/kilos/revisar', () => HttpResponse.json({ detail: 'caído' }, { status: 500 })),
+      http.post('*/api/movil/totales/revisar', () => HttpResponse.json({ detail: 'caído' }, { status: 500 })),
     );
     const user = userEvent.setup({ delay: null });
     render(<MovilPage />);
     await user.click(await screen.findByRole('button', { name: 'Armar totales por canal en la pantalla' }));
     const dialogo = screen.getByRole('dialog', { name: 'Armar totales por canal' });
-    expect(await within(dialogo).findByText('No se pudo revisar los kilos. Probá de nuevo.')).toBeInTheDocument();
+    expect(await within(dialogo).findByText('No se pudo revisar los totales. Probá de nuevo.')).toBeInTheDocument();
     expect(within(dialogo).queryByText(/Kilos: cierran/)).not.toBeInTheDocument();
     expect(within(dialogo).getByRole('button', { name: 'Completar con los sugeridos' })).toBeDisabled();
   });
@@ -695,20 +698,15 @@ describe('MovilPage', { timeout: 15000 }, () => {
     await waitFor(() => expect(pedidosMes[pedidosMes.length - 1]).toBe('último'));
   });
 
-  it('si los totales no suman lo que pide Contraloría, ofrece repartir la diferencia', async () => {
+  it('si los totales no suman lo que pide Contraloría, se corrigen en Totales por canal', async () => {
     const distintos = estado({ cierra: { kilos: false, plata: true }, inconsistencias: { kilos: [inconsistenciaFactory.build({
       tipo: 'totales_distintos', mensaje: 'A los totales por canal les faltan 100,000 kg para llegar a lo que pide Contraloría (1.000,000 kg).',
     })], plata: [] } });
-    server.use(
-      http.get('*/api/movil', () => HttpResponse.json(distintos)),
-      http.get('*/api/movil/diferencia/kilos', () => HttpResponse.json({ unidad: 'kilos', pide: '1000.000', suman: '900.000', diferencia: '100.000',
-        falta: '0.000', cierra: true, canales: [{ canal: 'Catering', hoy: '900.000', peso: '100.0', sugerido: '1000.000',
-          cambio: '100.000', error: null }] })),
-    );
+    server.use(http.get('*/api/movil', () => HttpResponse.json(distintos)));
     const user = userEvent.setup({ delay: null });
     render(<MovilPage />);
-    await user.click(await screen.findByRole('button', { name: 'Repartir la diferencia' }));
-    expect(await screen.findByRole('dialog', { name: 'Repartir la diferencia en kilos' })).toBeInTheDocument();
+    await user.click(await screen.findByRole('button', { name: 'Corregir en Totales por canal' }));
+    expect(await screen.findByRole('dialog', { name: 'Editar totales por canal' })).toBeInTheDocument();
   });
 
   it('mirando kilos, Para revisar avisa que los pesos no cierran y lleva a verlos', async () => {
@@ -719,26 +717,27 @@ describe('MovilPage', { timeout: 15000 }, () => {
     }))));
     const user = userEvent.setup({ delay: null });
     render(<MovilPage />);
-    expect(await screen.findByText(/La herramienta los puede proponer/)).toBeInTheDocument();
+    expect(await screen.findByText(/no van con sus kilos/)).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Ver en pesos' }));
     expect(await screen.findByText(mensaje)).toBeInTheDocument();
   });
 
-  it('si los kilos cierran y los pesos no, propone los pesos según los kilos, con motivo', async () => {
-    let motivo: string | undefined;
-    server.use(
-      http.get('*/api/movil', () => HttpResponse.json(estado({ cierra: { kilos: true, plata: false } }))),
-      http.post('*/api/movil/totales/pesos', async ({ request }) => {
-        motivo = ((await request.json()) as { motivo: string }).motivo;
-        return HttpResponse.json(estado());
-      }),
-    );
+  it('si los kilos cierran y los pesos no, se recalculan según los kilos en Totales por canal, con motivo', async () => {
+    server.use(http.get('*/api/movil', () => HttpResponse.json(estado({ cierra: { kilos: true, plata: false } }))));
     const user = userEvent.setup({ delay: null });
     render(<MovilPage />);
-    await user.click(await screen.findByRole('button', { name: 'Proponer pesos según los kilos' }));
-    await user.type(screen.getByRole('textbox', { name: /Motivo/ }), 'pesos coherentes con los kilos');
-    await user.click(screen.getByRole('button', { name: 'Proponer pesos' }));
-    await waitFor(() => expect(motivo).toBe('pesos coherentes con los kilos'));
+    await user.click(await screen.findByRole('button', { name: 'Corregir en Totales por canal' }));
+    const dialogo = await screen.findByRole('dialog', { name: 'Editar totales por canal' });
+    expect(within(dialogo).getByText(/no van con sus kilos/)).toBeInTheDocument();
+    await within(dialogo).findByText(/Kilos: cierran con Contraloría/);
+    await user.click(within(dialogo).getAllByRole('button', { name: 'Recalcular según los kilos' })[0]);
+    await waitFor(() => expect(within(dialogo).getByLabelText('Pesos de Catering')).toHaveValue('100,00'));
+    await user.click(within(dialogo).getByRole('button', { name: 'Guardar' }));
+    expect(within(dialogo).getByText('Escribí el motivo: queda en el historial.')).toBeInTheDocument();
+    await user.type(within(dialogo).getByRole('textbox', { name: /Motivo/ }), 'pesos coherentes con los kilos');
+    await user.click(within(dialogo).getByRole('button', { name: 'Guardar' }));
+    await waitFor(() => expect(pedidos.filter(p => p.metodo === 'PUT')).toHaveLength(1));
+    expect((pedidos.find(p => p.metodo === 'PUT')!.cuerpo as { motivo: string }).motivo).toBe('pesos coherentes con los kilos');
   });
 
   it('al armar los totales, si el mes anterior trae pesos, también arranca con ellos', async () => {

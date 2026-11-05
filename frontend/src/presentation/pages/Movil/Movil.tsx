@@ -16,7 +16,7 @@ import ErrorRoundedIcon from '@mui/icons-material/ErrorRounded';
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
 import { alpha } from '@mui/material/styles';
 import { useMovil, useSoloLectura } from '../../../stores/useMovil';
-import { Estado, RevisionKilos, Unidad } from '../../../stores/useMovil/useMovil.type';
+import { Estado, RevisionTotales, RevisionUnidad, Unidad } from '../../../stores/useMovil/useMovil.type';
 import { conUnidad, enMenores, formatear, nombreMes, UNIDADES } from './formato';
 import { AVENA, CIERRA, NO_CIERRA, numeros } from './estilo';
 import { Alerta, Principal, Resolver } from './Alerta';
@@ -29,7 +29,6 @@ import { Reglas } from './Reglas';
 import { CanalesDialog } from './CanalesDialog';
 import { CategoriasDialog } from './CategoriasDialog';
 import { MotivoDialog } from './MotivoDialog';
-import { DiferenciaDialog } from './DiferenciaDialog';
 import { Historial } from './Historial';
 
 const ACCIONES: Record<string, string> = {
@@ -72,23 +71,22 @@ const aTexto = (m: string | null) => (m == null ? '' : formatear(m));
 const PAUSA_MS = 250;
 const sinSigno = (m: string) => m.replace(/^-/, '');
 
-/** Los kilos que se están armando contra lo que pide Contraloría, en vivo; con el ajuste a un clic si no cierra. */
-const EstadoKilos = ({ r, onAjustar }: { r?: RevisionKilos; onAjustar: () => void }) => {
-  if (!r || r.falta === null) return null;
+/**
+ * Una unidad de los totales que se están armando, contra lo que pide Contraloría, en vivo: cierra, es un
+ * redondeo que se reparte solo, o falta/sobra, con las acciones para corregirlo.
+ */
+const EstadoTotal = ({ r, unidad, acciones }: { r: RevisionUnidad; unidad: Unidad; acciones: React.ReactNode }) => {
+  if (r.falta === null) return null;
+  const nombre = UNIDADES[unidad].nombre;
   const sobra = r.falta.startsWith('-');
-  const diferencia = `${conUnidad(sinSigno(r.falta), 'kilos')}${enMenores(r.falta, 'kilos')}`;
-  return (
-    <Box role="status" aria-live="polite" sx={{ mb: 2 }}>
-      {r.cierra
-        ? <Alerta tono="listo" titulo="Kilos: cierran con Contraloría">{conUnidad(r.pide, 'kilos')}</Alerta>
-        : r.se_reparte_solo
-        ? <Alerta tono="listo" titulo={`Kilos: ${sobra ? 'sobran' : 'faltan'} ${diferencia}`}>Es un redondeo: se reparte solo al guardar.</Alerta>
-        : <Alerta tono="frena" titulo={`Kilos: ${sobra ? 'sobran' : 'faltan'} ${diferencia}`}
-            acciones={<Principal onClick={onAjustar}>Ajustar a Contraloría</Principal>}>
-            Contraloría pide {conUnidad(r.pide, 'kilos')}. El ajuste reparte la diferencia según el peso de cada canal.
-          </Alerta>}
-    </Box>
-  );
+  const diferencia = `${conUnidad(sinSigno(r.falta), unidad)}${enMenores(r.falta, unidad)}`;
+  return r.cierra
+    ? <Alerta tono="listo" titulo={`${nombre}: cierran con Contraloría`}>{conUnidad(r.pide, unidad)}</Alerta>
+    : r.se_reparte_solo
+    ? <Alerta tono="listo" titulo={`${nombre}: ${sobra ? 'sobran' : 'faltan'} ${diferencia}`}>Es un redondeo: se reparte solo al guardar.</Alerta>
+    : <Alerta tono="frena" titulo={`${nombre}: ${sobra ? 'sobran' : 'faltan'} ${diferencia}`} acciones={acciones}>
+        Contraloría pide {conUnidad(r.pide, unidad)}.
+      </Alerta>;
 };
 // La misma regla que `normalizar` del backend: sin tildes, mayúsculas ni espacios de más.
 const claveDeCanal = (canal: string) =>
@@ -98,10 +96,11 @@ const claveDeCanal = (canal: string) =>
  * Los totales por canal, en la pantalla: editar los cargados (una fila por canal) o
  * armarlos sin Excel, arrancando de los kilos del mes anterior si ya se cargó.
  */
-const TotalesDialog = ({ totales, sugerencia, objetivo, onCerrar }: {
+const TotalesDialog = ({ totales, sugerencia, objetivo, aviso, onCerrar }: {
   totales: Totales | null; sugerencia?: Sugerencia; objetivo: Objetivo; onCerrar: () => void;
+  aviso?: string; // por qué se abrió desde Para revisar, si los totales cierran pero algo no
 }) => {
-  const { editarTotales, pesosSugeridos, revisarKilos, ocupado } = useMovil();
+  const { editarTotales, pesosSugeridos, revisarTotales, ocupado } = useMovil();
   const [iniciales] = useState<Fila[]>(() => {
     // Pesos vacíos: los del mes anterior, si su archivo los trae.
     const pesosAnteriores = new Map((sugerencia ?? []).map(t => [claveDeCanal(t.canal), aTexto(t.plata)]));
@@ -121,38 +120,45 @@ const TotalesDialog = ({ totales, sugerencia, objetivo, onCerrar }: {
     setFilas(fs => fs.map(f => (f.id === id ? { ...f, [campo]: valor } : f)));
     setError(null);
   };
-  // Mientras se escriben los kilos, el backend dice cuánto falta para Contraloría; el último pedido gana.
-  const [revision, setRevision] = useState<RevisionKilos>();
+  // Mientras se escriben los totales, el backend dice cuánto falta para Contraloría en kilos y en pesos;
+  // el último pedido gana.
+  const [revision, setRevision] = useState<RevisionTotales>();
   const pedido = useRef(0);
-  const kilosEscritos = filas.map(f => `${f.canal.trim()}\t${f.kilos.trim()}`).join('\n');
+  const escritos = filas.map(f => `${f.canal.trim()}\t${f.kilos.trim()}\t${f.plata.trim()}`).join('\n');
+  const columna = (campo: Campo) =>
+    Object.fromEntries(filas.filter(f => f.canal.trim()).map(f => [f.canal.trim(), f[campo].trim()]));
   useEffect(() => {
     if (!objetivo) return;
     const id = ++pedido.current;
     const t = setTimeout(() => {
-      const kilos = Object.fromEntries(filas.filter(f => f.canal.trim()).map(f => [f.canal.trim(), f.kilos.trim()]));
-      revisarKilos(kilos)
+      revisarTotales(columna('kilos'), columna('plata'))
         .then(r => { if (id === pedido.current) setRevision(r); })
         // Sin revisión no se sabe si cierran: no se muestra "cierran" ni se habilitan los pesos con una vieja.
-        .catch(() => { if (id === pedido.current) { setRevision(undefined); setError('No se pudo revisar los kilos. Probá de nuevo.'); } });
+        .catch(() => { if (id === pedido.current) { setRevision(undefined); setError('No se pudo revisar los totales. Probá de nuevo.'); } });
     }, PAUSA_MS);
     return () => clearTimeout(t);
-  }, [kilosEscritos]);
-  const ajustarKilos = () => {
-    const ajustados = revision?.ajustados ?? {};
-    setFilas(fs => fs.map(f => (ajustados[f.canal.trim()] ? { ...f, kilos: aTexto(ajustados[f.canal.trim()]) } : f)));
+  }, [escritos]);
+  const ajustar = (campo: Campo, r?: RevisionUnidad | null) => {
+    const ajustados = r?.ajustados ?? {};
+    setFilas(fs => fs.map(f => (ajustados[f.canal.trim()] ? { ...f, [campo]: aTexto(ajustados[f.canal.trim()]) } : f)));
   };
-  // Los pesos salen de los kilos: se completan cuando los kilos ya cierran, a pedido del planner.
-  const kilosListos = !objetivo || !!revision?.cierra || !!revision?.se_reparte_solo;
+  // Los pesos salen de los kilos: se sugieren cuando los kilos ya cierran, a pedido del planner.
+  const kilosListos = !objetivo || !!revision?.kilos.cierra || !!revision?.kilos.se_reparte_solo;
   const conPesos = /[1-9]/.test(objetivo?.nns ?? '');  // un monto no pasa por número de JavaScript
   const [sugiriendo, setSugiriendo] = useState(false);
-  const completarPesos = () => {
+  // Completar llena solo los vacíos; recalcular reemplaza todos los pesos por los sugeridos.
+  const sugerirPesos = (todos: boolean) => {
     setSugiriendo(true);
-    const kilos = Object.fromEntries(filas.filter(f => f.canal.trim()).map(f => [f.canal.trim(), f.kilos.trim()]));
-    pesosSugeridos(kilos)
-      .then(pesos => setFilas(fs => fs.map(f => (f.plata.trim() ? f : { ...f, plata: aTexto(pesos[f.canal.trim()] ?? null) }))))
+    pesosSugeridos(columna('kilos'))
+      .then(pesos => setFilas(fs => fs.map(f => (f.plata.trim() && !todos ? f : { ...f, plata: aTexto(pesos[f.canal.trim()] ?? null) }))))
       .catch(() => setError('No se pudieron sugerir los pesos. Completalos a mano o probá de nuevo.'))
       .finally(() => setSugiriendo(false));
   };
+  const recalcular = (
+    <Principal onClick={() => sugerirPesos(true)} disabled={sugiriendo || !kilosListos}>Recalcular según los kilos</Principal>
+  );
+  // Corregir totales ya cargados es un ajuste: queda en el historial con su motivo.
+  const [motivo, setMotivo] = useState('');
   const antes = (f: Fila, campo: Campo) => {
     const original = originales.get(f.id);
     return original && f[campo].trim() !== original[campo] ? `antes: ${original[campo] || 'vacío'}` : undefined;
@@ -174,7 +180,11 @@ const TotalesDialog = ({ totales, sugerencia, objetivo, onCerrar }: {
     // La misma tabla que lee el backend, con los números como se escriben acá (1.234,5).
     const texto = ['Canal\tKilos\tPlata', ...conCanal.map(f => `${f.canal.trim()}\t${f.kilos.trim()}\t${f.plata.trim()}`)]
       .join('\n');
-    const falla = await editarTotales(texto);
+    if (totales && !motivo.trim()) {
+      setError('Escribí el motivo: queda en el historial.');
+      return;
+    }
+    const falla = await editarTotales(texto, totales ? motivo.trim() : undefined);
     if (falla) setError(falla);
     else onCerrar();
   };
@@ -184,12 +194,24 @@ const TotalesDialog = ({ totales, sugerencia, objetivo, onCerrar }: {
       PaperProps={{ component: 'form', onSubmit: guardar }}>
       <DialogTitle id="titulo-totales">{totales ? 'Editar' : 'Armar'} totales por canal</DialogTitle>
       <DialogContent>
-        <EstadoKilos r={revision} onAjustar={ajustarKilos} />
+        <Box role="status" aria-live="polite" sx={{ display: 'grid', gap: 1, mb: 2 }}>
+          {aviso && <Alerta tono="frena" titulo="Pesos no cierra" acciones={conPesos && recalcular}>{aviso}</Alerta>}
+          {revision && (
+            <EstadoTotal r={revision.kilos} unidad="kilos"
+              acciones={<Principal onClick={() => ajustar('kilos', revision.kilos)}>Ajustar a Contraloría</Principal>} />
+          )}
+          {revision?.plata && sinPesos === 0 && (
+            <EstadoTotal r={revision.plata} unidad="plata" acciones={<>
+              {conPesos && recalcular}
+              <Resolver onClick={() => ajustar('plata', revision.plata)}>Ajustar a Contraloría</Resolver>
+            </>} />
+          )}
+        </Box>
         {sinPesos > 0 && (
           <Box sx={{ mb: 2 }}>
             <Alerta tono="aviso" titulo={sinPesos === conCanal.length ? 'Faltan los pesos' : `Falta el peso de ${sinPesos} ${sinPesos === 1 ? 'canal' : 'canales'}`}
               acciones={conPesos && (
-                <Principal onClick={completarPesos} disabled={sugiriendo || !kilosListos}>Completar con los sugeridos</Principal>
+                <Principal onClick={() => sugerirPesos(false)} disabled={sugiriendo || !kilosListos}>Completar con los sugeridos</Principal>
               )}>
               {conPesos && !kilosListos
                 ? 'Salen de los kilos: primero ajustá los kilos a lo que pide Contraloría.'
@@ -252,6 +274,11 @@ const TotalesDialog = ({ totales, sugerencia, objetivo, onCerrar }: {
               Al guardar deja de estar en los totales por canal.
             </Alerta>
           </Box>
+        )}
+        {totales && (
+          <TextField label="Motivo" value={motivo} onChange={e => { setMotivo(e.target.value); setError(null); }}
+            fullWidth sx={{ mt: 2 }} placeholder="Contraloría ajustó el objetivo del mes"
+            helperText="Queda en el historial, con tu nombre y la hora." />
         )}
         {error && <Box sx={{ mt: 2 }}><Alerta tono="frena">{error}</Alerta></Box>}
       </DialogContent>
@@ -428,11 +455,11 @@ const Pendientes = ({ estado, unidad, enMatriz }: { estado: Estado; unidad: Unid
   const [eligiendo, setEligiendo] = useState<Repetido>();
   const [canalesDe, setCanalesDe] = useState<string>();
   const [categorias, setCategorias] = useState(false);
-  const [repartiendo, setRepartiendo] = useState(false);
+  // Los totales se corrigen en un solo lugar: el diálogo de Totales por canal. `aviso`: por qué se abrió.
+  const [corrigiendo, setCorrigiendo] = useState<{ aviso?: string }>();
   const soloLectura = useSoloLectura();
   const repetido = (sku: string | null) => estado.repetidos.find(r => r.sku === sku);
-  const { enfocar, elegirUnidad, proponerPesos } = useMovil();
-  const [proponiendo, setProponiendo] = useState(false);
+  const { enfocar, elegirUnidad } = useMovil();
   const acciones = (p: Estado['problemas'][number]) => {
     const r = p.tipo === 'sku_repetido' ? repetido(p.sku) : undefined;
     const celda = p.bloque === 'apertura' && p.sku && p.canal && enMatriz.has(p.sku) ? `${p.sku} · ${p.canal}` : null;
@@ -463,15 +490,15 @@ const Pendientes = ({ estado, unidad, enMatriz }: { estado: Estado; unidad: Unid
   const yaVistas = new Set(estado.inconsistencias[unidad].map(clave));
   const cuantasOtra = estado.inconsistencias[otra].filter(i => !yaVistas.has(clave(i))).length;
   const mismoProblema = !sinPesos && estado.inconsistencias[otra].length > 0 && cuantasOtra === 0;
-  // Kilos cerrados y pesos no: los pesos se pueden proponer según los kilos (lo pidieron: armarlos a mano "es un chino").
+  // Kilos cerrados y pesos no: se corrigen en Totales por canal, donde se recalculan según los kilos.
   const proponer = estado.cierra.kilos && !estado.cierra.plata && !estado.faltan.length && !soloLectura;
+  const noVan = 'Los pesos de cada canal no van con sus kilos. Recalculalos según los kilos, al precio que tuvo cada SKU en ese canal el mes anterior.';
   const avisoPesos = proponer && (
     <Alerta tono="frena" titulo="Pesos no cierra" acciones={<>
-      <Principal onClick={() => setProponiendo(true)}>Proponer pesos según los kilos</Principal>
+      <Principal onClick={() => setCorrigiendo(sinPesos ? {} : { aviso: noVan })}>Corregir en Totales por canal</Principal>
       {unidad === 'kilos' && !sinPesos && <Resolver onClick={() => elegirUnidad('plata')}>Ver en pesos</Resolver>}
     </>}>
-      {sinPesos ? 'Faltan los pesos de algún canal. ' : 'Los pesos de cada canal no van con sus kilos. '}
-      La herramienta los puede proponer: cada canal se lleva lo que facturan sus kilos, al precio que tuvo cada SKU en ese canal el mes anterior.
+      {sinPesos ? 'Faltan los pesos de algún canal: se completan según los kilos.' : noVan}
     </Alerta>
   );
   const avisoOtra = proponer ? (unidad === 'kilos' && avisoPesos) : !estado.cierra[otra] && !estado.faltan.length && !mismoProblema && (
@@ -483,10 +510,9 @@ const Pendientes = ({ estado, unidad, enMatriz }: { estado: Estado; unidad: Unid
           : `Mirala en ${UNIDADES[otra].nombre.toLowerCase()}.`}
     </Alerta>
   );
-  const dialogoPesos = proponiendo && (
-    <MotivoDialog titulo="Proponer pesos según los kilos"
-      descripcion="Los pesos de cada canal pasan a ser lo que facturan sus kilos al precio que tuvo cada SKU en ese canal el mes anterior. Reemplaza los pesos cargados en Totales por canal; se puede deshacer."
-      confirmar="Proponer pesos" onConfirmar={proponerPesos} onCerrar={() => setProponiendo(false)} />
+  const dialogoPesos = corrigiendo && (
+    <TotalesDialog totales={estado.entradas.input2} sugerencia={estado.entradas.base?.canales}
+      objetivo={estado.entradas.input1} aviso={corrigiendo.aviso} onCerrar={() => setCorrigiendo(undefined)} />
   );
   if (!inconsistencias.length && !estado.problemas.length && !estado.avisos[unidad].length) {
     return <>{avisoOtra || <Typography color={CIERRA}>Nada para revisar en {UNIDADES[unidad].nombre.toLowerCase()}.</Typography>}{dialogoPesos}</>;
@@ -503,7 +529,7 @@ const Pendientes = ({ estado, unidad, enMatriz }: { estado: Estado; unidad: Unid
         <Alerta key={`i${n}`} tono="frena" titulo={TITULO_INCONSISTENCIA[i.tipo] ?? `${UNIDADES[unidad].nombre} no cierra`}
           acciones={<>
             {i.tipo === 'totales_distintos' && !soloLectura && (
-              <Principal onClick={() => setRepartiendo(true)}>Repartir la diferencia</Principal>
+              <Principal onClick={() => setCorrigiendo({})}>Corregir en Totales por canal</Principal>
             )}
             {i.tipo === 'sku_sin_canal' && i.skus[0] && (
               <Principal aria-label={`Elegir canales de SKU ${i.skus[0]}`} onClick={() => setCanalesDe(i.skus[0])}>
@@ -529,7 +555,6 @@ const Pendientes = ({ estado, unidad, enMatriz }: { estado: Estado; unidad: Unid
       {eligiendo && <FilaDialog repetido={eligiendo} onCerrar={() => setEligiendo(undefined)} />}
       {canalesDe && <CanalesDialog sku={canalesDe} estado={estado} onCerrar={() => setCanalesDe(undefined)} />}
       {categorias && <CategoriasDialog estado={estado} onCerrar={() => setCategorias(false)} />}
-      {repartiendo && <DiferenciaDialog unidad={unidad} onCerrar={() => setRepartiendo(false)} />}
     </Box>
   );
 };

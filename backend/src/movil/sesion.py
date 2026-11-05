@@ -163,16 +163,23 @@ class Sesion:
             return Ajuste("cargar_input1", nombre, autor, cuando)
         self._aplicar(cambio)
 
-    def cargar_input2(self, origen, autor: str, cuando: datetime, nombre: str | None = None) -> None:
-        """`origen`: el Excel de totales por canal, o la tabla en texto (editada en la pantalla)."""
+    def cargar_input2(self, origen, autor: str, cuando: datetime, nombre: str | None = None,
+                      motivo: str | None = None) -> None:
+        """
+        `origen`: el Excel de totales por canal, o la tabla en texto (editada en la pantalla). Corregir
+        totales ya cargados es un ajuste y lleva `motivo`; la pantalla lo pide.
+        """
         canales, problemas = _leer(leer_input2, origen)
+        motivo = _motivo(motivo) if motivo is not None else None
 
         def cambio():
             self._e.canales, self._e.problemas2, self._e.archivo2 = canales, problemas, nombre
             detalle = f"{nombre} · {len(canales)} canales" if nombre else f"{len(canales)} canales, editados a mano"
-            return Ajuste("cargar_input2", detalle, autor, cuando)
+            return Ajuste("cargar_input2", detalle, autor, cuando, motivo)
         self._aplicar(cambio)
 
+    # `diferencia`, `repartir_diferencia` y `proponer_pesos` ya no tienen pantalla (los totales se corrigen
+    # en un solo lugar, al editarlos), pero los meses guardados los repiten al reconstruirse: no borrarlos.
     def diferencia(self, unidad: str, valores: dict[str, str] | None = None) -> dict:
         """
         Cuando los totales por canal no suman lo que pide Contraloría: cuánto le toca a cada canal
@@ -336,18 +343,18 @@ class Sesion:
             return Ajuste("proponer_pesos", "Pesos por canal según los kilos repartidos", autor, cuando, motivo)
         self._aplicar(cambio)
 
-    def revisar_kilos(self, kilos: dict[str, str]) -> dict:
+    def revisar_totales(self, unidad: str, valores: dict[str, str]) -> dict:
         """
-        Los kilos por canal que el planner está armando en la pantalla, contra lo que pide Contraloría:
-        cuánto falta (o sobra, en negativo), si alcanza con el redondeo que se reparte solo, y cómo
-        quedaría cada canal ajustado según su peso. Solo lee: no cambia nada.
+        Los totales por canal de una unidad que el planner está armando en la pantalla, contra lo que pide
+        Contraloría: cuánto falta (o sobra, en negativo), si alcanza con el redondeo que se reparte solo, y
+        cómo quedaría cada canal ajustado según su peso. Solo lee: no cambia nada.
         """
         if self._e.objetivos is None:
-            raise ErrorDeAjuste("Cargá el objetivo de Contraloría para comparar los kilos.")
-        decimales = UNIDADES["kilos"]
-        pide = self._pide_objetivo("kilos")
+            raise ErrorDeAjuste("Cargá el objetivo de Contraloría para comparar los totales.")
+        decimales = self._unidad(unidad)
+        pide = self._pide_objetivo(unidad)
         validos, errores = {}, {}
-        for canal, texto in kilos.items():
+        for canal, texto in valores.items():
             v, error = _monto(texto, decimales)
             if error:
                 errores[canal] = error

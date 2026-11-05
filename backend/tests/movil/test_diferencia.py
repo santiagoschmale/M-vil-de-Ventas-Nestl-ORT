@@ -151,12 +151,12 @@ def test_los_kilos_que_se_arman_en_la_pantalla_se_comparan_con_contraloria_sin_g
     s = _sesion()
     pide = s._pide("kilos")
     mitad = a_texto((pide / 2).quantize(D("0.001")))
-    r = s.revisar_kilos({"Catering": mitad, "Vending": "1.000"})
+    r = s.revisar_totales("kilos", {"Catering": mitad, "Vending": "1.000"})
     assert D(r["falta"]) > 0 and not r["cierra"]
     assert sum(D(v) for v in r["ajustados"].values()) == pide  # ajustados según su peso, cierran
-    r = s.revisar_kilos(r["ajustados"])
+    r = s.revisar_totales("kilos", r["ajustados"])
     assert r["cierra"] and r["falta"] == "0.000"
     casi = {**r["ajustados"], "Vending": str(D(r["ajustados"]["Vending"]) + D("0.4"))}
-    assert s.revisar_kilos(casi)["se_reparte_solo"]  # un redondeo: se reparte solo al guardar
-    assert s.revisar_kilos({"Catering": "abc"})["errores"] == {"Catering": "no es un número"}
+    assert s.revisar_totales("kilos", casi)["se_reparte_solo"]  # un redondeo: se reparte solo al guardar
+    assert s.revisar_totales("kilos", {"Catering": "abc"})["errores"] == {"Catering": "no es un número"}
     assert s.historial[-1].accion == "cargar_base"  # no cambia nada

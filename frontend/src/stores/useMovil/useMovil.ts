@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { api } from '../../infra/http';
 import { useSnackbarProps } from '../useSnackbarProps';
-import { Apertura, Cruce, Diferencia, Estado, MesResumen, RevisionKilos, TUseMovil } from './useMovil.type';
+import { Apertura, Cruce, Estado, MesResumen, RevisionTotales, TUseMovil } from './useMovil.type';
 
 // Los errores del cliente HTTP traen la respuesta del backend: { detail: "..." }.
 const respuesta = (e: unknown) =>
@@ -146,8 +146,8 @@ export const useMovil = create<TUseMovil>((set, get) => {
     cargarInput1: archivo => subir('/movil/input1', archivo, { cargado: 'Objetivo de Contraloría cargado.' }),
     cargarBase: archivo => subir('/movil/base', archivo, { cargado: 'Mes anterior cargado.' }),
     cargarInput2: archivo => subir('/movil/input2', archivo, { cargado: TOTALES_CARGADOS }),
-    editarTotales: texto =>
-      cambiar(() => api.put(conMes('/movil/input2'), { texto }), { ...enDialogo, cargado: TOTALES_CARGADOS }),
+    editarTotales: (texto, motivo) =>
+      cambiar(() => api.put(conMes('/movil/input2'), { texto, motivo }), { ...enDialogo, cargado: TOTALES_CARGADOS }),
     // Sin totales: objetivo y mes anterior, para armar los totales por canal en la pantalla.
     // Solo objetivo: para un mes que ya heredó el resto del aprobado.
     cargarMuestra: (que = 'todo') => cambiar(
@@ -189,16 +189,10 @@ export const useMovil = create<TUseMovil>((set, get) => {
     reabrir: motivo => cambiar(() => api.post(conMes('/movil/reabrir'), { motivo }),
       { errorEnDialogo: true, aviso: 'El móvil volvió a borrador.' }),
 
-    diferencia: async (unidad, valores) => (valores
-      ? (await api.post(conMes(`/movil/diferencia/${unidad}/revisar`), { valores })).data as Diferencia
-      : (await api.get<Diferencia>(conMes(`/movil/diferencia/${unidad}`))).data),
-    revisarKilos: async kilos =>
-      (await api.post(conMes('/movil/totales/kilos/revisar'), { valores: kilos })).data as RevisionKilos,
+    revisarTotales: async (kilos, plata) =>
+      (await api.post(conMes('/movil/totales/revisar'), { kilos, plata })).data as RevisionTotales,
     pesosSugeridos: async kilos =>
       ((await api.post(conMes('/movil/totales/pesos/sugeridos'), { valores: kilos })).data as { pesos: Record<string, string> }).pesos,
-    repartirDiferencia: (unidad, valores, motivo) => cambiar(
-      () => api.put(conMes(`/movil/diferencia/${unidad}`), { valores, motivo }),
-      { ...enDialogo, aviso: 'Totales por canal actualizados.' }),
 
     // No un link directo: el navegador no mandaría el token de la sesión.
     exportar: async () => {
@@ -214,8 +208,6 @@ export const useMovil = create<TUseMovil>((set, get) => {
         avisar(mensajeDeError(e), 'error');
       }
     },
-    proponerPesos: motivo => cambiar(() => api.post(conMes('/movil/totales/pesos'), { motivo }),
-      { ...enDialogo, aviso: 'Pesos por canal propuestos según los kilos.' }),
 
     apertura: async (sku, canal) => {
       try {

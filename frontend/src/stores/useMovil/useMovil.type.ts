@@ -13,18 +13,6 @@ export type Ajuste = {
   motivo: string | null;
 };
 
-/** Repartir entre los canales la diferencia con Contraloría. Todo lo calcula el backend. */
-export type Diferencia = {
-  unidad: Unidad;
-  pide: Monto;
-  suman: Monto;
-  diferencia: Monto; // pide menos suman, con los totales de hoy: negativo si sobra
-  // Pide menos lo que suman los valores escritos: negativo si sobra; null si alguno no es un número.
-  falta: Monto | null;
-  cierra: boolean;
-  canales: { canal: string; hoy: Monto; peso: string; sugerido: Monto; cambio: Monto | null; error: string | null }[];
-};
-
 export type Inconsistencia = {
   tipo: string;
   mensaje: string;
@@ -164,7 +152,8 @@ export type TUseMovil = {
   elegirUnidad: (unidad: Unidad) => Promise<void>;
   cargarInput1: (archivo: File) => Resultado;
   cargarInput2: (archivo: File) => Resultado;
-  editarTotales: (texto: string) => Resultado;
+  // Con motivo al corregir totales ya cargados: queda en el historial.
+  editarTotales: (texto: string, motivo?: string) => Resultado;
   cargarBase: (archivo: File) => Resultado;
   cargarMuestra: (que?: 'todo' | 'sin_totales' | 'objetivo') => Resultado;
   cambiarSku: (sku: string, activo: boolean, motivo: string) => Resultado;
@@ -172,15 +161,11 @@ export type TUseMovil = {
   fijar: (sku: string, canal: string, monto: string, motivo: string) => Resultado;
   desfijar: (sku: string, canal: string, motivo: string) => Resultado;
   apertura: (sku: string, canal: string) => Promise<Apertura | null>;
-  // Sin valores, la sugerencia; con valores, cuánto falta o sobra con ellos (no cambia nada).
-  diferencia: (unidad: Unidad, valores?: Record<string, string>) => Promise<Diferencia>;
   /** Pesos sugeridos por canal para los kilos de cada uno, al armar los totales en la pantalla. No cambia nada. */
   pesosSugeridos: (kilos: Record<string, string>) => Promise<Record<string, string>>;
-  /** Los kilos que se están armando contra lo que pide Contraloría, y cómo quedarían ajustados. No cambia nada. */
-  revisarKilos: (kilos: Record<string, string>) => Promise<RevisionKilos>;
-  repartirDiferencia: (unidad: Unidad, valores: Record<string, string>, motivo: string) => Resultado;
-  proponerPesos: (motivo: string) => Resultado;
-  exportar: () => Promise<void>; // baja el Excel (con el token de la sesión, si hay Entra) // pesos por canal según los kilos repartidos
+  /** Los totales que se están armando, en kilos y en pesos, contra lo que pide Contraloría. No cambia nada. */
+  revisarTotales: (kilos: Record<string, string>, plata: Record<string, string>) => Promise<RevisionTotales>;
+  exportar: () => Promise<void>; // baja el Excel (con el token de la sesión, si hay Entra)
   agregarRegla: (datos: DatosRegla, motivo: string) => Resultado;
   editarRegla: (id: string, datos: DatosRegla, motivo: string) => Resultado;
   eliminarRegla: (id: string, motivo: string) => Resultado;
@@ -196,8 +181,8 @@ export type TUseMovil = {
   eliminarEntidad: (canal: string, entidad: string, motivo: string) => Resultado;
 };
 
-/** Kilos por canal armados en la pantalla, contra lo que pide Contraloría. */
-export type RevisionKilos = {
+/** Los totales de una unidad armados en la pantalla, contra lo que pide Contraloría. */
+export type RevisionUnidad = {
   pide: Monto;
   suman: Monto;
   falta: Monto | null; // negativo si sobra; null si algún valor no es un monto
@@ -206,3 +191,6 @@ export type RevisionKilos = {
   ajustados: Record<string, Monto>;
   errores: Record<string, string>;
 };
+
+/** Kilos y pesos; pesos es null si falta alguno (no hay qué comparar). */
+export type RevisionTotales = { kilos: RevisionUnidad; plata: RevisionUnidad | null };
