@@ -288,3 +288,50 @@ def test_apagar_a_todos_los_de_un_canal_se_informa_en_cada_celda_que_no_se_abre(
     r, _ = _con_apertura(apagados_entidades={"Joaquín Ledesma", "Nicolás Paz", "Sofía Correa"})
     cordoba = [p for p in r.problemas if p.bloque == "apertura" and "Córdoba" in p.mensaje]
     assert cordoba and all("apagados" in p.mensaje for p in cordoba)
+
+
+def test_un_canal_o_una_descripcion_que_empiezan_con_igual_salen_como_texto_en_todas_las_hojas():
+    """
+    Un canal llamado `=HYPERLINK(...)` (en los totales y en la base) o una descripción `=1+1`
+    del objetivo no pueden ejecutar nada al abrir el Excel exportado: en Kilos, Plata,
+    Apertura y Problemas van como texto, nunca como fórmula (el caso real de la card de
+    fórmulas; cubre el arreglo de #45).
+    """
+    from dataclasses import replace
+
+    from src.domain.problema import Problema
+    from src.importer.entradas import leer_apertura
+
+    objetivos, canales, base = _entradas()
+    apertura, _ = leer_apertura(MUESTRA / "base_mes_anterior.xlsx")
+    canal_real = next(c for (_, c) in apertura)  # un canal que se abre debajo del canal
+    trampa = '=HYPERLINK("http://ejemplo.test/robar","Abrir")'
+
+    def renombrar(canal):
+        return trampa if canal == canal_real else canal
+
+    canales = {renombrar(c): t for c, t in _sin_el_nuevo(canales).items()}
+    base = {(s, renombrar(c)): v for (s, c), v in base.items()}
+    apertura = {(s, renombrar(c)): e for (s, c), e in apertura.items()}
+    sku = next(iter(objetivos))
+    objetivos[sku] = replace(objetivos[sku], descripcion="=1+1")
+    r = armar(objetivos, canales, base, apagados={NUEVO}, apertura=apertura,
+              problemas=[Problema("aviso", "Una celda no se abre: revisar.", sku=sku, bloque="apertura", canal=trampa)])
+
+    destino = BytesIO()
+    exportar(r, destino)
+    destino.seek(0)
+    libro = load_workbook(destino)
+
+    vistas = {}
+    for hoja in libro.worksheets:
+        for fila in hoja.iter_rows():
+            for celda in fila:
+                if isinstance(celda.value, str) and celda.value.startswith("="):
+                    assert celda.data_type == "s", (hoja.title, celda.coordinate, celda.value)
+                    vistas.setdefault(hoja.title, set()).add(celda.value)
+    # El texto peligroso llegó a cada hoja (si no, el test no probaría nada).
+    assert vistas["Kilos"] == {trampa, "=1+1"}
+    assert vistas["Plata"] == {trampa, "=1+1"}
+    assert trampa in vistas["Apertura"]
+    assert trampa in vistas["Problemas"]
