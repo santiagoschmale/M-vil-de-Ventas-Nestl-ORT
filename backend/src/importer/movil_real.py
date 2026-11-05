@@ -145,11 +145,9 @@ def precios(hojas: dict[str, list[list]]) -> dict[tuple[str, str], Decimal]:
     return precio
 
 
-def apertura(hojas: dict[str, list[list]]) -> tuple[dict[tuple[str, str], dict[str, Decimal]], list[Problema]]:
-    """
-    {(sku, canal): {entidad: kilos}}: los distribuidores (hoja Distribuidores) y los asesores
-    del Call Center (la tabla de asesores de Soluciones, la segunda).
-    """
+def _tablas_de_apertura(hojas: dict[str, list[list]]) -> tuple[list[tuple[str, Tabla]], list[Problema]]:
+    """Qué tabla abre cada canal: los distribuidores (hoja Distribuidores) y los asesores del Call Center
+    (la segunda tabla de Soluciones). Una sola definición para kilos y pesos."""
     problemas: list[Problema] = []
     fuentes = []
     distribuidores = tablas(_hoja(hojas, "distribuidores"))
@@ -164,6 +162,12 @@ def apertura(hojas: dict[str, list[list]]) -> tuple[dict[tuple[str, str], dict[s
     else:
         problemas.append(Problema("aviso", "No se encontró la apertura por asesor: el Call Center cierra en el canal.",
                                   bloque="apertura"))
+    return fuentes, problemas
+
+
+def apertura(hojas: dict[str, list[list]]) -> tuple[dict[tuple[str, str], dict[str, Decimal]], list[Problema]]:
+    """{(sku, canal): {entidad: kilos}}: lo que vendió cada distribuidor y asesor el mes anterior."""
+    fuentes, problemas = _tablas_de_apertura(hojas)
     resultado: dict[tuple[str, str], dict[str, Decimal]] = {}
     for canal, tabla in fuentes:
         for sku, bloques in tabla.filas.items():
@@ -173,22 +177,23 @@ def apertura(hojas: dict[str, list[list]]) -> tuple[dict[tuple[str, str], dict[s
     return resultado, problemas
 
 
-def apertura_plata(hojas: dict[str, list[list]]) -> dict[tuple[str, str], dict[str, Decimal]]:
+def apertura_plata(hojas: dict[str, list[list]]) -> tuple[dict[tuple[str, str], dict[str, Decimal]], list[Problema]]:
     """
-    {(sku, canal): {entidad: nns}}: lo que facturó cada distribuidor y asesor el mes anterior, de las
-    mismas tablas que `apertura`. Solo las entidades que también tienen kilos.
+    {(sku, canal): {entidad: nns}}: lo que facturó cada distribuidor y asesor el mes anterior, de las mismas
+    tablas que `apertura` y para las mismas entidades. Una celda con lo facturado negativo es un error del
+    archivo: no se replica, se avisa y esa celda abre los pesos como los kilos.
     """
-    fuentes = []
-    distribuidores = tablas(_hoja(hojas, "distribuidores"))
-    if distribuidores:
-        fuentes.append((DISTRIBUIDORES, distribuidores[0]))
-    soluciones = tablas(_hoja(hojas, "soluciones"))
-    if len(soluciones) > 1:
-        fuentes.append((CALL_CENTER, soluciones[1]))
+    fuentes, _ = _tablas_de_apertura(hojas)
     resultado: dict[tuple[str, str], dict[str, Decimal]] = {}
+    problemas: list[Problema] = []
     for canal, tabla in fuentes:
         for sku, bloques in tabla.filas.items():
             celda = {entidad: nns or Decimal(0) for entidad, (kilos, nns) in bloques.items() if kilos}
-            if celda:
+            negativos = sorted(e for e, v in celda.items() if v < 0)
+            if negativos:
+                problemas.append(Problema(
+                    "aviso", f"{canal}: lo facturado el mes anterior por {', '.join(negativos)} es negativo. Los pesos de "
+                             f"esa celda se abren como los kilos.", sku=sku, bloque="apertura", canal=canal))
+            elif celda:
                 resultado[(sku, canal)] = celda
-    return resultado
+    return resultado, problemas

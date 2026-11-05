@@ -279,3 +279,22 @@ def test_si_a_una_entidad_le_falta_el_historico_en_pesos_la_celda_se_abre_como_l
     """Mezclar el histórico en pesos de una con el de kilos de otra compararía unidades distintas."""
     raiz = _celda(D(300), None)
     assert [_monto(raiz, e, "nns") for e in "AB"] == [D("500.00"), D("500.00")]
+
+
+def test_si_nadie_facturo_la_celda_los_pesos_se_abren_como_los_kilos():
+    """Una entrega bonificada: hubo kilos y nada facturado. No hay de dónde abrir los pesos por pesos."""
+    raiz = _celda(D(0), D(0))
+    assert [_monto(raiz, e, "nns") for e in "AB"] == [D("500.00"), D("500.00")]
+
+
+def test_con_un_porcentaje_manual_el_resto_se_abre_con_lo_facturado():
+    raiz = Nodo(entidad="celda", nombre="Distribuidores", peso=D(1), hijos=[
+        Nodo(entidad="A", nombre="A", peso=D(50), peso_nns=D(300)),
+        Nodo(entidad="B", nombre="B", peso=D(50), peso_nns=D(100)),
+        Nodo(entidad="C", nombre="C", peso=D(0), peso_nns=D(0), porcentaje=D(20)),
+    ])
+    raiz.valores["kilos"].monto = D("100.000")
+    raiz.valores["nns"].monto = D("1000.00")
+    recalcular(raiz, set())
+    # C se lleva su 20 %; el 80 % que queda va 3 a 1 entre A y B, como facturaron.
+    assert [_monto(raiz, e, "nns") for e in "ABC"] == [D("600.00"), D("200.00"), D("200.00")]

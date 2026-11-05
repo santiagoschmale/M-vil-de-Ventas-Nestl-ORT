@@ -99,8 +99,8 @@ export const AYUDA = {
         <P>
           <b>De dónde sale cada número</b>: cada SKU reparte lo que pide Contraloría entre sus canales como se
           repartió el mes anterior, ajustado a los totales de cada canal. Los kilos siguen lo que vendió cada canal;
-          los pesos, lo que facturó, porque el mismo SKU no vale lo mismo en todos los canales. Si un SKU no se
-          vendió en un canal el mes anterior, se usa su precio en Participaciones o, si tampoco, el de Contraloría.
+          los pesos, lo que facturó, porque el mismo SKU no vale lo mismo en todos los canales. Un SKU que el mes
+          anterior no se vendió en un canal no se reparte ahí, salvo que lo agregues con «Dónde se vende».
         </P>
         <P>
           En cada canal, <b>pedido</b> es lo que pediste y <b>repartido</b> lo que quedó: en verde, coinciden. Un

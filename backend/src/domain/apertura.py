@@ -80,9 +80,11 @@ _HISTORICO = "\0por histórico"  # la parte del grupo que va por histórico; no 
 
 
 def _peso(libres: list[Nodo], unidad: str) -> dict[str, Decimal]:
-    """El peso de cada hermano en esta unidad. En pesos, el histórico en pesos solo si lo tienen todos:
-    mezclar el de pesos de unos con el de kilos de otros compararía unidades distintas."""
-    if unidad == "nns" and libres and all(h.peso_nns is not None for h in libres):
+    """El peso de cada hermano en esta unidad. En pesos, el histórico en pesos solo si lo tienen todos y
+    suma algo: mezclar el de pesos de unos con el de kilos de otros compararía unidades distintas, y si
+    nadie facturó (una entrega bonificada) los pesos se abren como los kilos."""
+    if unidad == "nns" and libres and all(h.peso_nns is not None and h.peso_nns >= 0 for h in libres) \
+            and sum(h.peso_nns for h in libres) > 0:
         return {h.entidad: h.peso_nns for h in libres}
     return {h.entidad: h.peso for h in libres}
 

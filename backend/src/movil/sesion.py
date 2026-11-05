@@ -397,7 +397,7 @@ class Sesion:
         base_plata = leer_base_plata(origen)
         if hasattr(origen, "seek"):
             origen.seek(0)
-        apertura_plata = leer_apertura_plata(origen)
+        apertura_plata, problemas_plata = leer_apertura_plata(origen)
         if hasattr(origen, "seek"):
             origen.seek(0)
         precios = leer_precios(origen)
@@ -420,7 +420,8 @@ class Sesion:
             self._e.base, self._e.apertura, self._e.base_plata = base, apertura, base_plata
             self._e.precios, self._e.categorias_base = precios, categorias_base
             self._e.apertura_plata = apertura_plata
-            self._e.problemas_base, self._e.archivo_base = problemas + problemas_apertura, nombre
+            self._e.problemas_base = problemas + problemas_apertura + problemas_plata
+            self._e.archivo_base = nombre
             return Ajuste("cargar_base", nombre, autor, cuando)
         self._aplicar(cambio)
 

@@ -461,11 +461,11 @@ def leer_precios(origen) -> dict[tuple[str, str], Decimal]:
 # Apertura debajo del canal
 # ---------------------------------------------------------------------------
 
-def leer_apertura_plata(origen) -> dict[tuple[str, str], dict[str, Decimal]]:
+def leer_apertura_plata(origen) -> tuple[dict[tuple[str, str], dict[str, Decimal]], list[Problema]]:
     """Lo que facturó cada entidad debajo del canal el mes anterior, si el archivo lo trae (el móvil real)."""
     from src.importer import movil_real
     hojas = libro(origen)
-    return movil_real.apertura_plata(hojas) if movil_real.es_movil(hojas) else {}
+    return movil_real.apertura_plata(hojas) if movil_real.es_movil(hojas) else ({}, [])
 
 
 def leer_apertura(origen) -> tuple[dict[tuple[str, str], dict[str, Decimal]], list[Problema]]:

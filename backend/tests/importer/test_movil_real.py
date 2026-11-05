@@ -149,7 +149,21 @@ def test_el_precio_de_cada_sku_en_cada_canal_sale_del_mes_anterior_y_si_no_del_p
 def test_lo_que_facturo_cada_entidad_sale_de_las_mismas_tablas_que_la_apertura():
     # En el archivo de prueba, el NNS de cada bloque es diez veces los kilos; el que no vendió no entra.
     from src.importer.entradas import leer_apertura_plata
-    assert leer_apertura_plata(_movil()) == {
+    assert leer_apertura_plata(_movil()) == ({
         ("2001", "Distribuidores"): {"Distribuidor X": D("150")},
         ("2001", "Call Center"): {"Asesor A-SAP": D("200"), "Asesor B-SAP": D("50")},
-    }
+    }, [])
+
+
+def test_lo_facturado_negativo_no_se_replica_se_avisa():
+    def tabla(titulos, filas):
+        arriba, encabezado = [None] * 3, [None, "SKU", "Descripción"]
+        for t in titulos:
+            arriba += [t, None, None]
+            encabezado += KG3
+        return [arriba, encabezado, *[[None, sku, "x", *valores] for sku, valores in filas]]
+    hojas = {"Distribuidores": tabla(["Distribuidor X", "Distribuidor Y"], [("2001", [10, -50, 0, 5, 100, 0])]),
+             "Soluciones": [], "Ingredientes": []}
+    plata, problemas = movil_real.apertura_plata(hojas)
+    assert plata == {}
+    assert len(problemas) == 1 and "negativo" in problemas[0].mensaje and problemas[0].sku == "2001"
