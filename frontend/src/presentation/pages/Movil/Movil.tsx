@@ -284,12 +284,14 @@ const Entradas = ({ estado }: { estado: Estado }) => {
 
         <Tarjeta titulo="Totales por canal">
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-            <Subir cargado={!!input2} etiqueta="Excel de totales por canal" alElegir={cargarInput2} />
-            {/* Sin Excel, se arman en la pantalla; el diálogo explica desde dónde arranca. */}
-            <Button size="small" startIcon={<EditRoundedIcon />} onClick={() => setEditar(true)} disabled={ocupado || soloLectura}
+            {/* Editar (o armar en la pantalla) es lo de todos los meses; subir otro Excel, lo raro. */}
+            <Button size="small" variant="outlined" startIcon={<EditRoundedIcon />} onClick={() => setEditar(true)}
+              disabled={ocupado || soloLectura}
               aria-label={input2 ? 'Editar totales por canal' : 'Armar totales por canal en la pantalla'}>
               {input2 ? 'Editar' : 'Armar en pantalla'}
             </Button>
+            <Subir cargado={!!input2} etiqueta="Excel de totales por canal" alElegir={cargarInput2} secundario
+              texto={input2 ? 'Subir otro Excel' : 'Subir Excel'} />
           </Box>
           {input2 && (
             <Box>
