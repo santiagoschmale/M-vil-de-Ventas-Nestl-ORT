@@ -188,3 +188,20 @@ def test_el_mes_siguiente_abre_los_pesos_con_lo_que_facturo_cada_entidad_en_el_a
         heredado = {(sku, canal, e): v for (sku, canal), celda in s.entradas.apertura_plata.items()
                     for e, v in celda.items()}
     assert heredado == facturado
+
+
+def test_un_mes_guardado_con_repartir_la_diferencia_o_proponer_pesos_se_sigue_abriendo():
+    """Esas acciones ya no tienen pantalla, pero los meses que las usaron las repiten al reconstruirse."""
+    almacen = _almacen()
+    with Repositorio(almacen, hoy=HOY).usar() as s:
+        s.cargar_input1(MUESTRA / "input1_objetivo.xlsx", "objetivo.xlsx", P, CUANDO)
+        s.cargar_input2((MUESTRA / "input2_canales.tsv").read_text(encoding="utf-8"), P, CUANDO)
+        s.cargar_base(MUESTRA / "base_mes_anterior.xlsx", "base.xlsx", P, CUANDO)
+        s.cambiar_sku(NUEVO, activo=False, autor=P, cuando=CUANDO, motivo="nuevo")
+        d = s.diferencia("kilos")
+        s.repartir_diferencia("kilos", {c["canal"]: c["sugerido"] for c in d["canales"]}, P, CUANDO, "ajuste")
+        s.proponer_pesos(P, CUANDO, "según los kilos")
+        antes = dict(s.recorrido.plata.celdas)
+    with Repositorio(almacen, hoy=HOY).usar() as s:  # otro proceso: reconstruye desde lo guardado
+        assert [a.accion for a in s.historial][-2:] == ["repartir_diferencia", "proponer_pesos"]
+        assert s.recorrido.plata.celdas == antes

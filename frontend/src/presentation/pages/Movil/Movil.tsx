@@ -147,8 +147,12 @@ const TotalesDialog = ({ totales, sugerencia, objetivo, aviso, onCerrar }: {
   const conPesos = /[1-9]/.test(objetivo?.nns ?? '');  // un monto no pasa por número de JavaScript
   const [sugiriendo, setSugiriendo] = useState(false);
   // Completar llena solo los vacíos; recalcular reemplaza todos los pesos por los sugeridos.
+  // El aviso de Para revisar ("los pesos no van con sus kilos") deja de valer una vez que se recalculan.
+  const [recalculado, setRecalculado] = useState(false);
+  const avisoVigente = !!aviso && !recalculado;
   const sugerirPesos = (todos: boolean) => {
     setSugiriendo(true);
+    if (todos) setRecalculado(true);
     pesosSugeridos(columna('kilos'))
       .then(pesos => setFilas(fs => fs.map(f => (f.plata.trim() && !todos ? f : { ...f, plata: aTexto(pesos[f.canal.trim()] ?? null) }))))
       .catch(() => setError('No se pudieron sugerir los pesos. Completalos a mano o probá de nuevo.'))
@@ -195,14 +199,14 @@ const TotalesDialog = ({ totales, sugerencia, objetivo, aviso, onCerrar }: {
       <DialogTitle id="titulo-totales">{totales ? 'Editar' : 'Armar'} totales por canal</DialogTitle>
       <DialogContent>
         <Box role="status" aria-live="polite" sx={{ display: 'grid', gap: 1, mb: 2 }}>
-          {aviso && <Alerta tono="frena" titulo="Pesos no cierra" acciones={conPesos && recalcular}>{aviso}</Alerta>}
+          {avisoVigente && <Alerta tono="frena" titulo="Pesos no cierra" acciones={conPesos && recalcular}>{aviso}</Alerta>}
           {revision && (
             <EstadoTotal r={revision.kilos} unidad="kilos"
               acciones={<Principal onClick={() => ajustar('kilos', revision.kilos)}>Ajustar a Contraloría</Principal>} />
           )}
           {revision?.plata && sinPesos === 0 && (
             <EstadoTotal r={revision.plata} unidad="plata" acciones={<>
-              {conPesos && recalcular}
+              {conPesos && !avisoVigente && recalcular}
               <Resolver onClick={() => ajustar('plata', revision.plata)}>Ajustar a Contraloría</Resolver>
             </>} />
           )}

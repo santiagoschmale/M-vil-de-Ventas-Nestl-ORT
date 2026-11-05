@@ -732,12 +732,30 @@ describe('MovilPage', { timeout: 15000 }, () => {
     await within(dialogo).findByText(/Kilos: cierran con Contraloría/);
     await user.click(within(dialogo).getAllByRole('button', { name: 'Recalcular según los kilos' })[0]);
     await waitFor(() => expect(within(dialogo).getByLabelText('Pesos de Catering')).toHaveValue('100,00'));
+    expect(within(dialogo).queryByText(/no van con sus kilos/)).not.toBeInTheDocument();  // ya se recalcularon
     await user.click(within(dialogo).getByRole('button', { name: 'Guardar' }));
     expect(within(dialogo).getByText('Escribí el motivo: queda en el historial.')).toBeInTheDocument();
     await user.type(within(dialogo).getByRole('textbox', { name: /Motivo/ }), 'pesos coherentes con los kilos');
     await user.click(within(dialogo).getByRole('button', { name: 'Guardar' }));
     await waitFor(() => expect(pedidos.filter(p => p.metodo === 'PUT')).toHaveLength(1));
     expect((pedidos.find(p => p.metodo === 'PUT')!.cuerpo as { motivo: string }).motivo).toBe('pesos coherentes con los kilos');
+  });
+
+  it('si los pesos no suman lo de Contraloría, se ajustan en Totales por canal', async () => {
+    server.use(http.post('*/api/movil/totales/revisar', () => HttpResponse.json({
+      kilos: { pide: '1500.000', suman: '1500.000', falta: '0.000', cierra: true, se_reparte_solo: false, ajustados: {}, errores: {} },
+      plata: { pide: '120.00', suman: '100.00', falta: '20.00', cierra: false, se_reparte_solo: false,
+        ajustados: { Catering: '72.00', 'Directa (BA)': '48.00' }, errores: {} },
+    })));
+    const user = userEvent.setup({ delay: null });
+    render(<MovilPage />);
+    await user.click(await screen.findByRole('button', { name: /^Entradas/ }));
+    await user.click(screen.getByRole('button', { name: 'Editar totales por canal' }));
+    const dialogo = screen.getByRole('dialog', { name: 'Editar totales por canal' });
+    expect(await within(dialogo).findByText(/Pesos: faltan \$ 20,00/)).toBeInTheDocument();
+    await user.click(within(dialogo).getByRole('button', { name: 'Ajustar a Contraloría' }));
+    expect(within(dialogo).getByLabelText('Pesos de Catering')).toHaveValue('72,00');
+    expect(within(dialogo).getByLabelText('Kilos de Catering')).toHaveValue('1.000,000');  // los kilos no se tocan
   });
 
   it('al armar los totales, si el mes anterior trae pesos, también arranca con ellos', async () => {

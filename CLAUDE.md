@@ -28,7 +28,7 @@ como confirmada, de datos o a confirmar).
   precargada con la del mes anterior. La plata es por canal (cada canal tiene su
   precio): la plata de cada SKU en cada canal sale de su precio en ese canal en el
   mes anterior, nunca de un precio único. La herramienta solo valoriza a pedido
-  del planner (pesos sugeridos y "Proponer pesos según los kilos").
+  del planner ("Completar con los sugeridos" y "Recalcular según los kilos" en Totales por canal).
 - **El cruce SKU × canal es el centro del cálculo**: filas que suman el input 1,
   columnas que suman el input 2, cero forzado donde el SKU no se vende. Se parte
   del reparto del mes anterior y se ajusta por **ajuste biproporcional (RAS /

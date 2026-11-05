@@ -86,7 +86,7 @@ de la siguiente. Eso define lo que sigue (§3, "Lo que sigue").
 | Profundidad de apertura configurable por canal desde la herramienta | ✅ En Reglas, "Cómo se abre cada canal" |
 | Simulación de escenarios | ⬜ |
 | Cuadratura automática de totales | ✅ |
-| Sugerir dónde poner la diferencia cuando los totales no coinciden | ✅ "Repartir la diferencia" en Para revisar: según el peso de cada canal en los totales; se aplica con motivo y solo si cierra |
+| Sugerir dónde poner la diferencia cuando los totales no coinciden | ✅ En Totales por canal, en vivo: cuánto falta o sobra en kilos y en pesos, con "Ajustar a Contraloría" (según el peso de cada canal) y "Recalcular según los kilos" para los pesos. Las tarjetas rojas de Para revisar abren ese diálogo; corregir totales cargados pide motivo |
 
 ### COULD
 
