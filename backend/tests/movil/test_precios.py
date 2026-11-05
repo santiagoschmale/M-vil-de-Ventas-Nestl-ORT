@@ -85,3 +85,12 @@ def test_las_categorias_vacias_se_completan_con_las_del_mes_anterior():
     assert s.objetivos_vigentes()[sku].categoria == "Café"
     s.categorias[sku] = "Asignada"  # la asignada en la herramienta manda sobre la del mes anterior
     assert s.objetivos_vigentes()[sku].categoria == "Asignada"
+
+
+def test_con_precios_por_canal_proponer_pesos_cierra_en_cada_segmento():
+    """Cada SKU reparte su objetivo en pesos: un segmento no se lleva plata de los SKUs del otro."""
+    s = _cerrada()
+    sku, caro, barato = _un_sku_en_dos_canales(s)
+    _con_precios(s, sku, caro, barato)
+    s.proponer_pesos(P, CUANDO, "según los kilos")
+    assert s.recorrido.plata.celdas is not None  # cierra

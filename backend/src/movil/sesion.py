@@ -235,6 +235,28 @@ class Sesion:
         por_celda = {(s, normalizar(c)): p for (s, c), p in self._e.precios.items()}
         return lambda sku, canal, o: por_celda.get((sku, normalizar(canal))) or o.nns / o.kilos
 
+    def _por_canal(self, kilos: dict[Celda, Decimal], objetivos: dict) -> dict[str, tuple[Decimal, Decimal]]:
+        """
+        El objetivo de cada SKU repartido entre sus canales según `kilos` (SKU × canal): los kilos en
+        proporción a los kilos y los pesos en proporción a lo que facturan, kilos × precio de ese SKU en ese
+        canal. Cada SKU suma exacto su objetivo, así que cada segmento también. {canal: (kilos, pesos)}.
+        """
+        precio = self._precios()
+        por_sku: dict[str, dict[str, tuple[Decimal, Decimal]]] = {}
+        for (sku, canal), k in kilos.items():
+            o = objetivos.get(sku)
+            if k and o and o.kilos and o.nns:
+                por_sku.setdefault(sku, {})[canal] = (k, k * precio(sku, canal, o))
+        canales: dict[str, tuple[Decimal, Decimal]] = {}
+        for sku, celdas in por_sku.items():
+            o = objetivos[sku]
+            total_k = sum(k for k, _ in celdas.values())
+            total_p = sum(p for _, p in celdas.values())
+            for canal, (k, p) in celdas.items():
+                antes_k, antes_p = canales.get(canal, (Decimal(0), Decimal(0)))
+                canales[canal] = (antes_k + o.kilos * k / total_k, antes_p + o.nns * p / total_p)
+        return canales
+
     def pesos_segun_kilos(self) -> dict[str, Decimal]:
         """
         Los pesos de cada canal que van con los kilos ya repartidos: cada SKU factura sus kilos al precio que
@@ -245,12 +267,9 @@ class Sesion:
         if r.kilos.celdas is None:
             raise ErrorDeAjuste("Primero tienen que cerrar los kilos: los pesos se proponen según cómo se repartieron.")
         objetivos = self.objetivos_vigentes()
-        precio = self._precios()
         pesos = {c: Decimal(0) for c in self._e.canales}
-        for (sku, canal), kilos in r.kilos.celdas.items():
-            o = objetivos.get(sku)
-            if kilos and o and o.kilos and o.nns:
-                pesos[canal] += kilos * precio(sku, canal, o)
+        for canal, (_, plata) in self._por_canal(r.kilos.celdas, objetivos).items():
+            pesos[canal] += plata
         pide = self._pide("plata")
         if pide <= 0 or not any(pesos.values()):
             raise ErrorDeAjuste("El objetivo de Contraloría no tiene pesos: no hay de dónde proponerlos.")
@@ -271,15 +290,8 @@ class Sesion:
         if pide <= 0:
             raise ErrorDeAjuste("El objetivo de Contraloría no tiene pesos: no hay de dónde proponerlos.")
         promedio = pide / sum((o.kilos for o in activos.values()), Decimal(0))
-        # Kilos y pesos del mes anterior por canal, con los precios de este mes.
-        hubo: dict[str, list[Decimal]] = {}
-        precio = self._precios()
-        for (sku, canal), k in (self._e.base or {}).items():
-            o = activos.get(sku)
-            if o and k:
-                par = hubo.setdefault(normalizar(canal), [Decimal(0), Decimal(0)])
-                par[0] += k
-                par[1] += k * precio(sku, canal, o)
+        # El objetivo de este mes repartido como el mes anterior: qué kilos y qué pesos le tocan a cada canal.
+        hubo = {normalizar(c): v for c, v in self._por_canal(self._e.base or {}, activos).items()}
         valores = {}
         for canal, texto in kilos.items():
             k, error = _monto(texto, UNIDADES["kilos"])
