@@ -28,7 +28,7 @@ const items: SidebarItem[] = [
 
 const LeftMenu = () => {
 
-  const { fetchProfile } = useProfile();
+  const { fetchProfile, isAdmin } = useProfile();
   const [reiniciando, setReiniciando] = useState(false);
 
   useEffect(() => {
@@ -66,10 +66,10 @@ const LeftMenu = () => {
           <IconMenu
             id="profile-menu"
             links={conEntra() ? [] : [{ name: 'Logout', location: '/signout' }]}
-            // Empezar de cero: en local o en un entorno de prueba que lo permite (PERMITIR_REINICIAR).
+            // Empezar de cero: en local o en un entorno de prueba que lo permite (PERMITIR_REINICIAR), y solo para Admin.
             acciones={[
               ...(conEntra() ? [{ name: 'Cerrar sesión', onClick: () => cerrarSesion() }] : []),
-              ...(puedeReiniciar() ? [{ name: 'Empezar de cero', onClick: () => setReiniciando(true) }] : []),
+              ...(puedeReiniciar() && isAdmin() ? [{ name: 'Empezar de cero', onClick: () => setReiniciando(true) }] : []),
             ]}
             icon={<ExpandMoreRoundedIcon />}
             anchorOrigin={{ vertical: 'top', horizontal: 'left' }}
