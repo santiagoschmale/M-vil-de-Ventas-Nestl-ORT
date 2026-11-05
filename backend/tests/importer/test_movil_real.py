@@ -122,3 +122,25 @@ def test_un_archivo_que_no_es_el_movil_no_trae_pesos_del_mes_anterior():
     otro.save(archivo)
     archivo.seek(0)
     assert leer_base_plata(archivo) is None
+
+
+def test_el_precio_de_cada_sku_en_cada_canal_sale_del_mes_anterior_y_si_no_del_periodo():
+    def tabla(titulos, filas):
+        arriba, encabezado = [None] * 3, [None, "SKU", "Descripción"]
+        for t in titulos:
+            arriba += [t, None, None]
+            encabezado += KG3
+        return [arriba, encabezado, *[[None, sku, "x", *valores] for sku, valores in filas]]
+
+    hojas = {
+        # El período: Café a 100 $/kg en Catering y 50 $/kg en Vending; Té a 20 $/kg en Catering.
+        "Participaciones": tabla(["Catering", "Vending"], [("1001", [10, 1000, 0, 10, 500, 0]),
+                                                           ("2001", [5, 100, 0, 0, 0, 0])])
+                           + [[]] + tabla(["Distribuidor X"], [("1001", [3, 300, 0])]),  # no es un canal
+        # El mes anterior: Café a 120 $/kg en Catering (pisa al período); no se vendió en Vending.
+        "Ingredientes": tabla(["Catering", "Vending"], [("1001", [4, 480, 0, 0, 0, 0])]),
+        "Soluciones": [],
+        "Distribuidores": [],
+    }
+    assert movil_real.precios(hojas) == {("1001", "Catering"): D("120"), ("1001", "Vending"): D("50"),
+                                         ("2001", "Catering"): D("20")}

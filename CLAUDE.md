@@ -26,7 +26,9 @@ como confirmada, de datos o a confirmar).
   total por SKU **cierra exacto**.
 - **Input 2** (el planner): canal, kilos, plata. Se sube en Excel y se edita por canal en la herramienta (hoy la pega cada mes),
   precargada con la del mes anterior. La plata es por canal (cada canal tiene su
-  precio): **la herramienta no valoriza**.
+  precio): la plata de cada SKU en cada canal sale de su precio en ese canal en el
+  mes anterior, nunca de un precio único. La herramienta solo valoriza a pedido
+  del planner (pesos sugeridos y "Proponer pesos según los kilos").
 - **El cruce SKU × canal es el centro del cálculo**: filas que suman el input 1,
   columnas que suman el input 2, cero forzado donde el SKU no se vende. Se parte
   del reparto del mes anterior y se ajusta por **ajuste biproporcional (RAS /

@@ -107,6 +107,7 @@ def armar(
     reglas: list[Regla] | tuple[Regla, ...] = (),
     canales_sku: dict[str, set[str] | frozenset[str]] | None = None,
     porcentajes: dict[tuple[str, str], Decimal] | None = None,
+    precios: dict[Celda, Decimal] | None = None,
 ) -> Recorrido:
     """
     `apagados`: SKUs que el planner saca del mes (ON/OFF). No se reparten; si su
@@ -126,6 +127,10 @@ def armar(
 
     `porcentajes`: base de cálculo, {(canal, entidad): % manual}. Esa entidad se lleva
     ese % de cada celda del canal que se abre; el resto va por histórico (supuesto B1).
+
+    `precios`: lo que valió un kilo de cada SKU en cada canal el mes anterior. Los pesos arrancan de
+    la base en kilos a ese precio (los pesos del mes anterior), no de los kilos: un SKU no vale lo
+    mismo en todos los canales. Sin precio, el de Contraloría, y los pesos siguen a los kilos.
     """
     problemas = list(problemas or [])
     apagados = frozenset(apagados)
@@ -163,10 +168,12 @@ def armar(
     hay_plata = all(o.nns is not None for o in activos.values()) and all(t.plata is not None for t in canales.values())
     plata = None
     if hay_plata:
+        precio = {(s, por_nombre.get(normalizar(c), c)): p for (s, c), p in (precios or {}).items()}
         plata = cruzar(
             filas={s: o.nns for s, o in activos.items() if o.nns > 0},
             columnas={c: t.plata for c, t in canales.items()},
-            base=base,
+            base={(s, c): w * (precio.get((s, c)) or (activos[s].nns / activos[s].kilos if s in activos else 1))
+                  for (s, c), w in base.items()},
             decimales=PLATA,
             fijas=fijas_plata,
             grupos=grupos_plata,

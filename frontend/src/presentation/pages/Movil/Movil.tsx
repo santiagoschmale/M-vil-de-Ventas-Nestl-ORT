@@ -207,7 +207,7 @@ const TotalesDialog = ({ totales, sugerencia, objetivo, onCerrar }: {
               {conPesos && !kilosListos
                 ? 'Salen de los kilos: primero ajustá los kilos a lo que pide Contraloría.'
                 : conPesos
-                ? 'Se sugieren según los kilos de cada canal, al precio de Contraloría de cada SKU. Después los podés cambiar.'
+                ? 'Se sugieren según los kilos de cada canal, al precio que tuvo cada SKU en ese canal el mes anterior. Después los podés cambiar.'
                 : 'Sin pesos, se reparten solo los kilos hasta que los completes.'}
             </Alerta>
           </Box>
@@ -482,7 +482,7 @@ const Pendientes = ({ estado, unidad, enMatriz }: { estado: Estado; unidad: Unid
       {unidad === 'kilos' && !sinPesos && <Resolver onClick={() => elegirUnidad('plata')}>Ver en pesos</Resolver>}
     </>}>
       {sinPesos ? 'Faltan los pesos de algún canal. ' : 'Los pesos de cada canal no van con sus kilos. '}
-      La herramienta los puede proponer: cada canal se lleva lo que facturan sus kilos, al precio de Contraloría de cada SKU.
+      La herramienta los puede proponer: cada canal se lleva lo que facturan sus kilos, al precio que tuvo cada SKU en ese canal el mes anterior.
     </Alerta>
   );
   const avisoOtra = proponer ? (unidad === 'kilos' && avisoPesos) : !estado.cierra[otra] && !estado.faltan.length && !mismoProblema && (
@@ -496,7 +496,7 @@ const Pendientes = ({ estado, unidad, enMatriz }: { estado: Estado; unidad: Unid
   );
   const dialogoPesos = proponiendo && (
     <MotivoDialog titulo="Proponer pesos según los kilos"
-      descripcion="Los pesos de cada canal pasan a ser lo que facturan sus kilos al precio de Contraloría de cada SKU. Reemplaza los pesos cargados en Totales por canal; se puede deshacer."
+      descripcion="Los pesos de cada canal pasan a ser lo que facturan sus kilos al precio que tuvo cada SKU en ese canal el mes anterior. Reemplaza los pesos cargados en Totales por canal; se puede deshacer."
       confirmar="Proponer pesos" onConfirmar={proponerPesos} onCerrar={() => setProponiendo(false)} />
   );
   if (!inconsistencias.length && !estado.problemas.length && !estado.avisos[unidad].length) {

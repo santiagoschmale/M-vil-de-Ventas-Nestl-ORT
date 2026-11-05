@@ -431,6 +431,13 @@ def leer_base_plata(origen) -> dict[str, Decimal] | None:
     return movil_real.plata_por_canal(hojas) if movil_real.es_movil(hojas) else None
 
 
+def leer_precios(origen) -> dict[tuple[str, str], Decimal]:
+    """El precio por kilo de cada SKU en cada canal, si el archivo lo trae (el móvil real sí; la muestra no)."""
+    from src.importer import movil_real
+    hojas = libro(origen)
+    return movil_real.precios(hojas) if movil_real.es_movil(hojas) else {}
+
+
 # ---------------------------------------------------------------------------
 # Apertura debajo del canal
 # ---------------------------------------------------------------------------

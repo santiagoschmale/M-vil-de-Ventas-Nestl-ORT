@@ -125,6 +125,26 @@ def plata_por_canal(hojas: dict[str, list[list]]) -> dict[str, Decimal]:
     return por_canal
 
 
+def precios(hojas: dict[str, list[list]]) -> dict[tuple[str, str], Decimal]:
+    """
+    Precio por kilo (NNS / kilos) de cada SKU en cada canal: el del reparto del mes anterior y, donde
+    no se vendió, el del período de Participaciones. Un SKU no vale lo mismo en todos los canales.
+    """
+    reparto = [t for nombre in ("ingredientes", "soluciones") for t in tablas(_hoja(hojas, nombre))[:1]]
+    # Participaciones también tiene tablas de distribuidores y asesores: solo cuentan los canales del reparto.
+    canales = {_norm(c) for t in reparto for c in t.titulos}
+    fuentes = [tablas(_hoja(hojas, "participaciones"))] if "participaciones" in {_norm(n) for n in hojas} else []
+    fuentes.append(reparto)  # el mes anterior va último: pisa al período, es lo más reciente
+    precio: dict[tuple[str, str], Decimal] = {}
+    for encontradas in fuentes:
+        for tabla in encontradas:
+            for sku, bloques in tabla.filas.items():
+                for canal, (kilos, nns) in bloques.items():
+                    if _norm(canal) in canales and kilos and nns and kilos > 0 and nns > 0:
+                        precio[(sku, canal)] = nns / kilos
+    return precio
+
+
 def apertura(hojas: dict[str, list[list]]) -> tuple[dict[tuple[str, str], dict[str, Decimal]], list[Problema]]:
     """
     {(sku, canal): {entidad: kilos}}: los distribuidores (hoja Distribuidores) y los asesores
