@@ -94,3 +94,16 @@ def test_con_precios_por_canal_proponer_pesos_cierra_en_cada_segmento():
     _con_precios(s, sku, caro, barato)
     s.proponer_pesos(P, CUANDO, "según los kilos")
     assert s.recorrido.plata.celdas is not None  # cierra
+
+
+def test_los_pesos_sugeridos_cierran_en_cada_segmento():
+    """Los pesos que sugiere el diálogo de totales, guardados tal cual, cierran: ningún segmento se lleva
+    pesos de los SKUs del otro, aunque cada SKU valga distinto en cada canal."""
+    s = _cerrada()
+    sku, caro, barato = _un_sku_en_dos_canales(s)
+    _con_precios(s, sku, caro, barato)
+    kilos = {c: str(t.kilos) for c, t in s.entradas.canales.items()}
+    pesos = s.pesos_para(kilos)
+    filas = "\n".join(f"{c}\t{kilos[c]}\t{pesos[c]}" for c in kilos)
+    s.cargar_input2("Canal\tKilos\tPlata\n" + filas, P, CUANDO)
+    assert s.recorrido.plata.celdas is not None

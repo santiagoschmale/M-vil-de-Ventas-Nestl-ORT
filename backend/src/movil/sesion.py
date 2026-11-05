@@ -277,10 +277,10 @@ class Sesion:
 
     def pesos_para(self, kilos: dict[str, str]) -> dict[str, str]:
         """
-        Pesos sugeridos para totales por canal que todavía no los tienen (al armarlos en la pantalla):
-        los kilos de cada canal al precio por kilo que tuvo ese canal en el mes anterior, con la mezcla de
-        SKUs que vendió y el precio de cada SKU en ese canal. Suman exacto lo que pide Contraloría. Un canal
-        sin mes anterior va al precio promedio. Solo lee: no cambia nada.
+        Pesos sugeridos para totales por canal que todavía no los tienen (al armarlos en la pantalla): el
+        objetivo en pesos de cada SKU repartido entre sus canales como el mes anterior, ajustado a los kilos
+        que escribió el planner en cada canal y al precio de ese SKU en ese canal. Cada segmento suma lo
+        suyo y el total, lo que pide Contraloría. Un canal sin mes anterior va al precio promedio. Solo lee.
         """
         if self._e.objetivos is None:
             raise ErrorDeAjuste("Cargá el objetivo de Contraloría: los pesos salen de sus precios.")
@@ -290,14 +290,34 @@ class Sesion:
         if pide <= 0:
             raise ErrorDeAjuste("El objetivo de Contraloría no tiene pesos: no hay de dónde proponerlos.")
         promedio = pide / sum((o.kilos for o in activos.values()), Decimal(0))
-        # El objetivo de este mes repartido como el mes anterior: qué kilos y qué pesos le tocan a cada canal.
-        hubo = {normalizar(c): v for c, v in self._por_canal(self._e.base or {}, activos).items()}
-        valores = {}
+        escritos = {}  # canal normalizado -> (nombre, kilos que escribió el planner)
         for canal, texto in kilos.items():
             k, error = _monto(texto, UNIDADES["kilos"])
             if not error and k:
-                par = hubo.get(normalizar(canal))
-                valores[canal] = k * (par[1] / par[0] if par else promedio)
+                escritos[normalizar(canal)] = (canal, k)
+        if not escritos:
+            return {}
+        # El objetivo repartido como el mes anterior, y cuánto lo agrandó o achicó el planner en cada canal.
+        hubo = {normalizar(c): k for c, (k, _) in self._por_canal(self._e.base or {}, activos).items()}
+        factor = {n: k / hubo[n] for n, (_, k) in escritos.items() if hubo.get(n)}
+        # Cada SKU reparte su objetivo en pesos entre sus canales según kilos × precio: así cada SKU, y por
+        # lo tanto cada segmento, suma exacto lo suyo (escalar todos los canales juntos los mezcla).
+        precio = self._precios()
+        por_sku: dict[str, dict[str, Decimal]] = {}
+        for (sku, canal), k in (self._e.base or {}).items():
+            o, n = activos.get(sku), normalizar(canal)
+            if o and k and factor.get(n):
+                celdas = por_sku.setdefault(sku, {})
+                celdas[n] = celdas.get(n, Decimal(0)) + k * factor[n] * precio(sku, canal, o)
+        pesos = {n: Decimal(0) for n in escritos}
+        for sku, celdas in por_sku.items():
+            total = sum(celdas.values())
+            for n, v in celdas.items():
+                pesos[n] += activos[sku].nns * v / total
+        for n, (_, k) in escritos.items():
+            if n not in factor:  # sin mes anterior: al precio promedio de Contraloría
+                pesos[n] = k * promedio
+        valores = {nombre: pesos[n] for n, (nombre, _) in escritos.items() if pesos[n]}
         if not valores:
             return {}
         return {c: str(v) for c, v in repartir(pide, valores, UNIDADES["plata"]).items()}
