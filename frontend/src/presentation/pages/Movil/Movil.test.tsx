@@ -758,6 +758,22 @@ describe('MovilPage', { timeout: 15000 }, () => {
     expect(within(dialogo).getByLabelText('Kilos de Catering')).toHaveValue('1.000,000');  // los kilos no se tocan
   });
 
+  it('si kilos y pesos no cierran, el diálogo dice qué hace cada botón, por qué uno está apagado y que se puede guardar', async () => {
+    server.use(http.post('*/api/movil/totales/revisar', () => HttpResponse.json({
+      kilos: { pide: '1400.000', suman: '1500.000', falta: '-100.000', cierra: false, se_reparte_solo: false, ajustados: {}, errores: {} },
+      plata: { pide: '90.00', suman: '100.00', falta: '-10.00', cierra: false, se_reparte_solo: false, ajustados: {}, errores: {} },
+    })));
+    const user = userEvent.setup({ delay: null });
+    render(<MovilPage />);
+    await user.click(await screen.findByRole('button', { name: /^Entradas/ }));
+    await user.click(screen.getByRole('button', { name: 'Editar totales por canal' }));
+    const dialogo = screen.getByRole('dialog', { name: 'Editar totales por canal' });
+    expect(await within(dialogo).findByText(/le saca a cada canal su parte, según su tamaño/)).toBeInTheDocument();
+    expect(within(dialogo).getByText(/Primero ajustá los kilos: los pesos se recalculan con ellos/)).toBeInTheDocument();
+    expect(within(dialogo).getByRole('button', { name: 'Recalcular según los kilos' })).toBeDisabled();
+    expect(within(dialogo).getByText(/Kilos y pesos no cierran con Contraloría\. Podés guardar igual/)).toBeInTheDocument();
+  });
+
   it('al armar los totales, si el mes anterior trae pesos, también arranca con ellos', async () => {
     const sinTotales = estado({ faltan: ['totales por canal'] });
     sinTotales.entradas.input2 = null;

@@ -75,7 +75,10 @@ const sinSigno = (m: string) => m.replace(/^-/, '');
  * Una unidad de los totales que se están armando, contra lo que pide Contraloría, en vivo: cierra, es un
  * redondeo que se reparte solo, o falta/sobra, con las acciones para corregirlo.
  */
-const EstadoTotal = ({ r, unidad, acciones }: { r: RevisionUnidad; unidad: Unidad; acciones: React.ReactNode }) => {
+const EstadoTotal = ({ r, unidad, acciones, nota }: {
+  r: RevisionUnidad; unidad: Unidad; acciones: React.ReactNode;
+  nota?: string; // reemplaza la explicación del ajuste (p. ej. por qué un botón está deshabilitado)
+}) => {
   if (r.falta === null) return null;
   const nombre = UNIDADES[unidad].nombre;
   const sobra = r.falta.startsWith('-');
@@ -85,7 +88,8 @@ const EstadoTotal = ({ r, unidad, acciones }: { r: RevisionUnidad; unidad: Unida
     : r.se_reparte_solo
     ? <Alerta tono="listo" titulo={`${nombre}: ${sobra ? 'sobran' : 'faltan'} ${diferencia}`}>Es un redondeo: se reparte solo al guardar.</Alerta>
     : <Alerta tono="frena" titulo={`${nombre}: ${sobra ? 'sobran' : 'faltan'} ${diferencia}`} acciones={acciones}>
-        Contraloría pide {conUnidad(r.pide, unidad)}.
+        Contraloría pide {conUnidad(r.pide, unidad)}.{' '}
+        {nota ?? `«Ajustar a Contraloría» ${sobra ? 'le saca' : 'le suma'} a cada canal su parte, según su tamaño.`}
       </Alerta>;
 };
 // La misma regla que `normalizar` del backend: sin tildes, mayúsculas ni espacios de más.
@@ -144,6 +148,7 @@ const TotalesDialog = ({ totales, sugerencia, objetivo, aviso, onCerrar }: {
   };
   // Los pesos salen de los kilos: se sugieren cuando los kilos ya cierran, a pedido del planner.
   const kilosListos = !objetivo || !!revision?.kilos.cierra || !!revision?.kilos.se_reparte_solo;
+  const pesosListos = !objetivo || !!revision?.plata?.cierra || !!revision?.plata?.se_reparte_solo;
   const conPesos = /[1-9]/.test(objetivo?.nns ?? '');  // un monto no pasa por número de JavaScript
   const [sugiriendo, setSugiriendo] = useState(false);
   // Completar llena solo los vacíos; recalcular reemplaza todos los pesos por los sugeridos.
@@ -205,7 +210,9 @@ const TotalesDialog = ({ totales, sugerencia, objetivo, aviso, onCerrar }: {
               acciones={<Principal onClick={() => ajustar('kilos', revision.kilos)}>Ajustar a Contraloría</Principal>} />
           )}
           {revision?.plata && sinPesos === 0 && (
-            <EstadoTotal r={revision.plata} unidad="plata" acciones={<>
+            <EstadoTotal r={revision.plata} unidad="plata"
+              nota={conPesos && !kilosListos ? 'Primero ajustá los kilos: los pesos se recalculan con ellos.' : undefined}
+              acciones={<>
               {conPesos && !avisoVigente && recalcular}
               <Resolver onClick={() => ajustar('plata', revision.plata)}>Ajustar a Contraloría</Resolver>
             </>} />
@@ -286,7 +293,15 @@ const TotalesDialog = ({ totales, sugerencia, objetivo, aviso, onCerrar }: {
         )}
         {error && <Box sx={{ mt: 2 }}><Alerta tono="frena">{error}</Alerta></Box>}
       </DialogContent>
-      <DialogActions sx={{ px: 3, pb: 2 }}>
+      <DialogActions sx={{ px: 3, pb: 2, gap: 1, flexWrap: 'wrap' }}>
+        {revision && !(kilosListos && pesosListos && sinPesos === 0) && (
+          <Typography variant="body2" color="text.secondary" sx={{ mr: 'auto' }}>
+            {!kilosListos && (sinPesos > 0 || !pesosListos) ? 'Kilos y pesos no cierran con Contraloría.'
+              : !kilosListos ? 'Los kilos no cierran con Contraloría.'
+                : sinPesos > 0 ? 'Faltan pesos.' : 'Los pesos no cierran con Contraloría.'}
+            {' '}Podés guardar igual: queda en Para revisar.
+          </Typography>
+        )}
         <Button onClick={onCerrar}>Cancelar</Button>
         <Button type="submit" variant="contained" disabled={ocupado || !puedeGuardar}>Guardar</Button>
       </DialogActions>
