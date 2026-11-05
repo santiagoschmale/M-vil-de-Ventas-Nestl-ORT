@@ -1,13 +1,12 @@
 import React, { useState } from 'react';
 import {
-  Alert, Box, Button, Checkbox, Chip, Dialog, DialogActions, DialogContent, DialogTitle, FormControlLabel,
-  FormGroup, FormLabel, IconButton, Switch, Table, TableBody, TableCell, TableHead, TableRow, TextField,
-  ToggleButton, ToggleButtonGroup, Tooltip, Typography,
+  Box, Button, Checkbox, Chip, Dialog, DialogActions, DialogContent, DialogTitle, FormControlLabel, FormGroup, FormLabel, IconButton, Switch, Table, TableBody, TableCell, TableHead, TableRow, TextField, ToggleButton, ToggleButtonGroup, Tooltip, Typography,
 } from '@mui/material';
 import AddRoundedIcon from '@mui/icons-material/AddRounded';
 import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded';
 import EditRoundedIcon from '@mui/icons-material/EditRounded';
 import { useMovil, useSoloLectura } from '../../../stores/useMovil';
+import { Alerta } from './Alerta';
 import { DatosRegla, Estado, Limite, Regla } from '../../../stores/useMovil/useMovil.type';
 import { formatear, UNIDADES } from './formato';
 import { ENFOCADA, NO_CIERRA, numeros } from './estilo';
@@ -110,7 +109,7 @@ const ReglaDialog = ({ regla, estado, onCerrar }: Formulario & { estado: Estado;
 
         <TextField label="Motivo" required value={motivo} onChange={e => setMotivo(e.target.value)}
           helperText="Queda en el historial, con tu nombre y la hora." />
-        {error && <Alert severity="error">{error}</Alert>}
+        {error && <Alerta tono="frena">{error}</Alerta>}
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2 }}>
         <Button onClick={onCerrar}>Cancelar</Button>

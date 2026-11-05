@@ -30,6 +30,9 @@ beforeEach(() => {
     http.get('*/api/movil/cruce/kilos', () => HttpResponse.json(cruce)),
     http.get('*/api/movil/meses', () => HttpResponse.json([{ mes: '2026-10', aprobado: false }])),
     http.get('*/api/movil/apertura/*', () => HttpResponse.json({ detail: 'no se abre' }, { status: 404 })),
+    // Los kilos que se arman en la pantalla cierran con Contraloría, salvo que un test diga otra cosa.
+    http.post('*/api/movil/totales/kilos/revisar', () => HttpResponse.json(
+      { pide: '1300.000', suman: '1300.000', falta: '0.000', cierra: true, se_reparte_solo: false, ajustados: {}, errores: {} })),
     // Pesos sugeridos: 100 por canal.
     http.post('*/api/movil/totales/pesos/sugeridos', async ({ request }) => {
       const { valores } = await request.json() as { valores: Record<string, string> };
@@ -248,12 +251,39 @@ describe('MovilPage', { timeout: 15000 }, () => {
     // El mes anterior no trae pesos: se completan con los sugeridos a pedido, y el que ya escribió el planner queda.
     expect(within(dialogo).getByText('Faltan los pesos')).toBeInTheDocument();
     await user.type(within(dialogo).getByLabelText('Pesos de Córdoba'), '40');
+    await within(dialogo).findByText(/Kilos: cierran con Contraloría/);
     await user.click(within(dialogo).getByRole('button', { name: 'Completar con los sugeridos' }));
     await waitFor(() => expect(within(dialogo).getByLabelText('Pesos de Catering')).toHaveValue('100,00'));
     expect(within(dialogo).queryByText(/Falta/)).not.toBeInTheDocument();
     await user.click(within(dialogo).getByRole('button', { name: 'Guardar' }));
     await waitFor(() => expect(pedidos.filter(p => p.metodo === 'PUT')).toEqual([{ metodo: 'PUT', url: '/api/movil/input2',
       cuerpo: { texto: 'Canal\tKilos\tPlata\nCatering\t900,000\t100,00\nCórdoba\t400,000\t40' } }]));
+  });
+
+  it('al armar los totales se ve en vivo cuánto falta para Contraloría y se ajusta en un clic', async () => {
+    const base = { archivo: 'reparto_agosto.xlsx', celdas: 3, aperturas: 1,
+      canales: [{ canal: 'Catering', kilos: '900.000' }, { canal: 'Córdoba', kilos: '400.000' }] };
+    server.use(
+      http.get('*/api/movil', () => HttpResponse.json(estado({
+        faltan: ['totales por canal'], entradas: { ...estado().entradas, input2: null, base } }))),
+      http.post('*/api/movil/totales/kilos/revisar', async ({ request }) => {
+        const { valores } = await request.json() as { valores: Record<string, string> };
+        const ajustado = valores.Catering === '1.050,000';
+        return HttpResponse.json({ pide: '1500.000', suman: ajustado ? '1500.000' : '1300.000',
+          falta: ajustado ? '0.000' : '200.000', cierra: ajustado, se_reparte_solo: false,
+          ajustados: { Catering: '1050.000', Córdoba: '450.000' }, errores: {} });
+      }),
+    );
+    const user = userEvent.setup({ delay: null });
+    render(<MovilPage />);
+    await user.click(await screen.findByRole('button', { name: 'Armar totales por canal en la pantalla' }));
+    const dialogo = screen.getByRole('dialog', { name: 'Armar totales por canal' });
+    expect(await within(dialogo).findByText(/Kilos: faltan 200,000 kg/)).toBeInTheDocument();
+    expect(within(dialogo).getByRole('button', { name: 'Completar con los sugeridos' })).toBeDisabled();  // los pesos salen de los kilos
+    await user.click(within(dialogo).getByRole('button', { name: 'Ajustar a Contraloría' }));
+    expect(within(dialogo).getByLabelText('Kilos de Córdoba')).toHaveValue('450,000');
+    expect(await within(dialogo).findByText(/Kilos: cierran con Contraloría/)).toBeInTheDocument();
+    expect(within(dialogo).getByRole('button', { name: 'Completar con los sugeridos' })).toBeEnabled();
   });
 
   it('se pueden agregar y sacar canales al armar los totales, aun sin mes anterior', async () => {
@@ -612,7 +642,7 @@ describe('MovilPage', { timeout: 15000 }, () => {
     await waitFor(() => expect(within(sidebar).getAllByRole('button').map(b => b.textContent))
       .toEqual(['2026', 'noviembreEn curso', 'octubre✓ Aprobado']));
     await user.click(within(sidebar).getByRole('button', { name: /octubre/ }));
-    expect(await screen.findByText(/un mes anterior\. Es de solo lectura/)).toBeInTheDocument();
+    expect(await screen.findByText(/Es un mes anterior, de solo lectura/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Reabrir' })).not.toBeInTheDocument();
     expect(pedidosMes).toContain('2026-10');
     expect(within(screen.getByRole('banner')).getByText('Solo lectura')).toBeInTheDocument();

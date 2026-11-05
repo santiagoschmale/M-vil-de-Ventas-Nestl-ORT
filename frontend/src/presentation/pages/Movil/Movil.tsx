@@ -1,8 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
-  Accordion, AccordionDetails, AccordionSummary, Alert, Box, Button, Chip, Dialog, DialogActions, DialogContent,
-  DialogTitle, FormControlLabel, IconButton, LinearProgress, Link, List, ListItem, ListItemText, Paper, Radio, RadioGroup, Table, TableBody, TableCell, TableHead,
-  TableRow, TextField, ToggleButton, ToggleButtonGroup, Tooltip, Typography,
+  Accordion, AccordionDetails, AccordionSummary, Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle, FormControlLabel, IconButton, LinearProgress, Link, List, ListItem, ListItemText, Paper, Radio, RadioGroup, Table, TableBody, TableCell, TableHead, TableRow, TextField, ToggleButton, ToggleButtonGroup, Tooltip, Typography,
 } from '@mui/material';
 import ExpandMoreRoundedIcon from '@mui/icons-material/ExpandMoreRounded';
 import FileDownloadRoundedIcon from '@mui/icons-material/FileDownloadRounded';
@@ -16,11 +14,13 @@ import ArrowForwardRoundedIcon from '@mui/icons-material/ArrowForwardRounded';
 import ArrowBackRoundedIcon from '@mui/icons-material/ArrowBackRounded';
 import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
 import ErrorRoundedIcon from '@mui/icons-material/ErrorRounded';
+import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
 import { alpha } from '@mui/material/styles';
 import { useMovil, useSoloLectura } from '../../../stores/useMovil';
-import { Estado, Unidad } from '../../../stores/useMovil/useMovil.type';
-import { conUnidad, formatear, nombreMes, UNIDADES } from './formato';
+import { Estado, RevisionKilos, Unidad } from '../../../stores/useMovil/useMovil.type';
+import { conUnidad, enMenores, formatear, nombreMes, UNIDADES } from './formato';
 import { AVENA, CIERRA, NO_CIERRA, numeros } from './estilo';
+import { Alerta, Principal, Resolver } from './Alerta';
 import { Ayuda } from './Ayuda';
 import { AYUDA } from './ayudas';
 import { Foco, Repetido } from '../../../stores/useMovil/useMovil.type';
@@ -85,6 +85,27 @@ type Campo = 'kilos' | 'plata';
 
 const fila = (f: Partial<Fila>): Fila => ({ id: crypto.randomUUID(), canal: '', kilos: '', plata: '', nueva: false, ...f });
 const aTexto = (m: string | null) => (m == null ? '' : formatear(m));
+const PAUSA_MS = 250;
+const sinSigno = (m: string) => m.replace(/^-/, '');
+
+/** Los kilos que se están armando contra lo que pide Contraloría, en vivo; con el ajuste a un clic si no cierra. */
+const EstadoKilos = ({ r, onAjustar }: { r?: RevisionKilos; onAjustar: () => void }) => {
+  if (!r || r.falta === null) return null;
+  const sobra = r.falta.startsWith('-');
+  const diferencia = `${conUnidad(sinSigno(r.falta), 'kilos')}${enMenores(r.falta, 'kilos')}`;
+  return (
+    <Box role="status" aria-live="polite" sx={{ mb: 2 }}>
+      {r.cierra
+        ? <Alerta tono="listo" titulo="Kilos: cierran con Contraloría">{conUnidad(r.pide, 'kilos')}</Alerta>
+        : r.se_reparte_solo
+        ? <Alerta tono="listo" titulo={`Kilos: ${sobra ? 'sobran' : 'faltan'} ${diferencia}`}>Es un redondeo: se reparte solo al guardar.</Alerta>
+        : <Alerta tono="frena" titulo={`Kilos: ${sobra ? 'sobran' : 'faltan'} ${diferencia}`}
+            acciones={<Principal onClick={onAjustar}>Ajustar a Contraloría</Principal>}>
+            Contraloría pide {conUnidad(r.pide, 'kilos')}. El ajuste reparte la diferencia según el peso de cada canal.
+          </Alerta>}
+    </Box>
+  );
+};
 // La misma regla que `normalizar` del backend: sin tildes, mayúsculas ni espacios de más.
 const claveDeCanal = (canal: string) =>
   canal.normalize('NFKD').replace(/\p{M}/gu, '').replace(/\s+/g, ' ').trim().toLowerCase();
@@ -96,7 +117,7 @@ const claveDeCanal = (canal: string) =>
 const TotalesDialog = ({ totales, sugerencia, objetivo, onCerrar }: {
   totales: Totales | null; sugerencia?: Sugerencia; objetivo: Objetivo; onCerrar: () => void;
 }) => {
-  const { editarTotales, pesosSugeridos, ocupado } = useMovil();
+  const { editarTotales, pesosSugeridos, revisarKilos, ocupado } = useMovil();
   const [iniciales] = useState<Fila[]>(() => {
     // Pesos vacíos: los del mes anterior, si su archivo los trae.
     const pesosAnteriores = new Map((sugerencia ?? []).map(t => [claveDeCanal(t.canal), aTexto(t.plata)]));
@@ -116,7 +137,25 @@ const TotalesDialog = ({ totales, sugerencia, objetivo, onCerrar }: {
     setFilas(fs => fs.map(f => (f.id === id ? { ...f, [campo]: valor } : f)));
     setError(null);
   };
-  // Los pesos que faltan, sugeridos según los kilos de cada canal: solo si el planner lo pide.
+  // Mientras se escriben los kilos, el backend dice cuánto falta para Contraloría; el último pedido gana.
+  const [revision, setRevision] = useState<RevisionKilos>();
+  const pedido = useRef(0);
+  const kilosEscritos = filas.map(f => `${f.canal.trim()}\t${f.kilos.trim()}`).join('\n');
+  useEffect(() => {
+    if (!objetivo) return;
+    const id = ++pedido.current;
+    const t = setTimeout(() => {
+      const kilos = Object.fromEntries(filas.filter(f => f.canal.trim()).map(f => [f.canal.trim(), f.kilos.trim()]));
+      revisarKilos(kilos).then(r => { if (id === pedido.current) setRevision(r); }).catch(() => undefined);
+    }, PAUSA_MS);
+    return () => clearTimeout(t);
+  }, [kilosEscritos]);
+  const ajustarKilos = () => {
+    const ajustados = revision?.ajustados ?? {};
+    setFilas(fs => fs.map(f => (ajustados[f.canal.trim()] ? { ...f, kilos: aTexto(ajustados[f.canal.trim()]) } : f)));
+  };
+  // Los pesos salen de los kilos: se completan cuando los kilos ya cierran, a pedido del planner.
+  const kilosListos = !objetivo || !!revision?.cierra || !!revision?.se_reparte_solo;
   const conPesos = !!objetivo?.nns && Number(objetivo.nns) > 0;
   const [sugiriendo, setSugiriendo] = useState(false);
   const completarPesos = () => {
@@ -158,13 +197,16 @@ const TotalesDialog = ({ totales, sugerencia, objetivo, onCerrar }: {
       PaperProps={{ component: 'form', onSubmit: guardar }}>
       <DialogTitle id="titulo-totales">{totales ? 'Editar' : 'Armar'} totales por canal</DialogTitle>
       <DialogContent>
+        <EstadoKilos r={revision} onAjustar={ajustarKilos} />
         {sinPesos > 0 && (
           <Box sx={{ mb: 2 }}>
-            <Alerta frena={false} titulo={sinPesos === conCanal.length ? 'Faltan los pesos' : `Falta el peso de ${sinPesos} ${sinPesos === 1 ? 'canal' : 'canales'}`}
+            <Alerta tono="aviso" titulo={sinPesos === conCanal.length ? 'Faltan los pesos' : `Falta el peso de ${sinPesos} ${sinPesos === 1 ? 'canal' : 'canales'}`}
               acciones={conPesos && (
-                <Principal onClick={completarPesos} disabled={sugiriendo}>Completar con los sugeridos</Principal>
+                <Principal onClick={completarPesos} disabled={sugiriendo || !kilosListos}>Completar con los sugeridos</Principal>
               )}>
-              {conPesos
+              {conPesos && !kilosListos
+                ? 'Salen de los kilos: primero ajustá los kilos a lo que pide Contraloría.'
+                : conPesos
                 ? 'Se sugieren según los kilos de cada canal, al precio de Contraloría de cada SKU. Después los podés cambiar.'
                 : 'Sin pesos, se reparten solo los kilos hasta que los completes.'}
             </Alerta>
@@ -219,12 +261,12 @@ const TotalesDialog = ({ totales, sugerencia, objetivo, onCerrar }: {
         </Button>
         {sacados.length > 0 && (
           <Box sx={{ mt: 2 }}>
-            <Alerta frena={false} titulo={`Vas a sacar ${sacados.join(', ')}`}>
+            <Alerta tono="aviso" titulo={`Vas a sacar ${sacados.join(', ')}`}>
               Al guardar deja de estar en los totales por canal.
             </Alerta>
           </Box>
         )}
-        {error && <Box sx={{ mt: 2 }}><Alerta frena titulo="No se pudo guardar">{error}</Alerta></Box>}
+        {error && <Box sx={{ mt: 2 }}><Alerta tono="frena" titulo="No se pudo guardar">{error}</Alerta></Box>}
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2 }}>
         <Button onClick={onCerrar}>Cancelar</Button>
@@ -323,19 +365,6 @@ const Ir = ({ destinos }: { destinos: [Foco['tipo'], string][] }) => {
   );
 };
 
-/** Lo que resuelve el aviso: con borde (el tema le da la tinta), para que se distinga de "Ir a…" y del texto. */
-const Resolver = (props: React.ComponentProps<typeof Button>) => (
-  <Button size="small" variant="outlined" color="primary" {...props} sx={{ whiteSpace: 'nowrap', bgcolor: 'background.paper' }} />
-);
-
-/** La acción principal de una alerta que frena: llena, para que se vea qué hacer primero. */
-const Principal = (props: React.ComponentProps<typeof Button>) => (
-  <Button size="small" variant="contained" {...props} sx={{ whiteSpace: 'nowrap' }} />
-);
-
-const ACCIONES_SX = { display: 'flex', alignItems: 'center', flexWrap: 'nowrap', gap: 0.5 } as const;
-const AMBAR = '#D69E2E';
-
 // El título corto de cada alerta: qué pasa, en dos o tres palabras. El detalle (qué hacer) va abajo.
 const TITULO_INCONSISTENCIA: Record<string, string> = {
   totales_distintos: 'No coincide con Contraloría', sku_sin_canal: 'SKU sin historia', canal_sin_sku: 'Canal sin historia',
@@ -357,27 +386,6 @@ const tituloProblema = (p: Estado['problemas'][number]) => {
     ?? 'Para revisar';
 };
 
-/** Una alerta de Para revisar: título corto, el SKU si hay uno, qué hacer, y los botones a la derecha. */
-const Alerta = ({ frena, titulo, sku, descripcion, acciones, children }: {
-  frena: boolean; titulo: string; sku?: string | null; descripcion?: string | null; acciones?: React.ReactNode;
-  children: React.ReactNode;
-}) => (
-  <Box role={frena ? 'alert' : undefined} sx={{
-    bgcolor: 'background.paper', border: 1, borderColor: 'divider', borderTop: `3px solid ${frena ? NO_CIERRA : AMBAR}`,
-    px: 2, py: 1.25, display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', columnGap: 2, rowGap: 0.25, alignItems: 'center',
-  }}>
-    <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1.25, flexWrap: 'wrap', minWidth: 0 }}>
-      <Typography variant="body2" fontWeight={700}>{titulo}</Typography>
-      {sku && (
-        <Typography variant="body2" color="text.secondary">
-          <Box component="span" sx={{ fontFamily: 'monospace', color: 'text.primary' }}>{sku}</Box>{descripcion ? ` ${descripcion}` : ''}
-        </Typography>
-      )}
-    </Box>
-    <Box sx={{ ...ACCIONES_SX, gridColumn: 2, gridRow: '1 / span 2' }}>{acciones}</Box>
-    <Typography variant="body2" color="text.secondary" sx={{ gridColumn: 1, minWidth: 0 }}>{children}</Typography>
-  </Box>
-);
 
 const Grupo = ({ children }: { children: React.ReactNode }) => (
   <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>{children}</Typography>
@@ -412,7 +420,7 @@ const FilaDialog = ({ repetido, onCerrar }: { repetido: Repetido; onCerrar: () =
         </RadioGroup>
         <TextField label="Motivo" required value={motivo} onChange={e => setMotivo(e.target.value)}
           helperText="Queda en el historial, con tu nombre y la hora." />
-        {error && <Alert severity="error">{error}</Alert>}
+        {error && <Alerta tono="frena">{error}</Alerta>}
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2 }}>
         <Button onClick={onCerrar}>Cancelar</Button>
@@ -440,7 +448,7 @@ const Pendientes = ({ estado, unidad, enMatriz }: { estado: Estado; unidad: Unid
     const r = p.tipo === 'sku_repetido' ? repetido(p.sku) : undefined;
     const celda = p.bloque === 'apertura' && p.sku && p.canal && enMatriz.has(p.sku) ? `${p.sku} · ${p.canal}` : null;
     return (
-      <Box sx={ACCIONES_SX}>
+      <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'nowrap', gap: 0.5 }}>
         {celda && (
           <Resolver aria-label={`Ver celda ${celda}`} onClick={() => enfocar('celda', `${p.sku}|${p.canal}`)}>
             Ver celda
@@ -464,7 +472,7 @@ const Pendientes = ({ estado, unidad, enMatriz }: { estado: Estado; unidad: Unid
   // Kilos cerrados y pesos no: los pesos se pueden proponer según los kilos (lo pidieron: armarlos a mano "es un chino").
   const proponer = estado.cierra.kilos && !estado.cierra.plata && !estado.faltan.length && !soloLectura;
   const avisoPesos = proponer && (
-    <Alerta frena titulo="Pesos no cierra" acciones={<>
+    <Alerta tono="frena" titulo="Pesos no cierra" acciones={<>
       <Principal onClick={() => setProponiendo(true)}>Proponer pesos según los kilos</Principal>
       {unidad === 'kilos' && !sinPesos && <Resolver onClick={() => elegirUnidad('plata')}>Ver en pesos</Resolver>}
     </>}>
@@ -473,7 +481,7 @@ const Pendientes = ({ estado, unidad, enMatriz }: { estado: Estado; unidad: Unid
     </Alerta>
   );
   const avisoOtra = proponer ? (unidad === 'kilos' && avisoPesos) : !estado.cierra[otra] && !estado.faltan.length && (
-    <Alerta frena titulo={`${UNIDADES[otra].nombre} no cierra`} acciones={!sinPesos && (
+    <Alerta tono="frena" titulo={`${UNIDADES[otra].nombre} no cierra`} acciones={!sinPesos && (
       <Principal onClick={() => elegirUnidad(otra)}>Ver en {UNIDADES[otra].nombre.toLowerCase()}</Principal>
     )}>
       {sinPesos ? 'Faltan los pesos de algún canal en Totales por canal.'
@@ -498,7 +506,7 @@ const Pendientes = ({ estado, unidad, enMatriz }: { estado: Estado; unidad: Unid
       {avisoOtra}
       {unidad === 'plata' && avisoPesos}
       {inconsistencias.map((i, n) => (
-        <Alerta key={`i${n}`} frena titulo={TITULO_INCONSISTENCIA[i.tipo] ?? `${UNIDADES[unidad].nombre} no cierra`}
+        <Alerta key={`i${n}`} tono="frena" titulo={TITULO_INCONSISTENCIA[i.tipo] ?? `${UNIDADES[unidad].nombre} no cierra`}
           acciones={<>
             {i.tipo === 'totales_distintos' && !soloLectura && (
               <Principal onClick={() => setRepartiendo(true)}>Repartir la diferencia</Principal>
@@ -516,12 +524,12 @@ const Pendientes = ({ estado, unidad, enMatriz }: { estado: Estado; unidad: Unid
       {/* Lo del archivo o la apertura no bloquea: aviso, lo más grave primero. */}
       {hayAvisos && <Grupo>Avisos: no frenan, pero conviene mirarlos</Grupo>}
       {errores.map((p, n) => (
-        <Alerta key={`e${n}`} frena={false} titulo={tituloProblema(p)} sku={p.sku} descripcion={p.descripcion}
+        <Alerta key={`e${n}`} tono="aviso" titulo={tituloProblema(p)} sku={p.sku} descripcion={p.descripcion}
           acciones={acciones(p)}>{p.mensaje}</Alerta>
       ))}
-      {estado.avisos[unidad].map((a, n) => <Alerta key={`a${n}`} frena={false} titulo="Para tener en cuenta">{a}</Alerta>)}
+      {estado.avisos[unidad].map((a, n) => <Alerta key={`a${n}`} tono="aviso" titulo="Para tener en cuenta">{a}</Alerta>)}
       {avisos.map((p, n) => (
-        <Alerta key={`p${n}`} frena={false} titulo={tituloProblema(p)} sku={p.sku} descripcion={p.descripcion}
+        <Alerta key={`p${n}`} tono="aviso" titulo={tituloProblema(p)} sku={p.sku} descripcion={p.descripcion}
           acciones={acciones(p)}>{p.mensaje}</Alerta>
       ))}
       {eligiendo && <FilaDialog repetido={eligiendo} onCerrar={() => setEligiendo(undefined)} />}
@@ -680,7 +688,7 @@ const AprobarDialog = ({ estado, onCerrar }: { estado: Estado; onCerrar: () => v
             </List>
           </>
         )}
-        {error && <Alert severity="error" sx={{ mt: 1 }}>{error}</Alert>}
+        {error && <Box sx={{ mt: 1 }}><Alerta tono="frena">{error}</Alerta></Box>}
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2 }}>
         <Button onClick={onCerrar}>Cancelar</Button>
@@ -712,9 +720,10 @@ export const MovilPage = () => {
     return (
       <Box sx={{ p: 3 }}>
         {errorDeCarga
-          ? <Alert severity="error" action={<Button color="inherit" onClick={() => refrescar()}>Reintentar</Button>}>
+          ? <Alerta tono="frena" titulo="No se pudo cargar el móvil"
+              acciones={<Resolver onClick={() => refrescar()}>Reintentar</Resolver>}>
               {errorDeCarga}
-            </Alert>
+            </Alerta>
           : <Dato>Cargando el móvil…</Dato>}
       </Box>
     );
@@ -856,30 +865,30 @@ export const MovilPage = () => {
           </Box>
         </Box>
         {anterior ? (
-          <Alert severity="info" sx={{ alignItems: 'center' }} action={
-            <Button variant="outlined" color="info" size="small" startIcon={<ArrowBackRoundedIcon />}
-              sx={{ whiteSpace: 'nowrap' }} onClick={() => verMes(undefined)}>
+          <Alerta tono="info" titulo={`Estás viendo ${nombreMes(estado.mes)}`} acciones={
+            <Resolver startIcon={<ArrowBackRoundedIcon />} onClick={() => verMes(undefined)}>
               Volver a {ultimo ? nombreMes(ultimo) : 'el último mes'}
-            </Button>
+            </Resolver>
           }>
-            Estás viendo {nombreMes(estado.mes)}, un mes anterior. Es de solo lectura.
-          </Alert>
+            Es un mes anterior, de solo lectura.
+          </Alerta>
         ) : estado.aprobado && (
-          <Alert severity="success" icon={<TaskAltRoundedIcon />} sx={{ alignItems: 'center' }} action={
-            <Button variant="contained" color="success" size="small" endIcon={<ArrowForwardRoundedIcon />}
-              sx={{ whiteSpace: 'nowrap' }} disabled={ocupado} onClick={empezar}>
+          <Alerta tono="listo" titulo="Aprobado" acciones={
+            <Principal endIcon={<ArrowForwardRoundedIcon />} disabled={ocupado} onClick={empezar}>
               Empezar {mesSolo(estado.siguiente)}
-            </Button>
+            </Principal>
           }>
             Aprobado por {estado.aprobado.autor} el {new Date(estado.aprobado.cuando).toLocaleString('es-AR')}. Es de
             solo lectura: para cambiarlo, reabrilo. El móvil de {nombreMes(estado.siguiente)} arranca de este reparto.
-          </Alert>
+          </Alerta>
         )}
         {arranco && arranco.mes === estado.mes && (
-          <Alert severity="success" onClose={() => setArranco(undefined)}>
+          <Alerta tono="listo" titulo={`Arrancaste ${mesSolo(estado.mes)}`} acciones={
+            <IconButton size="small" aria-label="Cerrar" onClick={() => setArranco(undefined)}><CloseRoundedIcon fontSize="small" /></IconButton>
+          }>
             Arrancaste {mesSolo(estado.mes)} desde {mesSolo(arranco.de)} aprobado: se heredaron el reparto, los totales
             por canal y las reglas.{estado.faltan.length ? ` Falta: ${estado.faltan.join(', ')}.` : ''}
-          </Alert>
+          </Alerta>
         )}
         {confirmarAprobar && <AprobarDialog estado={estado} onCerrar={() => setConfirmarAprobar(false)} />}
         {reabriendo && (

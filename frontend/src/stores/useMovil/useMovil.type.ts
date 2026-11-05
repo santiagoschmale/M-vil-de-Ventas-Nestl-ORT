@@ -176,6 +176,8 @@ export type TUseMovil = {
   diferencia: (unidad: Unidad, valores?: Record<string, string>) => Promise<Diferencia>;
   /** Pesos sugeridos por canal para los kilos de cada uno, al armar los totales en la pantalla. No cambia nada. */
   pesosSugeridos: (kilos: Record<string, string>) => Promise<Record<string, string>>;
+  /** Los kilos que se están armando contra lo que pide Contraloría, y cómo quedarían ajustados. No cambia nada. */
+  revisarKilos: (kilos: Record<string, string>) => Promise<RevisionKilos>;
   repartirDiferencia: (unidad: Unidad, valores: Record<string, string>, motivo: string) => Resultado;
   proponerPesos: (motivo: string) => Resultado;
   exportar: () => Promise<void>; // baja el Excel (con el token de la sesión, si hay Entra) // pesos por canal según los kilos repartidos
@@ -192,4 +194,15 @@ export type TUseMovil = {
   asignarPorcentaje: (canal: string, entidad: string, porcentaje: string | null, motivo: string) => Resultado;
   agregarEntidad: (canal: string, entidad: string, porcentaje: string, motivo: string) => Resultado;
   eliminarEntidad: (canal: string, entidad: string, motivo: string) => Resultado;
+};
+
+/** Kilos por canal armados en la pantalla, contra lo que pide Contraloría. */
+export type RevisionKilos = {
+  pide: Monto;
+  suman: Monto;
+  falta: Monto | null; // negativo si sobra; null si algún valor no es un monto
+  cierra: boolean;
+  se_reparte_solo: boolean; // un redondeo: el backend lo reparte al guardar
+  ajustados: Record<string, Monto>;
+  errores: Record<string, string>;
 };

@@ -1,12 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, LinearProgress, Table, TableBody, TableCell,
-  TableHead, TableRow, TextField, Typography,
+  Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, LinearProgress, Table, TableBody, TableCell, TableHead, TableRow, TextField, Typography,
 } from '@mui/material';
 import { alpha } from '@mui/material/styles';
 import UndoRoundedIcon from '@mui/icons-material/UndoRounded';
 import TaskAltRoundedIcon from '@mui/icons-material/TaskAltRounded';
 import { useMovil } from '../../../stores/useMovil';
+import { Alerta } from './Alerta';
 import { Diferencia, Unidad } from '../../../stores/useMovil/useMovil.type';
 import { conUnidad, distintos, enMenores, formatear, UNIDADES } from './formato';
 import { CIERRA, NO_CIERRA, numeros } from './estilo';
@@ -202,7 +202,7 @@ export const DiferenciaDialog = ({ unidad, onCerrar }: Props) => {
               placeholder="Contraloría ajustó el objetivo del mes" helperText="Queda en el historial, con tu nombre y la hora." />
           </>
         )}
-        {error && <Alert severity="error">{error}</Alert>}
+        {error && <Alerta tono="frena">{error}</Alerta>}
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2, gap: 1, flexWrap: 'wrap' }}>
         {porQueNo && <Typography variant="body2" color="text.secondary" sx={{ mr: 'auto' }}>{porQueNo}</Typography>}

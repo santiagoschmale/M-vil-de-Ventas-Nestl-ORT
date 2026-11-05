@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import {
-  Alert, Button, Checkbox, Dialog, DialogActions, DialogContent, DialogTitle, FormControlLabel, FormGroup,
-  TextField, Typography,
+  Button, Checkbox, Dialog, DialogActions, DialogContent, DialogTitle, FormControlLabel, FormGroup, TextField, Typography,
 } from '@mui/material';
 import { useMovil, useSoloLectura } from '../../../stores/useMovil';
+import { Alerta } from './Alerta';
 import { Estado } from '../../../stores/useMovil/useMovil.type';
 
 type Props = { sku: string; estado: Estado; onCerrar: () => void };
@@ -44,7 +44,7 @@ export const CanalesDialog = ({ sku, estado, onCerrar }: Props) => {
         </FormGroup>
         <TextField label="Motivo" required value={motivo} onChange={e => setMotivo(e.target.value)}
           helperText="Queda en el historial, con tu nombre y la hora." />
-        {error && <Alert severity="error">{error}</Alert>}
+        {error && <Alerta tono="frena">{error}</Alerta>}
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2 }}>
         <Button onClick={onCerrar}>Cancelar</Button>

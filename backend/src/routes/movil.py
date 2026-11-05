@@ -575,6 +575,12 @@ def proponer_pesos(cuerpo: MotivoIn, s: Sesion = Depends(sesion), quien: str = D
     return _estado(s)
 
 
+@router.post("/totales/kilos/revisar", summary="Los kilos por canal que se están armando en la pantalla contra lo que "
+                                              "pide Contraloría, y cómo quedarían ajustados. No cambia nada")
+def revisar_kilos(cuerpo: ValoresIn, s: Sesion = Depends(sesion)):
+    return _aplicar(s.revisar_kilos, cuerpo.valores)
+
+
 @router.post("/totales/pesos/sugeridos", summary="Pesos sugeridos para los kilos de cada canal, al armar los totales "
                                                  "por canal en la pantalla. No cambia nada")
 def sugerir_pesos(cuerpo: ValoresIn, s: Sesion = Depends(sesion)):

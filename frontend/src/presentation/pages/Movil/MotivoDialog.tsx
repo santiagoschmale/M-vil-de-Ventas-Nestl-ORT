@@ -1,7 +1,8 @@
 import React, { useId, useState } from 'react';
 import {
-  Alert, Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, TextField,
+  Box, Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, TextField,
 } from '@mui/material';
+import { Alerta } from './Alerta';
 
 type Props = {
   titulo: string;
@@ -39,7 +40,7 @@ export const MotivoDialog = ({ titulo, descripcion, confirmar, onConfirmar, onCe
           onChange={e => setMotivo(e.target.value)}
           helperText="Queda en el historial, con tu nombre y la hora."
         />
-        {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
+        {error && <Box sx={{ mt: 2 }}><Alerta tono="frena">{error}</Alerta></Box>}
       </DialogContent>
       <DialogActions>
         <Button onClick={onCerrar}>Cancelar</Button>

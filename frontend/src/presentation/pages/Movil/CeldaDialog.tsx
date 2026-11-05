@@ -1,13 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  Alert, Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Divider,
-  FormControlLabel, IconButton, Radio, RadioGroup, Switch, Table, TableBody, TableCell, TableHead, TableRow, TextField,
-  Typography,
+  Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Divider, FormControlLabel, IconButton, Radio, RadioGroup, Switch, Table, TableBody, TableCell, TableHead, TableRow, TextField, Typography,
 } from '@mui/material';
 import AddRoundedIcon from '@mui/icons-material/AddRounded';
 import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded';
 import EditRoundedIcon from '@mui/icons-material/EditRounded';
 import { useMovil, useSoloLectura } from '../../../stores/useMovil';
+import { Alerta } from './Alerta';
 import { Apertura, Celda } from '../../../stores/useMovil/useMovil.type';
 import { formatear, UNIDADES } from './formato';
 import { APAGADO, TINTA, numeros } from './estilo';
@@ -59,7 +58,7 @@ const BaseDialog = ({ canal, entidad, porcentaje, nueva, onCerrar }: {
         )}
         <TextField fullWidth required label="Motivo" value={motivo} onChange={e => setMotivo(e.target.value)}
           sx={{ mt: 2 }} helperText="Queda en el historial, con tu nombre y la hora." />
-        {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
+        {error && <Box sx={{ mt: 2 }}><Alerta tono="frena">{error}</Alerta></Box>}
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2 }}>
         <Button onClick={onCerrar}>Cancelar</Button>
@@ -100,7 +99,7 @@ const AltaDialog = ({ canal, onCerrar }: { canal: string; onCerrar: () => void }
           inputProps={{ inputMode: 'decimal', style: numeros }} sx={{ width: 120, mt: 2 }} />
         <TextField fullWidth required label="Motivo" value={motivo} onChange={e => setMotivo(e.target.value)}
           sx={{ mt: 2 }} helperText="Queda en el historial, con tu nombre y la hora." />
-        {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
+        {error && <Box sx={{ mt: 2 }}><Alerta tono="frena">{error}</Alerta></Box>}
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2 }}>
         <Button onClick={onCerrar}>Cancelar</Button>
@@ -170,7 +169,7 @@ export const CeldaDialog = ({ sku, descripcion, canal, celda, onCerrar }: Props)
             sx={{ flex: '1 1 220px' }} helperText="Queda en el historial, con tu nombre y la hora."
           />
         </Box>
-        {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
+        {error && <Box sx={{ mt: 2 }}><Alerta tono="frena">{error}</Alerta></Box>}
 
         {apertura && (
           <>
@@ -179,7 +178,7 @@ export const CeldaDialog = ({ sku, descripcion, canal, celda, onCerrar }: Props)
               <Typography variant="subtitle1" fontWeight={700}>Cómo se abre debajo del canal</Typography>
               <Ayuda ayuda={AYUDA.apertura} />
             </Box>
-            {apertura.aviso && <Alert severity="warning" sx={{ my: 1 }}>{apertura.aviso}</Alert>}
+            {apertura.aviso && <Box sx={{ my: 1 }}><Alerta tono="aviso">{apertura.aviso}</Alerta></Box>}
             <Table size="small">
               <TableHead>
                 <TableRow>

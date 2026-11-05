@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import {
-  Alert, Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Table, TableBody, TableCell,
-  TableHead, TableRow, TextField,
+  Box, Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Table, TableBody, TableCell, TableHead, TableRow, TextField,
 } from '@mui/material';
 import { useMovil, useSoloLectura } from '../../../stores/useMovil';
+import { Alerta } from './Alerta';
 import { Estado } from '../../../stores/useMovil/useMovil.type';
 import { Subir } from './Movil';
 
@@ -59,7 +59,7 @@ export const CategoriasDialog = ({ estado, onCerrar }: { estado: Estado; onCerra
         </Table>
         <TextField fullWidth required label="Motivo" value={motivo} onChange={e => setMotivo(e.target.value)} sx={{ mt: 2 }}
           helperText="Queda en el historial, con tu nombre y la hora." />
-        {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
+        {error && <Box sx={{ mt: 2 }}><Alerta tono="frena">{error}</Alerta></Box>}
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2 }}>
         <Button onClick={onCerrar}>Cancelar</Button>

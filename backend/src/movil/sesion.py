@@ -42,7 +42,7 @@ from src.importer.entradas import (
 )
 from src.domain.problema import Problema
 from src.domain.cruce import LIMITES
-from src.movil.recorrido import Recorrido, Regla, armar
+from src.movil.recorrido import TOPE_DIFERENCIA, Recorrido, Regla, armar
 
 UNIDADES = {"kilos": KILOS, "plata": PLATA}
 
@@ -287,10 +287,41 @@ class Sesion:
             return Ajuste("proponer_pesos", "Pesos por canal según los kilos repartidos", autor, cuando, motivo)
         self._aplicar(cambio)
 
+    def revisar_kilos(self, kilos: dict[str, str]) -> dict:
+        """
+        Los kilos por canal que el planner está armando en la pantalla, contra lo que pide Contraloría:
+        cuánto falta (o sobra, en negativo), si alcanza con el redondeo que se reparte solo, y cómo
+        quedaría cada canal ajustado según su peso. Solo lee: no cambia nada.
+        """
+        if self._e.objetivos is None:
+            raise ErrorDeAjuste("Cargá el objetivo de Contraloría para comparar los kilos.")
+        decimales = UNIDADES["kilos"]
+        pide = self._pide_objetivo("kilos")
+        validos, errores = {}, {}
+        for canal, texto in kilos.items():
+            v, error = _monto(texto, decimales)
+            if error:
+                errores[canal] = error
+            else:
+                validos[canal] = v
+        suman = sum(validos.values(), Decimal(0))
+        falta = pide - suman
+        ajustados = {}
+        if not errores and suman > 0:
+            parte = repartir(abs(falta), validos, decimales)
+            ajustados = {c: str(v + (parte[c] if falta >= 0 else -parte[c])) for c, v in validos.items()}
+        return {"pide": str(pide), "suman": str(suman), "falta": None if errores else str(falta),
+                "cierra": not errores and falta == 0,
+                "se_reparte_solo": not errores and 0 < abs(falta) <= TOPE_DIFERENCIA[decimales],
+                "ajustados": ajustados, "errores": errores}
+
     def _pide(self, unidad: str) -> Decimal:
         """Lo que el cruce compara contra los totales por canal: los SKUs que se reparten."""
         if self._e.objetivos is None or self._e.canales is None:
             raise ErrorDeAjuste("Para repartir la diferencia hacen falta el objetivo de Contraloría y los totales por canal.")
+        return self._pide_objetivo(unidad)
+
+    def _pide_objetivo(self, unidad: str) -> Decimal:
         activos = [o for s, o in self.objetivos_vigentes().items() if s not in self.apagados_skus and o.kilos > 0]
         if unidad == "kilos":
             return sum((o.kilos for o in activos), Decimal(0))

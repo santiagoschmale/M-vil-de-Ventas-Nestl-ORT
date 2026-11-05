@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Alert, Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle } from '@mui/material';
+import { Box, Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle } from '@mui/material';
 import { useMovil } from '../../../stores/useMovil';
+import { Alerta } from './Alerta';
 
 /** Empezar de cero: borra todos los meses guardados. Solo en la instalación local, para practicar. */
 export const ReiniciarDialog = ({ onCerrar }: { onCerrar: () => void }) => {
@@ -22,7 +23,7 @@ export const ReiniciarDialog = ({ onCerrar }: { onCerrar: () => void }) => {
         <DialogContentText sx={{ mt: 1 }}>
           Existe solo en la instalación local, para practicar.
         </DialogContentText>
-        {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
+        {error && <Box sx={{ mt: 2 }}><Alerta tono="frena">{error}</Alerta></Box>}
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2 }}>
         <Button onClick={onCerrar}>Cancelar</Button>

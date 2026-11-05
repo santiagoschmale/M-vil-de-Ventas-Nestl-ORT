@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { api } from '../../infra/http';
 import { useSnackbarProps } from '../useSnackbarProps';
-import { Apertura, Cruce, Diferencia, Estado, MesResumen, TUseMovil } from './useMovil.type';
+import { Apertura, Cruce, Diferencia, Estado, MesResumen, RevisionKilos, TUseMovil } from './useMovil.type';
 
 // Los errores del cliente HTTP traen la respuesta del backend: { detail: "..." }.
 const respuesta = (e: unknown) =>
@@ -190,6 +190,8 @@ export const useMovil = create<TUseMovil>((set, get) => {
     diferencia: async (unidad, valores) => (valores
       ? (await api.post(conMes(`/movil/diferencia/${unidad}/revisar`), { valores })).data as Diferencia
       : (await api.get<Diferencia>(conMes(`/movil/diferencia/${unidad}`))).data),
+    revisarKilos: async kilos =>
+      (await api.post(conMes('/movil/totales/kilos/revisar'), { valores: kilos })).data as RevisionKilos,
     pesosSugeridos: async kilos =>
       ((await api.post(conMes('/movil/totales/pesos/sugeridos'), { valores: kilos })).data as { pesos: Record<string, string> }).pesos,
     repartirDiferencia: (unidad, valores, motivo) => cambiar(
