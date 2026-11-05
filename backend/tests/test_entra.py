@@ -115,3 +115,49 @@ def test_empezar_de_cero_solo_lo_hace_un_admin():
             os.environ.pop("PERMITIR_REINICIAR", None)
         else:
             os.environ["PERMITIR_REINICIAR"] = antes
+
+
+SKU = "90020900"  # de data/sample: tiene objetivo
+
+
+def _cambian_el_mes_para_todos():
+    """Aprobar, reabrir, empezar el mes siguiente y empezar de cero: solo Admin."""
+    return (("/api/movil/aprobar", None), ("/api/movil/reabrir", {"motivo": "prueba"}),
+            ("/api/movil/meses/siguiente", None), ("/api/movil/reiniciar", None))
+
+
+def test_un_planner_no_aprueba_ni_reabre_ni_empieza_el_mes_siguiente_ni_empieza_de_cero():
+    c = _entra()
+    assert c.post("/api/movil/muestra", headers=_con(_token())).status_code == 200  # con datos cargados, igual
+    for ruta, cuerpo in _cambian_el_mes_para_todos():
+        r = c.post(ruta, json=cuerpo, headers=_con(_token()))
+        assert r.status_code == 403 and "Admin" in r.json()["detail"], (ruta, r.json())
+
+
+def test_un_admin_pasa_el_control_de_rol_y_le_contesta_la_logica_del_movil():
+    """Con el rol, el pedido llega al móvil: sin nada cargado es el móvil el que dice que no (422), no el rol."""
+    c = _entra()
+    for ruta, cuerpo in _cambian_el_mes_para_todos()[:3]:
+        r = c.post(ruta, json=cuerpo, headers=_con(_token(roles=["Admin"])))
+        assert r.status_code == 422, (ruta, r.json())
+
+
+def test_un_planner_sigue_cargando_y_ajustando():
+    c = _entra()
+    assert c.post("/api/movil/muestra", headers=_con(_token())).status_code == 200
+    r = c.put(f"/api/movil/skus/{SKU}", json={"activo": False, "motivo": "no se vende este mes"},
+              headers=_con(_token()))
+    assert r.status_code == 200 and [x["codigo"] for x in r.json()["apagados"]["skus"]] == [SKU]
+
+
+def test_sin_entra_el_usuario_de_prueba_es_admin_y_puede_empezar_de_cero():
+    import os
+    antes = os.environ.get("PERMITIR_REINICIAR")
+    os.environ["PERMITIR_REINICIAR"] = "true"
+    try:
+        assert _cliente(ProveedorLocal()).post("/api/movil/reiniciar").status_code == 200
+    finally:
+        if antes is None:
+            os.environ.pop("PERMITIR_REINICIAR", None)
+        else:
+            os.environ["PERMITIR_REINICIAR"] = antes
