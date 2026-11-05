@@ -96,7 +96,7 @@ const claveDeCanal = (canal: string) =>
 const TotalesDialog = ({ totales, sugerencia, objetivo, onCerrar }: {
   totales: Totales | null; sugerencia?: Sugerencia; objetivo: Objetivo; onCerrar: () => void;
 }) => {
-  const { editarTotales, ocupado } = useMovil();
+  const { editarTotales, pesosSugeridos, ocupado } = useMovil();
   const [iniciales] = useState<Fila[]>(() => {
     // Pesos vacíos: los del mes anterior, si su archivo los trae.
     const pesosAnteriores = new Map((sugerencia ?? []).map(t => [claveDeCanal(t.canal), aTexto(t.plata)]));
@@ -115,6 +115,17 @@ const TotalesDialog = ({ totales, sugerencia, objetivo, onCerrar }: {
   const cambiar = (id: string, campo: 'canal' | Campo, valor: string) => {
     setFilas(fs => fs.map(f => (f.id === id ? { ...f, [campo]: valor } : f)));
     setError(null);
+  };
+  // Los pesos que faltan, sugeridos según los kilos de cada canal: solo si el planner lo pide.
+  const conPesos = !!objetivo?.nns && Number(objetivo.nns) > 0;
+  const [sugiriendo, setSugiriendo] = useState(false);
+  const completarPesos = () => {
+    setSugiriendo(true);
+    const kilos = Object.fromEntries(filas.filter(f => f.canal.trim()).map(f => [f.canal.trim(), f.kilos.trim()]));
+    pesosSugeridos(kilos)
+      .then(pesos => setFilas(fs => fs.map(f => (f.plata.trim() ? f : { ...f, plata: aTexto(pesos[f.canal.trim()] ?? null) }))))
+      .catch(() => setError('No se pudieron sugerir los pesos. Completalos a mano o probá de nuevo.'))
+      .finally(() => setSugiriendo(false));
   };
   const antes = (f: Fila, campo: Campo) => {
     const original = originales.get(f.id);
@@ -147,22 +158,17 @@ const TotalesDialog = ({ totales, sugerencia, objetivo, onCerrar }: {
       PaperProps={{ component: 'form', onSubmit: guardar }}>
       <DialogTitle id="titulo-totales">{totales ? 'Editar' : 'Armar'} totales por canal</DialogTitle>
       <DialogContent>
-        {!totales && (
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-            {sugerencia?.some(t => t.plata)
-              ? 'Arranca con los canales, los kilos y los pesos que se repartieron el mes anterior. Ajustalos a este mes.'
-              : sugerencia?.length
-              ? 'Arranca con los canales y los kilos que se repartieron el mes anterior, del archivo que cargaste. ' +
-                'Ajustalos a este mes y completá los pesos: ese archivo no los trae.'
-              : 'Una fila por canal, con sus kilos y sus pesos, como en el Excel. Si primero cargás el mes anterior, ' +
-                'arranca con sus canales y sus kilos.'}
-          </Typography>
-        )}
-        {objetivo && (
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-            Tienen que sumar lo mismo que el objetivo de Contraloría: {conUnidad(objetivo.kilos, 'kilos')} y{' '}
-            {conUnidad(objetivo.nns, 'plata')}.
-          </Typography>
+        {sinPesos > 0 && (
+          <Box sx={{ mb: 2 }}>
+            <Alerta frena={false} titulo={sinPesos === conCanal.length ? 'Faltan los pesos' : `Falta el peso de ${sinPesos} ${sinPesos === 1 ? 'canal' : 'canales'}`}
+              acciones={conPesos && (
+                <Principal onClick={completarPesos} disabled={sugiriendo}>Completar con los sugeridos</Principal>
+              )}>
+              {conPesos
+                ? 'Se sugieren según los kilos de cada canal, al precio de Contraloría de cada SKU. Después los podés cambiar.'
+                : 'Sin pesos, se reparten solo los kilos hasta que los completes.'}
+            </Alerta>
+          </Box>
         )}
         <Table size="small">
           <TableHead>
@@ -211,20 +217,14 @@ const TotalesDialog = ({ totales, sugerencia, objetivo, onCerrar }: {
           onClick={() => setFilas(fs => [...fs, fila({ nueva: true })])}>
           Agregar canal
         </Button>
-        {sinPesos > 0 && (
-          <Alert severity="warning" sx={{ mt: 2 }}>
-            {sinPesos === conCanal.length
-              ? 'Sin pesos, se reparten solo los kilos hasta que los completes.'
-              : `Falta el peso de ${sinPesos} ${sinPesos === 1 ? 'canal' : 'canales'}: se toma 0 y los pesos no van a ` +
-                'cerrar hasta que lo completes.'}
-          </Alert>
-        )}
         {sacados.length > 0 && (
-          <Alert severity="info" sx={{ mt: 2 }}>
-            Vas a sacar {sacados.join(', ')}: al guardar deja de estar en los totales por canal.
-          </Alert>
+          <Box sx={{ mt: 2 }}>
+            <Alerta frena={false} titulo={`Vas a sacar ${sacados.join(', ')}`}>
+              Al guardar deja de estar en los totales por canal.
+            </Alerta>
+          </Box>
         )}
-        {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
+        {error && <Box sx={{ mt: 2 }}><Alerta frena titulo="No se pudo guardar">{error}</Alerta></Box>}
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2 }}>
         <Button onClick={onCerrar}>Cancelar</Button>

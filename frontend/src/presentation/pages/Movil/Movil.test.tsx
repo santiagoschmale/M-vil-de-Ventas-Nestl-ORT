@@ -30,6 +30,11 @@ beforeEach(() => {
     http.get('*/api/movil/cruce/kilos', () => HttpResponse.json(cruce)),
     http.get('*/api/movil/meses', () => HttpResponse.json([{ mes: '2026-10', aprobado: false }])),
     http.get('*/api/movil/apertura/*', () => HttpResponse.json({ detail: 'no se abre' }, { status: 404 })),
+    // Pesos sugeridos: 100 por canal.
+    http.post('*/api/movil/totales/pesos/sugeridos', async ({ request }) => {
+      const { valores } = await request.json() as { valores: Record<string, string> };
+      return HttpResponse.json({ pesos: Object.fromEntries(Object.keys(valores).map(c => [c, '100.00'])) });
+    }),
     http.put('*/api/movil/skus/*', anotar),
     http.put('*/api/movil/celdas/*', anotar),
     http.put('*/api/movil/input2', anotar),
@@ -239,13 +244,16 @@ describe('MovilPage', { timeout: 15000 }, () => {
     render(<MovilPage />);
     await user.click(await screen.findByRole('button', { name: 'Armar totales por canal en la pantalla' }));
     const dialogo = screen.getByRole('dialog', { name: 'Armar totales por canal' });
-    expect(dialogo).toHaveTextContent(/mes anterior/);
     expect(within(dialogo).getByLabelText('Kilos de Catering')).toHaveValue('900,000');
-    await user.type(within(dialogo).getByLabelText('Pesos de Catering'), '60');
+    // El mes anterior no trae pesos: se completan con los sugeridos a pedido, y el que ya escribió el planner queda.
+    expect(within(dialogo).getByText('Faltan los pesos')).toBeInTheDocument();
     await user.type(within(dialogo).getByLabelText('Pesos de Córdoba'), '40');
+    await user.click(within(dialogo).getByRole('button', { name: 'Completar con los sugeridos' }));
+    await waitFor(() => expect(within(dialogo).getByLabelText('Pesos de Catering')).toHaveValue('100,00'));
+    expect(within(dialogo).queryByText(/Falta/)).not.toBeInTheDocument();
     await user.click(within(dialogo).getByRole('button', { name: 'Guardar' }));
-    await waitFor(() => expect(pedidos).toEqual([{ metodo: 'PUT', url: '/api/movil/input2',
-      cuerpo: { texto: 'Canal\tKilos\tPlata\nCatering\t900,000\t60\nCórdoba\t400,000\t40' } }]));
+    await waitFor(() => expect(pedidos.filter(p => p.metodo === 'PUT')).toEqual([{ metodo: 'PUT', url: '/api/movil/input2',
+      cuerpo: { texto: 'Canal\tKilos\tPlata\nCatering\t900,000\t100,00\nCórdoba\t400,000\t40' } }]));
   });
 
   it('se pueden agregar y sacar canales al armar los totales, aun sin mes anterior', async () => {
@@ -326,13 +334,12 @@ describe('MovilPage', { timeout: 15000 }, () => {
     expect(await screen.findByRole('dialog')).toHaveTextContent('100 · Catering');
   });
 
-  it('al editar los totales se ve qué cambió y contra qué objetivo se compara', async () => {
+  it('al editar los totales se ve qué cambió', async () => {
     const user = userEvent.setup({ delay: null });
     render(<MovilPage />);
     await user.click(await screen.findByRole('button', { name: /^Entradas/ }));
     await user.click(screen.getByRole('button', { name: 'Editar totales por canal' }));
     const dialogo = screen.getByRole('dialog');
-    expect(dialogo).toHaveTextContent('1.500,000 kg');  // el objetivo de Contraloría, como referencia
     expect(within(dialogo).queryByText(/antes:/)).not.toBeInTheDocument();
     const kilos = within(dialogo).getByLabelText('Kilos de Directa (BA)');
     await user.clear(kilos);
@@ -667,8 +674,7 @@ describe('MovilPage', { timeout: 15000 }, () => {
     const user = userEvent.setup({ delay: null });
     render(<MovilPage />);
     await user.click(await screen.findByRole('button', { name: 'Armar totales por canal en la pantalla' }));
-    expect(await screen.findByText(/Arranca con los canales, los kilos y los pesos/)).toBeInTheDocument();
-    expect(screen.getByRole('textbox', { name: 'Pesos de Catering' })).toHaveValue('12.345,67');
+        expect(screen.getByRole('textbox', { name: 'Pesos de Catering' })).toHaveValue('12.345,67');
   });
 
   it('a los SKUs sin categoría se les asigna una desde Para revisar', async () => {

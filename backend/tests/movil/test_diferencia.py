@@ -134,3 +134,14 @@ def test_los_pesos_se_proponen_segun_los_kilos_y_cierran():
 def test_sin_kilos_cerrados_no_se_proponen_pesos():
     s = _corta()  # los kilos no cierran
     assert _falla(s.proponer_pesos, P, CUANDO, "x")
+
+
+def test_al_armar_los_totales_sin_pesos_se_sugieren_segun_los_kilos():
+    """Armar los totales sin pesos: la pantalla los sugiere, al precio de cada canal en el mes anterior."""
+    s = _sesion()
+    kilos = {"Catering": "1.000", "Rosario": "1.000", "Canal nuevo": "1.000", "Sin kilos": ""}
+    pesos = {c: D(v) for c, v in s.pesos_para(kilos).items()}
+    assert set(pesos) == {"Catering", "Rosario", "Canal nuevo"}
+    assert sum(pesos.values()) == s._pide("plata")  # suman exacto lo de Contraloría
+    assert pesos["Catering"] != pesos["Rosario"]  # mismo kilos, distinto precio según lo que vendió cada uno
+    assert s.historial[-1].accion == "cargar_base"  # no cambia nada

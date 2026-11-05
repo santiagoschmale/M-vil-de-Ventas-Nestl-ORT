@@ -575,6 +575,12 @@ def proponer_pesos(cuerpo: MotivoIn, s: Sesion = Depends(sesion), quien: str = D
     return _estado(s)
 
 
+@router.post("/totales/pesos/sugeridos", summary="Pesos sugeridos para los kilos de cada canal, al armar los totales "
+                                                 "por canal en la pantalla. No cambia nada")
+def sugerir_pesos(cuerpo: ValoresIn, s: Sesion = Depends(sesion)):
+    return {"pesos": _aplicar(s.pesos_para, cuerpo.valores)}
+
+
 @router.post("/reiniciar", summary="Empezar de cero: borra todos los meses (solo en local, para practicar)")
 def reiniciar(request: Request):
     # Borra todo: solo con IS_LOCAL=true explícito (make api / dev-db lo setean), no por default.

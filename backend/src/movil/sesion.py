@@ -243,6 +243,39 @@ class Sesion:
             raise ErrorDeAjuste("El objetivo de Contraloría no tiene pesos: no hay de dónde proponerlos.")
         return repartir(pide, pesos, UNIDADES["plata"])
 
+    def pesos_para(self, kilos: dict[str, str]) -> dict[str, str]:
+        """
+        Pesos sugeridos para totales por canal que todavía no los tienen (al armarlos en la pantalla):
+        los kilos de cada canal al precio que tuvo ese canal en el mes anterior, con el precio de
+        Contraloría de cada SKU. Suman exacto lo que pide Contraloría. Un canal sin mes anterior va al
+        precio promedio. Solo lee: no cambia nada.
+        """
+        if self._e.objetivos is None:
+            raise ErrorDeAjuste("Cargá el objetivo de Contraloría: los pesos salen de sus precios.")
+        activos = {s: o for s, o in self.objetivos_vigentes().items()
+                   if s not in self.apagados_skus and o.kilos > 0 and o.nns is not None and o.nns > 0}
+        pide = sum((o.nns for o in activos.values()), Decimal(0))
+        if pide <= 0:
+            raise ErrorDeAjuste("El objetivo de Contraloría no tiene pesos: no hay de dónde proponerlos.")
+        promedio = pide / sum((o.kilos for o in activos.values()), Decimal(0))
+        # Kilos y pesos del mes anterior por canal, con los precios de este mes.
+        hubo: dict[str, list[Decimal]] = {}
+        for (sku, canal), k in (self._e.base or {}).items():
+            o = activos.get(sku)
+            if o and k:
+                par = hubo.setdefault(normalizar(canal), [Decimal(0), Decimal(0)])
+                par[0] += k
+                par[1] += k * o.nns / o.kilos
+        valores = {}
+        for canal, texto in kilos.items():
+            k, error = _monto(texto, UNIDADES["kilos"])
+            if not error and k:
+                par = hubo.get(normalizar(canal))
+                valores[canal] = k * (par[1] / par[0] if par else promedio)
+        if not valores:
+            return {}
+        return {c: str(v) for c, v in repartir(pide, valores, UNIDADES["plata"]).items()}
+
     def proponer_pesos(self, autor: str, cuando: datetime, motivo: str) -> None:
         """Pone en los totales por canal los pesos que van con los kilos repartidos (`pesos_segun_kilos`)."""
         motivo = _motivo(motivo)

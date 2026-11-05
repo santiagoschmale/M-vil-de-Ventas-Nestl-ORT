@@ -190,6 +190,8 @@ export const useMovil = create<TUseMovil>((set, get) => {
     diferencia: async (unidad, valores) => (valores
       ? (await api.post(conMes(`/movil/diferencia/${unidad}/revisar`), { valores })).data as Diferencia
       : (await api.get<Diferencia>(conMes(`/movil/diferencia/${unidad}`))).data),
+    pesosSugeridos: async kilos =>
+      ((await api.post(conMes('/movil/totales/pesos/sugeridos'), { valores: kilos })).data as { pesos: Record<string, string> }).pesos,
     repartirDiferencia: (unidad, valores, motivo) => cambiar(
       () => api.put(conMes(`/movil/diferencia/${unidad}`), { valores, motivo }),
       { ...enDialogo, aviso: 'Totales por canal actualizados.' }),
