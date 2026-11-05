@@ -32,6 +32,7 @@ from src.importer.entradas import (
     _codigo,
     ErrorDeEntrada,
     leer_apertura,
+    leer_apertura_plata,
     leer_base,
     leer_base_plata,
     leer_categorias,
@@ -100,6 +101,8 @@ class _Entradas:
     # Precio por kilo de cada SKU en cada canal {(sku, canal): $/kg}, del mes anterior: un SKU no vale
     # lo mismo en todos los canales. Vacío si el archivo no lo trae (se usa el de Contraloría).
     precios: dict = field(default_factory=dict)
+    # Lo que facturó cada entidad debajo del canal {(sku, canal): {entidad: $}}: abre los pesos.
+    apertura_plata: dict = field(default_factory=dict)
     # La categoría de cada SKU en el mes anterior: completa las que el objetivo trae vacías.
     categorias_base: dict = field(default_factory=dict)
 
@@ -394,6 +397,9 @@ class Sesion:
         base_plata = leer_base_plata(origen)
         if hasattr(origen, "seek"):
             origen.seek(0)
+        apertura_plata = leer_apertura_plata(origen)
+        if hasattr(origen, "seek"):
+            origen.seek(0)
         precios = leer_precios(origen)
         if hasattr(origen, "seek"):
             origen.seek(0)
@@ -413,6 +419,7 @@ class Sesion:
         def cambio():
             self._e.base, self._e.apertura, self._e.base_plata = base, apertura, base_plata
             self._e.precios, self._e.categorias_base = precios, categorias_base
+            self._e.apertura_plata = apertura_plata
             self._e.problemas_base, self._e.archivo_base = problemas + problemas_apertura, nombre
             return Ajuste("cargar_base", nombre, autor, cuando)
         self._aplicar(cambio)
@@ -782,6 +789,9 @@ class Sesion:
             "precios": [[sku, canal, str(p)] for (sku, canal), p in sorted(self._precios_aprobados(r).items())],
             "apertura": [[sku, canal, h.entidad, str(h.valores["kilos"].monto)]
                          for (sku, canal), raiz in sorted(r.aperturas.items()) for h in raiz.hijos],
+            # Lo que facturó cada entidad en el aprobado: abre los pesos del mes siguiente.
+            "apertura_plata": [[sku, canal, h.entidad, str(h.valores["nns"].monto)]
+                               for (sku, canal), raiz in sorted(r.aperturas.items()) for h in raiz.hijos],
             "totales": [[c, str(t.kilos), None if t.plata is None else str(t.plata)]
                         for c, t in self._e.canales.items()],
             "reglas": [[x.regla.id, x.regla.canal, sorted(x.regla.categorias), x.regla.limite,
@@ -812,6 +822,9 @@ class Sesion:
         apertura: dict[Celda, dict[str, Decimal]] = {}
         for sku, canal, entidad, v in foto["apertura"]:
             apertura.setdefault((sku, canal), {})[entidad] = Decimal(v)
+        apertura_plata: dict[Celda, dict[str, Decimal]] = {}
+        for sku, canal, entidad, v in foto.get("apertura_plata", []):
+            apertura_plata.setdefault((sku, canal), {})[entidad] = Decimal(v)
         canales = {c: TotalCanal(Decimal(k), None if p is None else Decimal(p)) for c, k, p in foto["totales"]}
         precios = {(sku, canal): Decimal(p) for sku, canal, p in foto.get("precios", [])}
 
@@ -820,7 +833,7 @@ class Sesion:
         def cambio():
             ajuste = Ajuste("heredar", f"Arrancó desde el móvil aprobado de {de}", autor, cuando)
             self._e.base, self._e.apertura, self._e.problemas_base = base, apertura, []
-            self._e.precios = precios
+            self._e.precios, self._e.apertura_plata = precios, apertura_plata
             self._e.archivo_base = f"Móvil aprobado de {de}"
             self._e.canales, self._e.problemas2, self._e.archivo2 = canales, [], f"Totales de {de}"
             for id_, canal, categorias, limite, kilos, nns in foto["reglas"]:
@@ -1001,6 +1014,7 @@ class Sesion:
                 canales_sku={k: c for k, (c, _) in self.canales_sku.items()},
                 porcentajes=porcentajes,
                 precios=self._e.precios,
+                apertura_plata={k: v for k, v in self._e.apertura_plata.items() if normalizar(k[1]) not in cerrados},
             )
         except ErrorDeCruce as e:
             raise ErrorDeAjuste(str(e)) from e

@@ -42,8 +42,8 @@ transacción: si el recálculo falla, vuelve al estado anterior.
   medio minuto.
 - **El mes siguiente** (`Repositorio.empezar_siguiente`) exige el último aprobado y
   arranca con `heredar(foto)`: el reparto aprobado es la base, y se heredan totales por
-  canal, reglas, %, entidades apagadas, categorías, canales cerrados y lo que valió cada
-  kilo de cada SKU en cada canal. La foto va dentro
+  canal, reglas, %, entidades apagadas, categorías, canales cerrados, lo que valió cada
+  kilo de cada SKU en cada canal y lo que facturó cada entidad debajo del canal. La foto va dentro
   del comando: el mes nuevo no depende de cómo se recalcule el anterior.
 - **Empezar de cero** (menú del usuario): borra todos los meses y arranca el mes actual
   vacío. Solo en local (`IS_LOCAL=true`) o en un entorno de prueba (`PERMITIR_REINICIAR=true`),
@@ -189,8 +189,13 @@ celda. El cruce no cambia al apagar un distribuidor.
   El mes siguiente hereda lo que valió cada kilo en el aprobado.
   `importer/movil_real.py::precios`, `Sesion._precios`, `Sesion._por_canal`.
   En Participaciones, Call Center figura con el nombre del proveedor: no matchea y cae al
-  precio del mes anterior o al de Contraloría. Debajo del canal, los pesos se abren
-  con los pesos relativos en kilos de cada entidad.
+  precio del mes anterior o al de Contraloría.
+- **Debajo del canal, kilos y pesos con su propio histórico**: los kilos de cada celda se
+  abren según lo que vendió cada distribuidor o vendedor; los pesos, según lo que
+  facturó (hoja Distribuidores y tabla de asesores de Soluciones). Si a alguna entidad de
+  la celda le falta lo facturado, los pesos de esa celda se abren como los kilos: no se
+  mezclan unidades. El mes siguiente hereda lo que facturó cada una en el aprobado.
+  `domain/apertura.py::_peso`, `importer/movil_real.py::apertura_plata`.
 - **Categoría de cada SKU**: la del objetivo; si viene vacía, la asignada en la
   herramienta (en un mes heredado, ahí entran las del aprobado); si tampoco, la de la
   hoja Móvil Mes del archivo del mes anterior.

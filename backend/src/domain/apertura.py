@@ -55,6 +55,9 @@ class Nodo:
     entidad: str  # id de la entidad; único dentro del árbol de un SKU
     nombre: str
     peso: Decimal  # participación histórica, relativa a los hermanos
+    # Participación histórica en pesos, si la hay: un distribuidor no paga lo mismo que otro por el
+    # mismo SKU. None = los pesos se abren con `peso`, como los kilos.
+    peso_nns: Decimal | None = None
     # Base de cálculo: None = por histórico (`peso`); si no, un % fijo de lo que hay para
     # repartir entre los hermanos, el mismo en todas las unidades (supuesto B1).
     porcentaje: Decimal | None = None
@@ -76,20 +79,29 @@ class Nodo:
 _HISTORICO = "\0por histórico"  # la parte del grupo que va por histórico; no choca con una entidad
 
 
-def _por_base(disponible: Decimal, libres: list[Nodo], decimales: int) -> dict[str, Decimal]:
+def _peso(libres: list[Nodo], unidad: str) -> dict[str, Decimal]:
+    """El peso de cada hermano en esta unidad. En pesos, el histórico en pesos solo si lo tienen todos:
+    mezclar el de pesos de unos con el de kilos de otros compararía unidades distintas."""
+    if unidad == "nns" and libres and all(h.peso_nns is not None for h in libres):
+        return {h.entidad: h.peso_nns for h in libres}
+    return {h.entidad: h.peso for h in libres}
+
+
+def _por_base(disponible: Decimal, libres: list[Nodo], decimales: int, unidad: str = "kilos") -> dict[str, Decimal]:
     """
     Los que tienen % se llevan ese % de `disponible`; lo que queda se reparte entre los
     que van por histórico, según su peso. Dos repartos con mayores restos: cierra exacto.
     Si nadie va por histórico, los % se usan como pesos (si falta uno apagado, se reescalan).
     """
     manuales = {h.entidad: h.porcentaje for h in libres if h.porcentaje is not None}
+    peso = _peso(libres, unidad)
     if not manuales:
-        return repartir(disponible, {h.entidad: h.peso for h in libres}, decimales)
+        return repartir(disponible, peso, decimales)
     # Solo cuenta como "por histórico" quien tiene historia: con peso 0 no se le puede dar
     # el resto, y si nadie tiene, los % se usan como pesos (no se cae la celda).
-    historicos = {h.entidad: h.peso for h in libres if h.porcentaje is None and h.peso > 0}
+    historicos = {h.entidad: peso[h.entidad] for h in libres if h.porcentaje is None and peso[h.entidad] > 0}
     cero = Decimal(f"0E-{decimales}")
-    sin_historia = {h.entidad: cero for h in libres if h.porcentaje is None and h.peso == 0}
+    sin_historia = {h.entidad: cero for h in libres if h.porcentaje is None and peso[h.entidad] == 0}
     resto = 100 - sum(manuales.values())
     partes = repartir(disponible, {**manuales, **({_HISTORICO: resto} if historicos and resto > 0 else {})},
                       decimales)
@@ -138,7 +150,7 @@ def _repartir_hijos(nodo: Nodo, unidad: str, decimales: int) -> None:
         aviso = "Lo fijado supera el total de este nodo: no queda nada para los calculados."
     elif libres and disponible > 0:
         try:
-            reparto = _por_base(disponible, libres, decimales)
+            reparto = _por_base(disponible, libres, decimales, unidad)
         except ErrorDeReparto as e:
             aviso = str(e)
     # disponible == 0: los calculados reciben cero, sin necesidad de pesos.

@@ -171,3 +171,24 @@ def apertura(hojas: dict[str, list[list]]) -> tuple[dict[tuple[str, str], dict[s
             if celda:
                 resultado[(sku, canal)] = celda
     return resultado, problemas
+
+
+def apertura_plata(hojas: dict[str, list[list]]) -> dict[tuple[str, str], dict[str, Decimal]]:
+    """
+    {(sku, canal): {entidad: nns}}: lo que facturó cada distribuidor y asesor el mes anterior, de las
+    mismas tablas que `apertura`. Solo las entidades que también tienen kilos.
+    """
+    fuentes = []
+    distribuidores = tablas(_hoja(hojas, "distribuidores"))
+    if distribuidores:
+        fuentes.append((DISTRIBUIDORES, distribuidores[0]))
+    soluciones = tablas(_hoja(hojas, "soluciones"))
+    if len(soluciones) > 1:
+        fuentes.append((CALL_CENTER, soluciones[1]))
+    resultado: dict[tuple[str, str], dict[str, Decimal]] = {}
+    for canal, tabla in fuentes:
+        for sku, bloques in tabla.filas.items():
+            celda = {entidad: nns or Decimal(0) for entidad, (kilos, nns) in bloques.items() if kilos}
+            if celda:
+                resultado[(sku, canal)] = celda
+    return resultado

@@ -173,3 +173,18 @@ def test_empezar_de_cero_borra_todos_los_meses():
     assert almacen.meses() == [] and almacen.comandos("2026-10") == []
     with Repositorio(almacen, hoy=HOY).usar() as s:  # también después de reiniciar el servidor
         assert s.mes == "2026-10" and s.faltan() and s.historial == []
+
+
+def test_el_mes_siguiente_abre_los_pesos_con_lo_que_facturo_cada_entidad_en_el_aprobado():
+    """Debajo del canal, los pesos del mes siguiente siguen lo que facturó cada distribuidor y vendedor."""
+    r = Repositorio(_almacen(), hoy=HOY)
+    with r.usar() as s:
+        _armar(s)
+        facturado = {(sku, canal, h.entidad): h.valores["nns"].monto
+                     for (sku, canal), raiz in s.recorrido.aperturas.items() for h in raiz.hijos}
+    assert facturado
+    r.empezar_siguiente(P, DESPUES)
+    with r.usar() as s:
+        heredado = {(sku, canal, e): v for (sku, canal), celda in s.entradas.apertura_plata.items()
+                    for e, v in celda.items()}
+    assert heredado == facturado

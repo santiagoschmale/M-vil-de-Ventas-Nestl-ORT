@@ -108,6 +108,7 @@ def armar(
     canales_sku: dict[str, set[str] | frozenset[str]] | None = None,
     porcentajes: dict[tuple[str, str], Decimal] | None = None,
     precios: dict[Celda, Decimal] | None = None,
+    apertura_plata: dict[Celda, dict[str, Decimal]] | None = None,
 ) -> Recorrido:
     """
     `apagados`: SKUs que el planner saca del mes (ON/OFF). No se reparten; si su
@@ -179,7 +180,8 @@ def armar(
             grupos=grupos_plata,
         )
     entidades_apagadas = frozenset(entidades_apagadas)
-    aperturas = _abrir(kilos, plata, apertura or {}, entidades_apagadas, problemas, por_nombre, porcentajes or {})
+    aperturas = _abrir(kilos, plata, apertura or {}, entidades_apagadas, problemas, por_nombre, porcentajes or {},
+                       apertura_plata or {})
     return Recorrido(objetivos=objetivos, canales=canales, kilos=kilos, plata=plata, problemas=problemas,
                      aperturas=aperturas, entidades_apagadas=entidades_apagadas)
 
@@ -252,7 +254,7 @@ def _grupos(reglas, activos, por_nombre, problemas) -> tuple[list[Grupo], list[G
     return kilos, plata
 
 
-def _abrir(kilos, plata, apertura, apagadas, problemas, por_nombre, porcentajes) -> dict[Celda, Nodo]:
+def _abrir(kilos, plata, apertura, apagadas, problemas, por_nombre, porcentajes, apertura_plata) -> dict[Celda, Nodo]:
     """Una raíz por celda del cruce con apertura: el valor del cruce se reparte entre sus entidades."""
     if kilos.celdas is None:
         return {}
@@ -265,8 +267,11 @@ def _abrir(kilos, plata, apertura, apagadas, problemas, por_nombre, porcentajes)
         valor_plata = Decimal(0) if plata is None or plata.celdas is None else plata.celdas.get(k, Decimal(0))
         if valor_kilos == 0 and valor_plata == 0:
             continue
+        # Lo que facturó cada entidad en esta celda el mes anterior: abre los pesos (si no hay, abren los kilos).
+        facturado = apertura_plata.get((sku, canal_base))
         raiz = Nodo(entidad=f"{sku}|{canal}", nombre=canal, peso=Decimal(1),
-                    hijos=[Nodo(entidad=e, nombre=e, peso=w, porcentaje=porcentajes.get((canal, e)))
+                    hijos=[Nodo(entidad=e, nombre=e, peso=w, porcentaje=porcentajes.get((canal, e)),
+                                peso_nns=None if facturado is None else facturado.get(e, Decimal(0)))
                            for e, w in sorted(_con_porcentaje(pesos, canal, porcentajes).items())])
         raiz.valores["kilos"].monto = valor_kilos
         raiz.valores["nns"].monto = valor_plata

@@ -246,3 +246,36 @@ def test_si_se_apagan_todos_los_hijos_se_avisa_y_no_queda_en_silencio():
     distribuidores = _nodo(raiz, "canal.distribuidores")
     assert distribuidores.cuadra["kilos"] is False
     assert distribuidores.aviso["kilos"] and "apagad" in distribuidores.aviso["kilos"]
+
+
+# ---------------------------------------------------------------------------
+# Pesos con su propio histórico
+# ---------------------------------------------------------------------------
+
+def _celda(peso_nns_a, peso_nns_b):
+    """Una celda con dos distribuidores que vendieron los mismos kilos pero facturaron distinto."""
+    raiz = Nodo(entidad="celda", nombre="Distribuidores", peso=D(1), hijos=[
+        Nodo(entidad="A", nombre="A", peso=D(50), peso_nns=peso_nns_a),
+        Nodo(entidad="B", nombre="B", peso=D(50), peso_nns=peso_nns_b),
+    ])
+    raiz.valores["kilos"].monto = D("100.000")
+    raiz.valores["nns"].monto = D("1000.00")
+    recalcular(raiz, set())
+    return raiz
+
+
+def test_los_pesos_se_abren_con_lo_que_facturo_cada_entidad():
+    raiz = _celda(D(300), D(100))  # A facturó el triple que B con los mismos kilos
+    assert [_monto(raiz, e) for e in "AB"] == [D("50.000"), D("50.000")]  # los kilos, por kilos
+    assert [_monto(raiz, e, "nns") for e in "AB"] == [D("750.00"), D("250.00")]  # los pesos, por pesos
+
+
+def test_sin_historico_en_pesos_los_pesos_se_abren_como_los_kilos():
+    raiz = _celda(None, None)
+    assert [_monto(raiz, e, "nns") for e in "AB"] == [D("500.00"), D("500.00")]
+
+
+def test_si_a_una_entidad_le_falta_el_historico_en_pesos_la_celda_se_abre_como_los_kilos():
+    """Mezclar el histórico en pesos de una con el de kilos de otra compararía unidades distintas."""
+    raiz = _celda(D(300), None)
+    assert [_monto(raiz, e, "nns") for e in "AB"] == [D("500.00"), D("500.00")]

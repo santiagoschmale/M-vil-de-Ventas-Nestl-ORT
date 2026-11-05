@@ -185,13 +185,10 @@ Pendiente de UX: la etapa 2 se revisa celda por celda; una vista por canal (vend
 
 ### Lo que sigue
 
-1. **Pesos debajo del canal con la historia en pesos.** Por canal los pesos ya siguen el
-   precio de cada SKU en cada canal; debajo del canal todavía se abren con los % de kilos
-   de cada distribuidor o vendedor.
-2. **El Excel de salida del equipo de ventas**, cuando llegue el template, con NNS
+1. **El Excel de salida del equipo de ventas**, cuando llegue el template, con NNS
    c/IIBB (A15, B9).
-3. **El registro de la app en Entra** (I6): los pasos para IT están en el README.
-4. **Confirmar la base del reparto** (A18): la herramienta parte del mes anterior; el
+2. **El registro de la app en Entra** (I6): los pasos para IT están en el README.
+3. **Confirmar la base del reparto** (A18): la herramienta parte del mes anterior; el
    cliente usa el período de Participaciones como histórico. ¿El año, el mes anterior o
    el mismo mes del año anterior?
 
