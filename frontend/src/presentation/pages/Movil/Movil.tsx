@@ -4,7 +4,6 @@ import {
 } from '@mui/material';
 import ExpandMoreRoundedIcon from '@mui/icons-material/ExpandMoreRounded';
 import FileDownloadRoundedIcon from '@mui/icons-material/FileDownloadRounded';
-import UploadFileRoundedIcon from '@mui/icons-material/UploadFileRounded';
 import EditRoundedIcon from '@mui/icons-material/EditRounded';
 import AddRoundedIcon from '@mui/icons-material/AddRounded';
 import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded';
@@ -21,6 +20,7 @@ import { Estado, RevisionKilos, Unidad } from '../../../stores/useMovil/useMovil
 import { conUnidad, enMenores, formatear, nombreMes, UNIDADES } from './formato';
 import { AVENA, CIERRA, NO_CIERRA, numeros } from './estilo';
 import { Alerta, Principal, Resolver } from './Alerta';
+import { Subir } from './Subir';
 import { Ayuda } from './Ayuda';
 import { AYUDA } from './ayudas';
 import { Foco, Repetido } from '../../../stores/useMovil/useMovil.type';
@@ -48,22 +48,6 @@ const ACCIONES: Record<string, string> = {
   agregar_entidad: 'Agregó un distribuidor o vendedor', eliminar_entidad: 'Eliminó un distribuidor o vendedor',
   proponer_pesos: 'Propuso los pesos por canal según los kilos',
   abrir_canal: 'Abrió un canal entre distribuidores o vendedores', cerrar_canal: 'Dejó un canal sin abrir debajo', repartir_diferencia: 'Repartió la diferencia entre los canales',
-};
-
-export const Subir = ({ cargado, etiqueta, alElegir, texto }: {
-  cargado: boolean; etiqueta: string; alElegir: (f: File) => void; texto?: string;
-}) => {
-  const { ocupado } = useMovil();
-  const soloLectura = useSoloLectura();
-  return (
-    <Button component="label" variant="outlined" size="small" startIcon={<UploadFileRoundedIcon />} disabled={ocupado || soloLectura}>
-      {texto ?? (cargado ? 'Reemplazar' : 'Subir Excel')}
-      <input
-        hidden type="file" accept=".xlsx,.xlsb" aria-label={etiqueta}
-        onChange={e => { const f = e.target.files?.[0]; if (f) alElegir(f); e.target.value = ''; }}
-      />
-    </Button>
-  );
 };
 
 const Dato = ({ children }: { children: React.ReactNode }) => (
@@ -146,7 +130,10 @@ const TotalesDialog = ({ totales, sugerencia, objetivo, onCerrar }: {
     const id = ++pedido.current;
     const t = setTimeout(() => {
       const kilos = Object.fromEntries(filas.filter(f => f.canal.trim()).map(f => [f.canal.trim(), f.kilos.trim()]));
-      revisarKilos(kilos).then(r => { if (id === pedido.current) setRevision(r); }).catch(() => undefined);
+      revisarKilos(kilos)
+        .then(r => { if (id === pedido.current) setRevision(r); })
+        // Sin revisión no se sabe si cierran: no se muestra "cierran" ni se habilitan los pesos con una vieja.
+        .catch(() => { if (id === pedido.current) { setRevision(undefined); setError('No se pudo revisar los kilos. Probá de nuevo.'); } });
     }, PAUSA_MS);
     return () => clearTimeout(t);
   }, [kilosEscritos]);
@@ -156,7 +143,7 @@ const TotalesDialog = ({ totales, sugerencia, objetivo, onCerrar }: {
   };
   // Los pesos salen de los kilos: se completan cuando los kilos ya cierran, a pedido del planner.
   const kilosListos = !objetivo || !!revision?.cierra || !!revision?.se_reparte_solo;
-  const conPesos = !!objetivo?.nns && Number(objetivo.nns) > 0;
+  const conPesos = /[1-9]/.test(objetivo?.nns ?? '');  // un monto no pasa por número de JavaScript
   const [sugiriendo, setSugiriendo] = useState(false);
   const completarPesos = () => {
     setSugiriendo(true);

@@ -5,7 +5,7 @@ import {
 import { useMovil, useSoloLectura } from '../../../stores/useMovil';
 import { Alerta } from './Alerta';
 import { Estado } from '../../../stores/useMovil/useMovil.type';
-import { Subir } from './Movil';
+import { Subir } from './Subir';
 
 /**
  * Categoría de los SKUs que no la traen en el objetivo del mes. Se sube un Excel (SKU y

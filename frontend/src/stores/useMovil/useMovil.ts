@@ -73,7 +73,9 @@ export const useMovil = create<TUseMovil>((set, get) => {
       if (!opciones.errorEnDialogo) avisar(mensaje, 'error');
       // Un rechazo puede ser porque otro planner cambió el móvil (p. ej. lo aprobó): traer el estado real.
       if (respuesta(e)?.status === 422) {
-        api.get<Estado>(conMes('/movil')).then(r => set({ estado: r.data, mes: r.data.mes })).catch(() => undefined);
+        api.get<Estado>(conMes('/movil'))
+          .then(r => { set({ estado: r.data, mes: r.data.mes }); return traerCruce(r.data); })
+          .catch(() => undefined);
         traerMeses().catch(() => undefined);
       }
       return mensaje;

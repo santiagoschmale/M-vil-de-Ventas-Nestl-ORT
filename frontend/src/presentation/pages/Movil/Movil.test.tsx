@@ -301,6 +301,36 @@ describe('MovilPage', { timeout: 15000 }, () => {
     expect(await screen.findByText('Hay 1 cosa para resolver en pesos.')).toBeInTheDocument();
   });
 
+  it('si falla la revisión de kilos, no dice que cierran ni habilita los pesos', async () => {
+    const base = { archivo: 'reparto_agosto.xlsx', celdas: 3, aperturas: 1,
+      canales: [{ canal: 'Catering', kilos: '900.000' }, { canal: 'Córdoba', kilos: '400.000' }] };
+    server.use(
+      http.get('*/api/movil', () => HttpResponse.json(estado({
+        faltan: ['totales por canal'], entradas: { ...estado().entradas, input2: null, base } }))),
+      http.post('*/api/movil/totales/kilos/revisar', () => HttpResponse.json({ detail: 'caído' }, { status: 500 })),
+    );
+    const user = userEvent.setup({ delay: null });
+    render(<MovilPage />);
+    await user.click(await screen.findByRole('button', { name: 'Armar totales por canal en la pantalla' }));
+    const dialogo = screen.getByRole('dialog', { name: 'Armar totales por canal' });
+    expect(await within(dialogo).findByText('No se pudo revisar los kilos. Probá de nuevo.')).toBeInTheDocument();
+    expect(within(dialogo).queryByText(/Kilos: cierran/)).not.toBeInTheDocument();
+    expect(within(dialogo).getByRole('button', { name: 'Completar con los sugeridos' })).toBeDisabled();
+  });
+
+  it('si el backend rechaza un cambio, se vuelven a traer el estado y la tabla', async () => {
+    let tablas = 0;
+    server.use(
+      http.get('*/api/movil/cruce/kilos', () => { tablas += 1; return HttpResponse.json(cruce); }),
+      http.put('*/api/movil/skus/*', () => HttpResponse.json({ detail: 'El móvil ya está aprobado.' }, { status: 422 })),
+    );
+    render(<MovilPage />);
+    await screen.findByRole('columnheader', { name: 'Objetivo (kg)' });
+    const antes = tablas;
+    await useMovil.getState().cambiarSku('100', false, 'x');
+    await waitFor(() => expect(tablas).toBeGreaterThan(antes));
+  });
+
   it('se pueden agregar y sacar canales al armar los totales, aun sin mes anterior', async () => {
     server.use(http.get('*/api/movil', () => HttpResponse.json(estado({
       faltan: ['totales por canal', 'mes anterior'], entradas: { ...estado().entradas, input2: null, base: null } }))));
