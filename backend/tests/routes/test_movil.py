@@ -375,11 +375,17 @@ def test_las_alertas_dicen_la_descripcion_del_sku():
     assert con_sku and all(p["descripcion"] for p in con_sku)
 
 
-def test_empezar_de_cero_solo_en_local():
+def test_empezar_de_cero_solo_en_local_o_en_un_entorno_de_prueba_que_lo_permite():
     import os
     c = _cerrado()
     antes = os.environ.get("IS_LOCAL")
     try:
+        os.environ["IS_LOCAL"] = "false"
+        os.environ["PERMITIR_REINICIAR"] = "true"  # el entorno de prueba del cliente
+        assert c.get("/api/config").json()["reiniciar"] is True
+        assert c.post("/api/movil/reiniciar").status_code == 200
+        os.environ.pop("PERMITIR_REINICIAR")
+        assert c.get("/api/config").json()["reiniciar"] is False
         os.environ["IS_LOCAL"] = "false"
         assert c.post("/api/movil/reiniciar").status_code == 403
         os.environ.pop("IS_LOCAL")

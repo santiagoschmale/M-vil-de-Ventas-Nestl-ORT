@@ -11,7 +11,6 @@ from __future__ import annotations
 import re
 from collections import defaultdict
 from datetime import datetime
-from os import environ
 from decimal import Decimal
 from io import BytesIO
 from pathlib import Path
@@ -587,11 +586,12 @@ def sugerir_pesos(cuerpo: ValoresIn, s: Sesion = Depends(sesion)):
     return {"pesos": _aplicar(s.pesos_para, cuerpo.valores)}
 
 
-@router.post("/reiniciar", summary="Empezar de cero: borra todos los meses (solo en local, para practicar)")
+@router.post("/reiniciar", summary="Empezar de cero: borra todos los meses (en local o en un entorno de prueba con "
+                                   "PERMITIR_REINICIAR=true)")
 def reiniciar(request: Request):
-    # Borra todo: solo con IS_LOCAL=true explícito (make api / dev-db lo setean), no por default.
-    if environ.get("IS_LOCAL", "").lower() != "true":
-        raise HTTPException(403, "Empezar de cero solo se puede en una instalación local de prueba.")
+    from src.routes.cuenta import puede_reiniciar
+    if not puede_reiniciar():
+        raise HTTPException(403, "Empezar de cero solo se puede en un entorno de prueba.")
     request.app.state.repositorio.reiniciar()
     with request.app.state.repositorio.usar() as s:
         return _estado(s)

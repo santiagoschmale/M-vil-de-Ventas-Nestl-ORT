@@ -54,13 +54,13 @@ def _con(token):
 
 def test_sin_entra_configurado_la_pantalla_no_pide_login():
     c = _cliente(ProveedorLocal())
-    assert c.get("/api/config").json() == {"entra": None}
+    assert c.get("/api/config").json()["entra"] is None
     assert c.get("/api/whoami").json()["username"] == "usuario-prueba"
     assert c.get("/api/movil").status_code == 200
 
 
 def test_con_entra_la_pantalla_sabe_con_que_app_iniciar_sesion():
-    assert _entra().get("/api/config").json() == {"entra": {"tenant": TENANT, "client_id": CLIENTE}}
+    assert _entra().get("/api/config").json()["entra"] == {"tenant": TENANT, "client_id": CLIENTE}
 
 
 def test_sin_token_no_se_ve_el_movil():

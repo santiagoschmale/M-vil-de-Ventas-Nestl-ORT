@@ -9,7 +9,11 @@ import { api } from './http';
 let msal: PublicClientApplication | undefined;
 let alcances: string[] = [];
 
+let reiniciable = false;
+
 export const conEntra = () => msal !== undefined;
+/** Empezar de cero: solo en local o en un entorno de prueba que lo permite (lo dice el backend). */
+export const puedeReiniciar = () => reiniciable;
 
 const token = async () => {
   try {
@@ -24,6 +28,7 @@ const token = async () => {
 /** Antes de mostrar la pantalla: si hay Entra, la sesión tiene que estar iniciada. */
 export const iniciarSesion = async (): Promise<void> => {
   const config = await fetch('/api/config').then(r => (r.ok ? r.json() : null)).catch(() => null);
+  reiniciable = !!config?.reiniciar;
   if (!config?.entra) return;
   const { tenant, client_id: cliente } = config.entra as { tenant: string; client_id: string };
   const { PublicClientApplication } = await import('@azure/msal-browser');
