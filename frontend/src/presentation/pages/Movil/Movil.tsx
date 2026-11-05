@@ -691,7 +691,7 @@ const AprobarDialog = ({ estado, onCerrar }: { estado: Estado; onCerrar: () => v
 };
 
 export const MovilPage = () => {
-  const { estado, cruce, unidad, refrescar, elegirUnidad, ocupado, errorDeCarga, foco, deshacer, reabrir, meses, verMes,
+  const { estado, cruce, unidad, refrescar, elegirUnidad, exportar, ocupado, errorDeCarga, foco, deshacer, reabrir, meses, verMes,
     empezarSiguiente } = useMovil();
   const ultimo = meses[meses.length - 1]?.mes;
   const [confirmarExportar, setConfirmarExportar] = useState(false);
@@ -826,7 +826,7 @@ export const MovilPage = () => {
                         Exportar
                       </Button>
                     ) : (
-                      <Button variant="outlined" startIcon={<FileDownloadRoundedIcon />} href={`/api/movil/exportar?mes=${estado.mes}`} disabled={!cierraTodo}>
+                      <Button variant="outlined" startIcon={<FileDownloadRoundedIcon />} onClick={() => exportar()} disabled={!cierraTodo}>
                         Exportar
                       </Button>
                     )}
@@ -906,7 +906,7 @@ export const MovilPage = () => {
             </DialogContent>
             <DialogActions sx={{ px: 3, pb: 2 }}>
               <Button onClick={() => setConfirmarExportar(false)}>Cancelar</Button>
-              <Button variant="contained" href={`/api/movil/exportar?mes=${estado.mes}`} onClick={() => setConfirmarExportar(false)}>
+              <Button variant="contained" onClick={() => { setConfirmarExportar(false); exportar(); }}>
                 Exportar igual
               </Button>
             </DialogActions>

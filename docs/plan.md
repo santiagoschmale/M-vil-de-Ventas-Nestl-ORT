@@ -69,7 +69,7 @@ de la siguiente. Eso define lo que sigue (§3, "Lo que sigue").
 |---|---|---|
 | Persistencia en Postgres, un móvil por mes | ✅ | Cada acción queda guardada; meses anteriores en solo lectura. Falta probarlo en el Postgres del sandbox |
 | Categorías guardadas en la herramienta | ✅ | Si el objetivo no trae categoría, se completa desde lo asignado (B8). Se hereda |
-| Autenticación | 🟡 | Proveedor local detrás de una interfaz. Confirmado SSO con Entra, no usuario y contraseña (19/10). Depende de IT (I6) |
+| Autenticación | 🟡 | Login con Entra ID listo: el front inicia sesión con Microsoft (MSAL) y el backend valida el token y el rol Planner/Admin. Se activa con `ENTRA_TENANT_ID` y `ENTRA_CLIENT_ID`; sin ellas, proveedor local sin login. Falta: que IT registre la app (I6, pasos en el README) |
 | Entorno de pruebas para el cliente | ⬜ | IT ofreció armar la imagen Docker y subirla a un servidor de ellos (I2). Alternativa: uno nuestro, en memoria |
 | Leer el móvil real | 🟡 | Se lee el `.xlsb` del planner: el objetivo de Móvil Mes y el mes anterior de las hojas de reparto (`importer/movil_real.py`). Soluciones entra como Call Center y Distribuidores mientras A17 siga abierta; un cero en el reparto no aplica. Falta: los totales por canal desde el mismo archivo |
 | Tests en CI | ✅ | Backend y front |
@@ -195,7 +195,7 @@ En este orden: los tres primeros son para la prueba con datos reales.
    Dockerfiles necesitan los registros privados de Nestlé (I1), que tiene IT.
 3. **El Excel de salida del equipo de ventas**, cuando llegue el template, con NNS
    c/IIBB (A15, B9).
-4. Después de la prueba: SSO con Entra (I6) y la base del mismo mes del año anterior
+4. Después de la prueba: el registro de la app en Entra (I6) y la base del mismo mes del año anterior
    (A18).
 
 

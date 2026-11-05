@@ -12,7 +12,8 @@ export const useProfile = create<TUseProfile>((set, get) => ({
 
   isAdmin: () => {
     const { profile } = get()
-    return profile?.roles.includes('sm-admin') || false
+    // 'Admin' es el rol de la app en Entra; 'sm-admin', el del template.
+    return profile?.roles.some(r => r === 'Admin' || r === 'sm-admin') || false
   },
 
   isContribuitor: () => {

@@ -9,6 +9,8 @@ export const Profile = () => {
     if(!unformated) {
       return 
     }
+    // Nestlé manda "Apellido,Nombre"; Entra, "Nombre Apellido".
+    if (!unformated.includes(',')) return unformated
     const names = unformated.split(',')
     return `${names[1]} ${names[0]}`
   };

@@ -175,7 +175,8 @@ export type TUseMovil = {
   // Sin valores, la sugerencia; con valores, cuánto falta o sobra con ellos (no cambia nada).
   diferencia: (unidad: Unidad, valores?: Record<string, string>) => Promise<Diferencia>;
   repartirDiferencia: (unidad: Unidad, valores: Record<string, string>, motivo: string) => Resultado;
-  proponerPesos: (motivo: string) => Resultado; // pesos por canal según los kilos repartidos
+  proponerPesos: (motivo: string) => Resultado;
+  exportar: () => Promise<void>; // baja el Excel (con el token de la sesión, si hay Entra) // pesos por canal según los kilos repartidos
   agregarRegla: (datos: DatosRegla, motivo: string) => Resultado;
   editarRegla: (id: string, datos: DatosRegla, motivo: string) => Resultado;
   eliminarRegla: (id: string, motivo: string) => Resultado;

@@ -110,7 +110,23 @@ docker run -d --name movil-frontend --network movil -p 8080:80 movil-frontend
 - `IS_LOCAL=false`: sin recarga automática ni "Empezar de cero". Con las `nbra-*`
   reales, además carga la configuración de Key Vault.
 - La pantalla queda en el puerto 8080. Acepta archivos de hasta 50 MB.
-- Hasta que haya login con Entra, todos entran como un usuario de prueba.
+- Login: con `ENTRA_TENANT_ID` y `ENTRA_CLIENT_ID` en la API, se inicia sesión con Microsoft
+  Entra ID (ver abajo). Sin ellas, todos entran como un usuario de prueba.
+
+### Login con Entra ID
+
+Lo que tiene que hacer IT en el registro de la aplicación (una sola app para la pantalla y la API):
+
+1. **Plataforma "Single-page application"**, con las direcciones de retorno donde corre la
+   pantalla: `http://localhost:5175` para desarrollo y la del servidor de prueba (por ejemplo
+   `https://movil.prueba.nestle…`).
+2. **Exponer una API** con el identificador `api://<client ID>` y el permiso
+   `access_as_user`, y autorizar a la misma app a pedirlo.
+3. **Roles de la app** `Planner` y `Admin`, asignados a quienes usan el móvil. Sin uno de esos
+   roles, la API responde "Tu usuario no tiene acceso".
+4. Pasarnos el **tenant ID** y el **client ID**, que van en `ENTRA_TENANT_ID` y
+   `ENTRA_CLIENT_ID` de la API. La pantalla los toma de `/api/config`: la misma imagen sirve
+   para cualquier ambiente.
 
 ## Estructura
 

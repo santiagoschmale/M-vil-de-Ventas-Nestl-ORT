@@ -380,7 +380,13 @@ describe('MovilPage', { timeout: 15000 }, () => {
     await user.click(await screen.findByRole('button', { name: 'Exportar' }));
     const dialogo = screen.getByRole('dialog');
     expect(dialogo).toHaveTextContent('Rosario no se puede abrir.');
-    expect(within(dialogo).getByRole('link', { name: 'Exportar igual' })).toHaveAttribute('href', '/api/movil/exportar?mes=2026-10');
+    // Se baja con un pedido (lleva el token de la sesión), no con un link directo.
+    let pedido = '';
+    server.use(http.get('*/api/movil/exportar', ({ request }) => { pedido = request.url; return new HttpResponse(new Blob(['x'])); }));
+    URL.createObjectURL = vi.fn(() => 'blob:x');
+    URL.revokeObjectURL = vi.fn();
+    await user.click(within(dialogo).getByRole('button', { name: 'Exportar igual' }));
+    await waitFor(() => expect(new URL(pedido).searchParams.get('mes')).toBe('2026-10'));
   });
 
   it('un SKU sin historia se resuelve diciendo dónde se vende', async () => {
@@ -700,7 +706,7 @@ describe('MovilPage', { timeout: 15000 }, () => {
   it('exportar se habilita solo cuando kilos y pesos cierran', async () => {
     server.use(http.get('*/api/movil', () => HttpResponse.json(estado({ cierra: { kilos: true, plata: false } }))));
     render(<MovilPage />);
-    expect(await screen.findByRole('link', { name: 'Exportar' })).toHaveAttribute('aria-disabled', 'true');
+    expect(await screen.findByRole('button', { name: 'Exportar' })).toBeDisabled();
   });
 });
 
@@ -727,7 +733,7 @@ describe('MovilPage: qué sigue', { timeout: 15000 }, () => {
   it('el botón lleno es el paso siguiente: Aprobar, no Exportar', async () => {
     render(<MovilPage />);
     expect(await screen.findByRole('button', { name: 'Aprobar' })).toHaveClass('MuiButton-contained');
-    expect(screen.getByRole('link', { name: 'Exportar' })).toHaveClass('MuiButton-outlined');
+    expect(screen.getByRole('button', { name: 'Exportar' })).toHaveClass('MuiButton-outlined');
   });
 
   it('aprobado, la barra fija muestra el estado y el botón para empezar el mes siguiente', async () => {
@@ -736,7 +742,7 @@ describe('MovilPage: qué sigue', { timeout: 15000 }, () => {
     const barra = await screen.findByRole('banner');
     expect(await within(barra).findByText('Aprobado')).toBeInTheDocument();
     expect(within(barra).getByRole('button', { name: 'Empezar noviembre' })).toHaveClass('MuiButton-contained');
-    expect(within(barra).getByRole('link', { name: 'Exportar' })).toHaveClass('MuiButton-outlined');
+    expect(within(barra).getByRole('button', { name: 'Exportar' })).toHaveClass('MuiButton-outlined');
   });
 
   it('sin entradas, la barra no muestra controles que todavía no sirven', async () => {
@@ -745,7 +751,7 @@ describe('MovilPage: qué sigue', { timeout: 15000 }, () => {
     const barra = await screen.findByRole('banner');
     await within(barra).findByText(/Siguiente: en Entradas/);
     expect(within(barra).queryByRole('button', { name: 'Aprobar' })).not.toBeInTheDocument();
-    expect(within(barra).queryByRole('link', { name: 'Exportar' })).not.toBeInTheDocument();
+    expect(within(barra).queryByRole('button', { name: 'Exportar' })).not.toBeInTheDocument();
     expect(within(barra).queryByRole('group', { name: 'Unidad de la matriz' })).not.toBeInTheDocument();
   });
 

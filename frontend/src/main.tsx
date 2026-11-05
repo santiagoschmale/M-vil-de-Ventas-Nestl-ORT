@@ -8,16 +8,18 @@ import theme from './theme';
 
 import Router from './presentation/Router';
 import { Home } from './presentation/pages/Home/Home';
+import { iniciarSesion } from './infra/auth';
 
 
 const root = ReactDOM.createRoot(document.getElementById('root')!)
 
 async function deferRender() {
-  if (import.meta.env.MODE !== 'development') {
-    return
+  if (import.meta.env.MODE === 'development') {
+    const { worker } = await import('./mocks/worker')
+    await worker.start()
   }
-  const { worker } = await import('./mocks/worker')
-  return worker.start()
+  // Con Entra configurado en el backend, la pantalla se muestra recién con la sesión iniciada.
+  await iniciarSesion()
 }
 
 deferRender().then(() => {

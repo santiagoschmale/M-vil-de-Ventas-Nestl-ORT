@@ -194,6 +194,20 @@ export const useMovil = create<TUseMovil>((set, get) => {
       () => api.put(conMes(`/movil/diferencia/${unidad}`), { valores, motivo }),
       { ...enDialogo, aviso: 'Totales por canal actualizados.' }),
 
+    // No un link directo: el navegador no mandaría el token de la sesión.
+    exportar: async () => {
+      try {
+        const r = await api.get<Blob>(conMes('/movil/exportar'), { responseType: 'blob' });
+        const disposicion = String(r.headers['content-disposition'] ?? '');
+        const nombre = /filename="?([^";]+)"?/.exec(disposicion)?.[1] ?? `movil-${get().mes ?? ''}.xlsx`;
+        const url = URL.createObjectURL(r.data);
+        const enlace = Object.assign(document.createElement('a'), { href: url, download: nombre });
+        enlace.click();
+        URL.revokeObjectURL(url);
+      } catch (e) {
+        avisar(mensajeDeError(e), 'error');
+      }
+    },
     proponerPesos: motivo => cambiar(() => api.post(conMes('/movil/totales/pesos'), { motivo }),
       { ...enDialogo, aviso: 'Pesos por canal propuestos según los kilos.' }),
 

@@ -47,12 +47,6 @@ server {
         try_files $uri $uri/ /index.html;
     }
 
-    # Hasta que haya login real (Entra): el nombre va como "Apellido,Nombre".
-    location /api/whoami {
-        default_type application/json;
-        return 200 '{"name":"Prueba,Usuario","username":"usuario-prueba","roles":["sm-admin"],"custom":{}}';
-    }
-
     # El backend, por su nombre en docker-compose.yml.
     location /api/ {
         proxy_pass http://backend:3000;
