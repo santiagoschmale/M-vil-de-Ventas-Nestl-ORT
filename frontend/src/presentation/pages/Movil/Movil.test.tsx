@@ -752,7 +752,7 @@ describe('MovilPage', { timeout: 15000 }, () => {
     await user.click(screen.getByRole('button', { name: 'Editar totales por canal' }));
     const dialogo = screen.getByRole('dialog', { name: 'Editar totales por canal' });
     expect(await within(dialogo).findByRole('button', { name: 'Sacar lo que sobra' })).toBeInTheDocument();
-    expect(within(dialogo).getByText('A cada canal según su tamaño')).toBeInTheDocument();
+    expect(within(dialogo).getByText('En proporción a los kilos de cada canal')).toBeInTheDocument();
     expect(within(dialogo).getByRole('button', { name: 'Recalcular según los kilos' })).toBeDisabled();
     expect(within(dialogo).getByText('Primero cerrá los kilos')).toBeInTheDocument();
     expect(within(dialogo).queryByRole('button', { name: 'Ajustar a Contraloría' })).not.toBeInTheDocument();  // en pesos, solo recalcular

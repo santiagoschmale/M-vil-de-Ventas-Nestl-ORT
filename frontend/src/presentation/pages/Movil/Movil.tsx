@@ -213,7 +213,7 @@ const TotalesDialog = ({ totales, sugerencia, objetivo, aviso, onCerrar }: {
           {avisoVigente && <Alerta tono="frena" titulo="Pesos no cierra" acciones={conPesos && recalcular}>{aviso}</Alerta>}
           {revision && (
             <EstadoTotal r={revision.kilos} unidad="kilos" acciones={
-              <ConAyuda ayuda="A cada canal según su tamaño">
+              <ConAyuda ayuda="En proporción a los kilos de cada canal">
                 <Principal onClick={() => ajustar('kilos', revision.kilos)}>
                   {revision.kilos.falta?.startsWith('-') ? 'Sacar lo que sobra' : 'Sumar lo que falta'}
                 </Principal>
