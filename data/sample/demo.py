@@ -44,17 +44,18 @@ def main() -> None:
             ok(c.post(f"/api/movil/etapas/{etapa}?mes={mes}"))
         ok(c.post(f"/api/movil/aprobar?mes={mes}"))
 
-    # El primero, como lo arma un planner: totales del mes anterior, diferencia, SKU nuevo y pesos.
+    # El primero, como lo arma un planner: totales del mes anterior, SKU nuevo, kilos ajustados a Contraloría
+    # y pesos según los kilos, como en el diálogo de Totales por canal.
     _fecha(DESDE)
     mes = ok(c.post("/api/movil/muestra?totales=false"))["mes"]
     sug = ok(c.get("/api/movil"))["entradas"]["base"]["canales"]
     ok(c.put("/api/movil/input2", json={"texto": "Canal\tKilos\tPlata\n" + "\n".join(
         f"{s['canal']}\t{s['kilos']}\t" for s in sug)}))
-    d = ok(c.get("/api/movil/diferencia/kilos"))
-    ok(c.put("/api/movil/diferencia/kilos", json={
-        "valores": {x["canal"]: x["sugerido"] for x in d["canales"]}, "motivo": "Contraloría ajustó el objetivo"}))
     ok(c.put("/api/movil/skus/90020900/canales", json={"canales": ["Catering", "Vending"], "motivo": "SKU nuevo"}))
-    ok(c.post("/api/movil/totales/pesos", json={"motivo": "Según los kilos"}))
+    kilos = ok(c.post("/api/movil/totales/revisar", json={"kilos": {s["canal"]: s["kilos"] for s in sug}}))["kilos"]["ajustados"]
+    pesos = ok(c.post("/api/movil/totales/pesos/sugeridos", json={"valores": kilos}))["pesos"]
+    ok(c.put("/api/movil/input2", json={"motivo": "Contraloría ajustó el objetivo", "texto": "Canal\tKilos\tPlata\n" + "\n".join(
+        f"{c_}\t{kilos[c_]}\t{pesos[c_]}" for c_ in kilos)}))
     cerrar_y_aprobar(mes)
 
     # Los siguientes heredan todo: con el objetivo nuevo ya cierran.
