@@ -70,11 +70,12 @@ de la siguiente. Eso define lo que sigue (§3, "Lo que sigue").
 | Persistencia en Postgres, un móvil por mes | ✅ | Cada acción queda guardada; meses anteriores en solo lectura. Falta probarlo en el Postgres del sandbox |
 | Categorías guardadas en la herramienta | ✅ | Si el objetivo no trae categoría, se completa desde lo asignado (B8). Se hereda |
 | Autenticación | 🟡 | Login con Entra ID listo: el front inicia sesión con Microsoft (MSAL) y el backend valida el token y el rol Planner/Admin. Se activa con `ENTRA_TENANT_ID` y `ENTRA_CLIENT_ID`; sin ellas, proveedor local sin login. Falta: que IT registre la app (I6, pasos en el README) |
-| Entorno de pruebas para el cliente | ⬜ | IT ofreció armar la imagen Docker y subirla a un servidor de ellos (I2). Alternativa: uno nuestro, en memoria |
-| Leer el móvil real | 🟡 | Se lee el `.xlsb` del planner: el objetivo de Móvil Mes y el mes anterior de las hojas de reparto (`importer/movil_real.py`). Soluciones entra como Call Center y Distribuidores mientras A17 siga abierta; un cero en el reparto no aplica. Falta: los totales por canal desde el mismo archivo |
+| Entorno de pruebas para el cliente | ✅ | IT lo levantó en un servidor suyo con las imágenes Docker, detrás de su control de acceso (I2). Se actualiza con cada tag. "Empezar de cero" con `PERMITIR_REINICIAR=true`, solo para Admin |
+| Leer el móvil real | 🟡 | Se lee el `.xlsb` del planner: el objetivo de Móvil Mes y el mes anterior de las hojas de reparto (`importer/movil_real.py`). Soluciones entra como Call Center y Distribuidores mientras A17 siga abierta; un cero en el reparto no aplica. Del mismo archivo salen los kilos y pesos por canal con que arrancan los totales, el precio de cada SKU en cada canal (mes anterior y Participaciones) y las categorías que el objetivo trae vacías |
 | Tests en CI | ✅ | Backend y front |
 | Deshacer el último cambio | ✅ | Una vez. Con login: solo el propio |
-| Totales por canal sin Excel | ✅ | Se arman en la pantalla con los canales y kilos del mes anterior; los pesos los completa el planner. Con persistencia, arrancar con el input 2 del mes anterior (kilos y pesos) |
+| Totales por canal sin Excel | ✅ | Se arman en la pantalla con los canales, kilos y pesos del mes anterior. Arriba se ve en vivo cuánto falta o sobra en kilos contra Contraloría, con "Ajustar a Contraloría"; con los kilos cerrados, los pesos que falten se completan al precio de cada SKU en cada canal |
+| Revisión de seguridad | ✅ | Dependencias sin vulnerabilidades altas (npm y pip). Excel exportado sin fórmulas, tope a lo que un Excel ocupa descomprimido, rol Admin para empezar de cero, solo tokens de acceso, cabeceras de seguridad en nginx. Quedan react-router 7 y vitest 4 (moderadas y de desarrollo) |
 
 ### SHOULD
 
@@ -182,22 +183,16 @@ Pendiente de UX: la etapa 2 se revisa celda por celda; una vista por canal (vend
 - **Un cambio en una etapa** desmarca las siguientes, porque las recalcula.
 - **Aprobar exige** todas las etapas revisadas.
 
-### Lo que sigue (desde la demo del 19/10)
+### Lo que sigue
 
-En este orden: los tres primeros son para la prueba con datos reales.
-
-1. **Leer su móvil real y rearmar septiembre.** Con el único archivo que mandaron: el
-   objetivo sale de Móvil Mes, los totales por canal de las hojas de reparto y la
-   base de Participaciones (venta 2025). Se compara el resultado contra su reparto,
-   celda por celda. Los tests usan un archivo inventado con la misma forma; el real
-   se usa en `data/real/` (git lo ignora) o en el servidor de ellos, nunca en el repo.
-2. **Que lo puedan usar en un servidor de ellos**: el paquete Docker para IT. Los
-   Dockerfiles necesitan los registros privados de Nestlé (I1), que tiene IT.
-3. **El Excel de salida del equipo de ventas**, cuando llegue el template, con NNS
+1. **Pesos debajo del canal con la historia en pesos.** Por canal los pesos ya siguen el
+   precio de cada SKU en cada canal; debajo del canal todavía se abren con los % de kilos
+   de cada distribuidor o vendedor.
+2. **El Excel de salida del equipo de ventas**, cuando llegue el template, con NNS
    c/IIBB (A15, B9).
-4. Después de la prueba: el registro de la app en Entra (I6) y la base del mismo mes del año anterior
-   (A18).
-
+3. **El registro de la app en Entra** (I6): los pasos para IT están en el README.
+4. **Confirmar la base del reparto** (A18): el mes anterior, como hoy, o el período de
+   Participaciones, que el cliente usa como histórico.
 
 ---
 
@@ -286,11 +281,11 @@ siguiente desde el aprobado). Falta: versiones al reabrir (A16) y quién ve qué
 
 | Dependencia | Riesgo si llega tarde |
 |---|---|
-| Formato de entrada y de salida, con Finanzas (B6, A15) | **Alto.** Sin el de entrada no leemos datos reales; sin el de salida no se carga en SAP. Llegó el móvil de septiembre (20/10); falta el template de ventas |
-| Columna Categoría en el template de entrada (B8) | **Alto.** Sin ella no se pueden armar reglas |
+| Formato de entrada y de salida, con Finanzas (B6, A15) | **Alto.** Sin el de entrada no leemos datos reales; sin el de salida no se carga en SAP. Llegaron los móviles de septiembre y octubre; falta el template de ventas |
+| Columna Categoría en el template de entrada (B8) | Bajo. Móvil Mes la trae; las vacías se completan con el mes anterior o se asignan en la herramienta |
 | Supuestos B1 a B3 (% manual, altas, OK por etapa) | Medio. Se validan en la demo |
 | Credenciales del índice privado (`nbra-*`, npm) | **Alto.** El pipeline de Nestlé no instala |
-| Acceso al sandbox | **Alto.** Es el entorno donde prueba el cliente |
+| Acceso al sandbox | Resuelto: IT levantó un entorno de prueba con las imágenes Docker |
 | PostgreSQL: ¿lo proveen o lo desplegamos? | Medio. En local se usa un contenedor |
 | App registration en Entra | Medio. Mitigado con el proveedor local |
 | Archivos anonimizados | Bajo técnicamente, alto en cumplimiento |

@@ -107,6 +107,7 @@ make instalar                  # una vez; otra versión: make instalar PYTHON=py
 make dev                       # API :3000 + pantalla http://localhost:5175
 make test                      # suite completa (backend + front): antes de subir
 make db && make dev-db         # igual que dev, pero guardando cada móvil en Postgres (Docker)
+make demo && make dev-db       # Postgres con dos años de meses aprobados y el mes de la demo listo
 ```
 
 Un solo archivo de tests, mientras se trabaja:

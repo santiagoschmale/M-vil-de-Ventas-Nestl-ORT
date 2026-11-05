@@ -79,7 +79,8 @@ cd frontend; npx vitest --watch=false
 
 ### Después
 
-Abrir http://localhost:5175 y tocar "Cargar datos de muestra". Si la pantalla dice
+Abrir http://localhost:5175 y tocar "Cargar datos de muestra". Para una demo con dos años
+de meses aprobados y noviembre listo para armar: `make demo` y después `make dev-db`. Si la pantalla dice
 "Contestó otra aplicación", otro programa está usando el puerto 3000.
 
 ## Desplegarlo con Docker
@@ -102,16 +103,19 @@ docker run -d --name backend --network movil -e DATABASE_URL=<url de Postgres> -
 docker run -d --name movil-frontend --network movil -p 8080:80 movil-frontend
 ```
 
-- `DATABASE_URL`: `postgresql://usuario:clave@host:5432/base`. La primera línea crea
-  las tablas; se corre de nuevo con cada versión nueva. Sin `DATABASE_URL`, todo vive
-  en memoria y se pierde al reiniciar.
+Variables de la API:
+
+| Variable | Qué hace | En producción |
+|---|---|---|
+| `DATABASE_URL` | `postgresql://usuario:clave@host:5432/base`. Sin ella, todo vive en memoria y se pierde al reiniciar. La línea de `alembic` crea las tablas; se corre de nuevo con cada versión. | Sí |
+| `IS_LOCAL` | `false` fuera de la máquina de desarrollo: sin recarga automática y, con las `nbra-*` reales, carga la configuración de Key Vault. `true` habilita "Empezar de cero". | `false` |
+| `ENTRA_TENANT_ID`, `ENTRA_CLIENT_ID` | Login con Microsoft Entra ID (ver abajo). Sin ellas no hay login: todos entran como un usuario de prueba con rol Admin, y la API lo avisa en el log. Solo para un entorno de prueba detrás de otro control de acceso. | Sí |
+| `PERMITIR_REINICIAR` | `true` en un entorno de prueba: aparece "Empezar de cero", que borra todos los meses. Solo para un usuario con rol Admin. | No |
+
 - **El contenedor de la API se tiene que llamar `backend`**: la pantalla (nginx) le
   pasa `/api` a `http://backend:3000`.
-- `IS_LOCAL=false`: sin recarga automática ni "Empezar de cero". Con las `nbra-*`
-  reales, además carga la configuración de Key Vault.
-- La pantalla queda en el puerto 8080. Acepta archivos de hasta 50 MB.
-- Login: con `ENTRA_TENANT_ID` y `ENTRA_CLIENT_ID` en la API, se inicia sesión con Microsoft
-  Entra ID (ver abajo). Sin ellas, todos entran como un usuario de prueba.
+- La pantalla queda en el puerto 8080. Acepta archivos de hasta 50 MB; la API, de hasta
+  20 MB y que descomprimidos no pasen 500 MB.
 
 ### Login con Entra ID
 
