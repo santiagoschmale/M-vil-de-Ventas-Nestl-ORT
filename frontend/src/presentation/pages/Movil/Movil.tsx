@@ -146,9 +146,11 @@ const TotalesDialog = ({ totales, sugerencia, objetivo, aviso, onCerrar }: {
     }, PAUSA_MS);
     return () => clearTimeout(t);
   }, [escritos]);
-  const ajustar = (campo: Campo, r?: RevisionUnidad | null) => {
-    const ajustados = r?.ajustados ?? {};
-    setFilas(fs => fs.map(f => (ajustados[f.canal.trim()] ? { ...f, [campo]: aTexto(ajustados[f.canal.trim()]) } : f)));
+  // Los kilos se reparten en proporción a cada canal; los pesos no: se recalculan con los kilos (así cierra
+  // también el reparto por SKU, no solo el total).
+  const ajustarKilos = () => {
+    const ajustados = revision?.kilos.ajustados ?? {};
+    setFilas(fs => fs.map(f => (ajustados[f.canal.trim()] ? { ...f, kilos: aTexto(ajustados[f.canal.trim()]) } : f)));
   };
   // Los pesos salen de los kilos: se sugieren cuando los kilos ya cierran, a pedido del planner.
   const kilosListos = !objetivo || !!revision?.kilos.cierra || !!revision?.kilos.se_reparte_solo;
@@ -213,7 +215,7 @@ const TotalesDialog = ({ totales, sugerencia, objetivo, aviso, onCerrar }: {
           {revision && (
             <EstadoTotal r={revision.kilos} unidad="kilos" acciones={
               <ConAyuda ayuda="En proporción a los kilos de cada canal">
-                <Principal onClick={() => ajustar('kilos', revision.kilos)}>
+                <Principal onClick={ajustarKilos}>
                   {revision.kilos.falta?.startsWith('-') ? 'Repartir lo que sobra' : 'Repartir lo que falta'}
                 </Principal>
               </ConAyuda>} />
@@ -297,7 +299,7 @@ const TotalesDialog = ({ totales, sugerencia, objetivo, aviso, onCerrar }: {
         )}
         {error && <Box sx={{ mt: 2 }}><Alerta tono="frena">{error}</Alerta></Box>}
       </DialogContent>
-      <DialogActions sx={{ px: 3, pb: 2, gap: 1, flexWrap: 'wrap' }}>
+      <DialogActions sx={{ px: 3, pb: 2 }}>
         <Button onClick={onCerrar}>Cancelar</Button>
         <Button type="submit" variant="contained" disabled={ocupado || !puedeGuardar}>Guardar</Button>
       </DialogActions>
