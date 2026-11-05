@@ -68,14 +68,14 @@ de la siguiente. Eso define lo que sigue (§3, "Lo que sigue").
 | Funcionalidad | Estado | Qué falta |
 |---|---|---|
 | Persistencia en Postgres, un móvil por mes | ✅ | Cada acción queda guardada; meses anteriores en solo lectura. Falta probarlo en el Postgres del sandbox |
-| Categorías guardadas en la herramienta | ✅ | Si el objetivo no trae categoría, se completa desde lo asignado (B8). Se hereda |
+| Categorías guardadas en la herramienta | ✅ | Si el objetivo no trae categoría, se completa desde lo asignado (B8) y, si no, desde la hoja Móvil Mes del archivo del mes anterior. Se hereda |
 | Autenticación | 🟡 | Login con Entra ID listo: el front inicia sesión con Microsoft (MSAL) y el backend valida el token y el rol Planner/Admin. Se activa con `ENTRA_TENANT_ID` y `ENTRA_CLIENT_ID`; sin ellas, proveedor local sin login. Falta: que IT registre la app (I6, pasos en el README) |
-| Entorno de pruebas para el cliente | ✅ | IT lo levantó en un servidor suyo con las imágenes Docker, detrás de su control de acceso (I2). Se actualiza con cada tag. "Empezar de cero" con `PERMITIR_REINICIAR=true`, solo para Admin |
+| Entorno de pruebas para el cliente | ✅ | IT lo levantó en un servidor suyo con las imágenes Docker, detrás de su control de acceso (I2). IT lo actualiza a mano con el tag que le pasamos; no es el pipeline de ArgoCD. "Empezar de cero" con `PERMITIR_REINICIAR=true`, solo para Admin |
 | Leer el móvil real | 🟡 | Se lee el `.xlsb` del planner: el objetivo de Móvil Mes y el mes anterior de las hojas de reparto (`importer/movil_real.py`). Soluciones entra como Call Center y Distribuidores mientras A17 siga abierta; un cero en el reparto no aplica. Del mismo archivo salen los kilos y pesos por canal con que arrancan los totales, el precio de cada SKU en cada canal (mes anterior y Participaciones) y las categorías que el objetivo trae vacías |
 | Tests en CI | ✅ | Backend y front |
 | Deshacer el último cambio | ✅ | Una vez. Con login: solo el propio |
 | Totales por canal sin Excel | ✅ | Se arman en la pantalla con los canales, kilos y pesos del mes anterior. Arriba se ve en vivo cuánto falta o sobra en kilos contra Contraloría, con "Ajustar a Contraloría"; con los kilos cerrados, los pesos que falten se completan al precio de cada SKU en cada canal |
-| Revisión de seguridad | ✅ | Dependencias sin vulnerabilidades altas (npm y pip). Excel exportado sin fórmulas, tope a lo que un Excel ocupa descomprimido, rol Admin para empezar de cero, solo tokens de acceso, cabeceras de seguridad en nginx. Quedan react-router 7 y vitest 4 (moderadas y de desarrollo) |
+| Revisión de seguridad | ✅ | Dependencias sin vulnerabilidades altas (npm y pip). Excel exportado sin fórmulas, tope a lo que un Excel ocupa descomprimido, rol Admin para empezar de cero, solo tokens de acceso, cabeceras de seguridad en nginx. Quedan vulnerabilidades moderadas en react-router-dom 6 (no aplican: sin SSR ni rutas que escriba el usuario) y en vitest 3 (desarrollo); se cierran subiendo a react-router 7 y vitest 4 |
 
 ### SHOULD
 
@@ -191,8 +191,9 @@ Pendiente de UX: la etapa 2 se revisa celda por celda; una vista por canal (vend
 2. **El Excel de salida del equipo de ventas**, cuando llegue el template, con NNS
    c/IIBB (A15, B9).
 3. **El registro de la app en Entra** (I6): los pasos para IT están en el README.
-4. **Confirmar la base del reparto** (A18): el mes anterior, como hoy, o el período de
-   Participaciones, que el cliente usa como histórico.
+4. **Confirmar la base del reparto** (A18): la herramienta parte del mes anterior; el
+   cliente usa el período de Participaciones como histórico. ¿El año, el mes anterior o
+   el mismo mes del año anterior?
 
 ---
 
@@ -285,7 +286,6 @@ siguiente desde el aprobado). Falta: versiones al reabrir (A16) y quién ve qué
 | Columna Categoría en el template de entrada (B8) | Bajo. Móvil Mes la trae; las vacías se completan con el mes anterior o se asignan en la herramienta |
 | Supuestos B1 a B3 (% manual, altas, OK por etapa) | Medio. Se validan en la demo |
 | Credenciales del índice privado (`nbra-*`, npm) | **Alto.** El pipeline de Nestlé no instala |
-| Acceso al sandbox | Resuelto: IT levantó un entorno de prueba con las imágenes Docker |
 | PostgreSQL: ¿lo proveen o lo desplegamos? | Medio. En local se usa un contenedor |
 | App registration en Entra | Medio. Mitigado con el proveedor local |
 | Archivos anonimizados | Bajo técnicamente, alto en cumplimiento |

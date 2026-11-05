@@ -80,7 +80,8 @@ cd frontend; npx vitest --watch=false
 ### Después
 
 Abrir http://localhost:5175 y tocar "Cargar datos de muestra". Para una demo con dos años
-de meses aprobados y noviembre listo para armar: `make demo` y después `make dev-db`. Si la pantalla dice
+de meses aprobados y noviembre listo para armar: `make demo` y después `make dev-db`.
+`make demo` borra todo lo guardado en Postgres; si la API ya estaba levantada, reiniciarla. Si la pantalla dice
 "Contestó otra aplicación", otro programa está usando el puerto 3000.
 
 ## Desplegarlo con Docker
@@ -108,8 +109,8 @@ Variables de la API:
 | Variable | Qué hace | En producción |
 |---|---|---|
 | `DATABASE_URL` | `postgresql://usuario:clave@host:5432/base`. Sin ella, todo vive en memoria y se pierde al reiniciar. La línea de `alembic` crea las tablas; se corre de nuevo con cada versión. | Sí |
-| `IS_LOCAL` | `false` fuera de la máquina de desarrollo: sin recarga automática y, con las `nbra-*` reales, carga la configuración de Key Vault. `true` habilita "Empezar de cero". | `false` |
-| `ENTRA_TENANT_ID`, `ENTRA_CLIENT_ID` | Login con Microsoft Entra ID (ver abajo). Sin ellas no hay login: todos entran como un usuario de prueba con rol Admin, y la API lo avisa en el log. Solo para un entorno de prueba detrás de otro control de acceso. | Sí |
+| `IS_LOCAL` | Sin definir vale como `true`: recarga automática y sin Key Vault. En un contenedor va `false`: sin recarga y, con las `nbra-*` reales, carga la configuración de Key Vault. `true` explícito habilita "Empezar de cero" (solo para Admin). | `false` |
+| `ENTRA_TENANT_ID`, `ENTRA_CLIENT_ID` | Login con Microsoft Entra ID (ver abajo). Sin ellas no hay login: todos entran como un usuario de prueba con rol Admin y, con `IS_LOCAL=false`, la API lo avisa en el log. Solo para un entorno de prueba detrás de otro control de acceso. | Sí |
 | `PERMITIR_REINICIAR` | `true` en un entorno de prueba: aparece "Empezar de cero", que borra todos los meses. Solo para un usuario con rol Admin. | No |
 
 - **El contenedor de la API se tiene que llamar `backend`**: la pantalla (nginx) le
