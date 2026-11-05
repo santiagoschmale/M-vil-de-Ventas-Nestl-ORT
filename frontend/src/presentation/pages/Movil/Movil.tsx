@@ -193,7 +193,7 @@ const TotalesDialog = ({ totales, sugerencia, objetivo, onCerrar }: {
   };
 
   return (
-    <Dialog open onClose={onCerrar} maxWidth="sm" fullWidth aria-labelledby="titulo-totales"
+    <Dialog open onClose={onCerrar} maxWidth="md" fullWidth aria-labelledby="titulo-totales"
       PaperProps={{ component: 'form', onSubmit: guardar }}>
       <DialogTitle id="titulo-totales">{totales ? 'Editar' : 'Armar'} totales por canal</DialogTitle>
       <DialogContent>
@@ -235,7 +235,7 @@ const TotalesDialog = ({ totales, sugerencia, objetivo, onCerrar }: {
                 {(['kilos', 'plata'] as const).map(campo => {
                   const a = antes(f, campo);
                   return (
-                    <TableCell key={campo}>
+                    <TableCell key={campo} align="right">
                       <TextField size="small" value={f[campo]} onChange={e => cambiar(f.id, campo, e.target.value)}
                         helperText={a} color={a ? 'warning' : undefined} focused={!!a || undefined}
                         inputProps={{
