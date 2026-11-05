@@ -39,6 +39,9 @@ def crear_app() -> FastAPI:
     nueva.state.repositorio = Repositorio(Almacen(url) if url else None)
     tenant, cliente = environ.get("ENTRA_TENANT_ID"), environ.get("ENTRA_CLIENT_ID")
     nueva.state.autenticacion = ProveedorEntra(tenant, cliente) if tenant and cliente else ProveedorLocal()
+    if not (tenant and cliente) and environ.get("IS_LOCAL", "true").lower() == "false":
+        logger.warning("Sin ENTRA_TENANT_ID y ENTRA_CLIENT_ID no hay login: cualquiera que llegue a la API la usa. "
+                       "Solo para un entorno de prueba detrás de otro control de acceso.")
     nueva.include_router(health.router)
     nueva.include_router(cuenta.router)
     # Todo el móvil pide sesión, también lo que solo lee: con Entra, sin token no se ve nada.

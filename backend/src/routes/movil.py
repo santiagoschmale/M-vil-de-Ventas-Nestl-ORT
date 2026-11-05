@@ -592,6 +592,8 @@ def sugerir_pesos(cuerpo: ValoresIn, s: Sesion = Depends(sesion)):
 def reiniciar(request: Request):
     if not puede_reiniciar():
         raise HTTPException(403, "Empezar de cero solo se puede en un entorno de prueba.")
+    if "Admin" not in request.app.state.autenticacion.perfil(request).get("roles", []):
+        raise HTTPException(403, "Empezar de cero borra todos los meses: lo puede hacer solo un usuario con rol Admin.")
     request.app.state.repositorio.reiniciar()
     with request.app.state.repositorio.usar() as s:
         return _estado(s)

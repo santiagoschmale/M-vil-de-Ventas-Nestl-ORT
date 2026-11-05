@@ -384,3 +384,13 @@ def test_la_fila_de_totales_al_pie_no_es_un_sku():
     archivo.seek(0)
     objetivos, _ = leer_input1(archivo)
     assert set(objetivos) == {"1001"}
+
+
+def test_un_excel_que_descomprimido_es_enorme_se_rechaza_sin_abrirlo():
+    from src.importer import entradas
+    antes = entradas.DESCOMPRIMIDO_MAXIMO
+    entradas.DESCOMPRIMIDO_MAXIMO = 100  # cualquier Excel real pesa más que esto descomprimido
+    try:
+        assert _falla(entradas.libro, _excel([["SKU", "Kilos"], ["1", "10"]]))
+    finally:
+        entradas.DESCOMPRIMIDO_MAXIMO = antes

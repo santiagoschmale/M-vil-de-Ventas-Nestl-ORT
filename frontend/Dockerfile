@@ -43,6 +43,13 @@ server {
     # Los Excel del móvil real pesan varios MB: el límite por defecto de nginx (1 MB) los rechaza.
     client_max_body_size 50m;
 
+    # Sin versión de nginx en las respuestas; la pantalla no se puede meter dentro de otra página.
+    server_tokens off;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "DENY" always;
+    add_header Content-Security-Policy "frame-ancestors 'none'" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
     location / {
         try_files $uri $uri/ /index.html;
     }

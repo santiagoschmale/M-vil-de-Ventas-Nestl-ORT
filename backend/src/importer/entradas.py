@@ -155,8 +155,27 @@ def _al_paso(valor: Decimal, decimales: int, que: str, sku, problemas: list[Prob
     return redondeado
 
 
+# Un .xlsx o .xlsb es un zip: uno chico puede descomprimirse a gigas y tirar el servidor.
+DESCOMPRIMIDO_MAXIMO = 500 * 1024 * 1024
+
+
+def _no_es_una_bomba(origen) -> None:
+    import zipfile
+    try:
+        with zipfile.ZipFile(origen) as z:
+            total = sum(i.file_size for i in z.infolist())
+    except zipfile.BadZipFile:
+        return  # no es un zip: que lo rechace el lector, con su mensaje
+    finally:
+        if hasattr(origen, "seek"):
+            origen.seek(0)
+    if total > DESCOMPRIMIDO_MAXIMO:
+        raise ErrorDeEntrada("El archivo es demasiado grande una vez abierto: revisá que sea el Excel correcto.")
+
+
 def libro(origen) -> dict[str, list[list]]:
     """Las hojas de un Excel, por nombre: .xlsx, o .xlsb (el formato en que trabaja el planner)."""
+    _no_es_una_bomba(origen)
     try:
         wb = load_workbook(origen, read_only=True, data_only=True)
     except Exception as e:  # openpyxl lanza de todo según qué esté roto

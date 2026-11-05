@@ -57,6 +57,9 @@ class ProveedorEntra:
                                       options={"require": ["exp", "iss", "aud"]})
         except self._jwt.PyJWTError as e:
             raise HTTPException(401, "Tu sesión venció o no es válida: volvé a iniciar sesión.") from e
+        # Un token de acceso para nuestra API trae el permiso que pide la pantalla; el de identidad, no.
+        if "access_as_user" not in str(claims.get("scp", "")).split():
+            raise HTTPException(401, "Tu sesión venció o no es válida: volvé a iniciar sesión.")
         if claims.get("iss") not in self._emisores:
             raise HTTPException(401, "La sesión es de otra organización: iniciá sesión con tu cuenta de Nestlé.")
         if self._roles and not self._roles & set(claims.get("roles", [])):

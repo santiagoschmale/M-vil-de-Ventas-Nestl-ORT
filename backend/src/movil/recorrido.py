@@ -378,6 +378,13 @@ def exportar(recorrido: Recorrido, destino) -> None:
             hoja.append([f"cruce {unidad}", "aviso", None, None, a])
     for p in recorrido.problemas:
         hoja.append([p.bloque or "archivo", p.severidad, p.sku, p.canal, p.mensaje])
+    # Un texto que empieza con "=" se guardaría como fórmula (un canal o una descripción del archivo podría
+    # ejecutar algo al abrir el Excel). El móvil no exporta fórmulas: todo va como texto.
+    for hoja in libro.worksheets:
+        for fila in hoja.iter_rows():
+            for celda in fila:
+                if celda.data_type == "f":
+                    celda.data_type = "s"
     libro.save(destino)
 
 

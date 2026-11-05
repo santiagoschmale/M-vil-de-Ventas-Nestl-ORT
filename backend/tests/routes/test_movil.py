@@ -398,3 +398,12 @@ def test_empezar_de_cero_solo_en_local_o_en_un_entorno_de_prueba_que_lo_permite(
             os.environ.pop("IS_LOCAL", None)
         else:
             os.environ["IS_LOCAL"] = antes
+
+
+def test_un_texto_que_empieza_con_igual_se_exporta_como_texto_no_como_formula():
+    c = _cerrado()
+    texto = (MUESTRA / "input2_sin_sku_nuevo.tsv").read_text(encoding="utf-8") + "\n=1+1\t0\t0"
+    assert c.put("/api/movil/input2", json={"texto": texto}).status_code == 200
+    hoja = load_workbook(BytesIO(c.get("/api/movil/exportar").content))["Kilos"]
+    celda = next(x for x in hoja[1] if x.value == "=1+1")
+    assert celda.data_type == "s"

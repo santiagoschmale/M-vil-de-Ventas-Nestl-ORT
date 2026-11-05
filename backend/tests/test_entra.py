@@ -30,7 +30,8 @@ class _Claves:
 
 def _token(clave=CLAVE, **cambios):
     claims = {"iss": f"https://login.microsoftonline.com/{TENANT}/v2.0", "aud": CLIENTE, "exp": int(time.time()) + 600,
-              "name": "Ana Prueba", "preferred_username": "ana.prueba@nestle.test", "oid": "1", "roles": ["Planner"]}
+              "name": "Ana Prueba", "preferred_username": "ana.prueba@nestle.test", "oid": "1", "roles": ["Planner"],
+              "scp": "access_as_user"}
     claims.update(cambios)
     return jwt.encode({k: v for k, v in claims.items() if v is not None}, clave, algorithm="RS256")
 
@@ -93,3 +94,24 @@ def test_rechaza_tokens_vencidos_ajenos_o_de_otra_app():
 def test_sin_el_rol_no_entra():
     r = _entra().get("/api/movil", headers=_con(_token(roles=None)))
     assert r.status_code == 403 and "rol Planner" in r.json()["detail"]
+
+
+def test_un_token_de_identidad_no_sirve_para_la_api():
+    """El token de identidad también es para nuestra app, pero no trae el permiso de la API."""
+    assert _entra().get("/api/whoami", headers=_con(_token(scp=None))).status_code == 401
+
+
+def test_empezar_de_cero_solo_lo_hace_un_admin():
+    import os
+    antes = os.environ.get("PERMITIR_REINICIAR")
+    os.environ["PERMITIR_REINICIAR"] = "true"
+    try:
+        c = _entra()
+        r = c.post("/api/movil/reiniciar", headers=_con(_token()))
+        assert r.status_code == 403 and "Admin" in r.json()["detail"]
+        assert c.post("/api/movil/reiniciar", headers=_con(_token(roles=["Admin"]))).status_code == 200
+    finally:
+        if antes is None:
+            os.environ.pop("PERMITIR_REINICIAR", None)
+        else:
+            os.environ["PERMITIR_REINICIAR"] = antes
