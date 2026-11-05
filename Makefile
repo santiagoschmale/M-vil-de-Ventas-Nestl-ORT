@@ -4,6 +4,7 @@
 #   make dev        API + pantalla, en memoria; abrir http://localhost:5175
 #   make db         Postgres en Docker, con las migraciones al día
 #   make dev-db     como make dev, pero cada móvil queda guardado en Postgres
+#   make demo       Postgres con dos años de meses aprobados y el mes de la demo listo
 #   make test       tests del backend y del front
 #
 # Sin acceso a los registros privados de Nestlé: el backend usa los reemplazos de
@@ -19,7 +20,7 @@ PUERTO_WEB := 5175
 DB_URL := postgresql://motor:motor@localhost:5433/motor_distribucion
 
 .DEFAULT_GOAL := ayuda
-.PHONY: ayuda instalar api web dev db dev-db test
+.PHONY: ayuda instalar api web dev db dev-db demo test
 
 ayuda:
 	@echo "make instalar   entorno de Python y dependencias del front (una vez)"
@@ -28,6 +29,7 @@ ayuda:
 	@echo "make web        solo la pantalla (necesita la API levantada)"
 	@echo "make db         Postgres en Docker (necesita Docker Desktop abierto) y migraciones al día"
 	@echo "make dev-db     como make dev, pero cada móvil queda guardado en Postgres (antes: make db)"
+	@echo "make demo       borra Postgres y deja dos años de meses aprobados + el mes de la demo (después: make dev-db)"
 	@echo "make test       tests del backend y del front"
 
 $(VENV):
@@ -58,3 +60,6 @@ db:
 
 dev-db:
 	DATABASE_URL=$(DB_URL) $(MAKE) -j2 api web
+
+demo: db
+	cd backend && DATABASE_URL=$(DB_URL) .venv/bin/python ../data/sample/demo.py
