@@ -71,14 +71,19 @@ const aTexto = (m: string | null) => (m == null ? '' : formatear(m));
 const PAUSA_MS = 250;
 const sinSigno = (m: string) => m.replace(/^-/, '');
 
+/** Un botón con una línea debajo que dice qué hace o por qué está apagado. */
+const ConAyuda = ({ ayuda, children }: { ayuda: string; children: React.ReactNode }) => (
+  <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 0.25 }}>
+    {children}
+    <Typography variant="caption" color="text.secondary">{ayuda}</Typography>
+  </Box>
+);
+
 /**
  * Una unidad de los totales que se están armando, contra lo que pide Contraloría, en vivo: cierra, es un
  * redondeo que se reparte solo, o falta/sobra, con las acciones para corregirlo.
  */
-const EstadoTotal = ({ r, unidad, acciones, nota }: {
-  r: RevisionUnidad; unidad: Unidad; acciones: React.ReactNode;
-  nota?: string; // reemplaza la explicación del ajuste (p. ej. por qué un botón está deshabilitado)
-}) => {
+const EstadoTotal = ({ r, unidad, acciones }: { r: RevisionUnidad; unidad: Unidad; acciones: React.ReactNode }) => {
   if (r.falta === null) return null;
   const nombre = UNIDADES[unidad].nombre;
   const sobra = r.falta.startsWith('-');
@@ -88,8 +93,7 @@ const EstadoTotal = ({ r, unidad, acciones, nota }: {
     : r.se_reparte_solo
     ? <Alerta tono="listo" titulo={`${nombre}: ${sobra ? 'sobran' : 'faltan'} ${diferencia}`}>Es un redondeo: se reparte solo al guardar.</Alerta>
     : <Alerta tono="frena" titulo={`${nombre}: ${sobra ? 'sobran' : 'faltan'} ${diferencia}`} acciones={acciones}>
-        Contraloría pide {conUnidad(r.pide, unidad)}.{' '}
-        {nota ?? `«Ajustar a Contraloría» ${sobra ? 'le saca' : 'le suma'} a cada canal su parte, según su tamaño.`}
+        Contraloría pide {conUnidad(r.pide, unidad)}.
       </Alerta>;
 };
 // La misma regla que `normalizar` del backend: sin tildes, mayúsculas ni espacios de más.
@@ -164,7 +168,9 @@ const TotalesDialog = ({ totales, sugerencia, objetivo, aviso, onCerrar }: {
       .finally(() => setSugiriendo(false));
   };
   const recalcular = (
-    <Principal onClick={() => sugerirPesos(true)} disabled={sugiriendo || !kilosListos}>Recalcular según los kilos</Principal>
+    <ConAyuda ayuda={kilosListos ? 'Con el precio de cada SKU en cada canal' : 'Primero cerrá los kilos'}>
+      <Principal onClick={() => sugerirPesos(true)} disabled={sugiriendo || !kilosListos}>Recalcular según los kilos</Principal>
+    </ConAyuda>
   );
   // Corregir totales ya cargados es un ajuste: queda en el historial con su motivo.
   const [motivo, setMotivo] = useState('');
@@ -206,16 +212,15 @@ const TotalesDialog = ({ totales, sugerencia, objetivo, aviso, onCerrar }: {
         <Box role="status" aria-live="polite" sx={{ display: 'grid', gap: 1, mb: 2 }}>
           {avisoVigente && <Alerta tono="frena" titulo="Pesos no cierra" acciones={conPesos && recalcular}>{aviso}</Alerta>}
           {revision && (
-            <EstadoTotal r={revision.kilos} unidad="kilos"
-              acciones={<Principal onClick={() => ajustar('kilos', revision.kilos)}>Ajustar a Contraloría</Principal>} />
+            <EstadoTotal r={revision.kilos} unidad="kilos" acciones={
+              <ConAyuda ayuda="A cada canal según su tamaño">
+                <Principal onClick={() => ajustar('kilos', revision.kilos)}>
+                  {revision.kilos.falta?.startsWith('-') ? 'Sacar lo que sobra' : 'Sumar lo que falta'}
+                </Principal>
+              </ConAyuda>} />
           )}
           {revision?.plata && sinPesos === 0 && (
-            <EstadoTotal r={revision.plata} unidad="plata"
-              nota={conPesos && !kilosListos ? 'Primero ajustá los kilos: los pesos se recalculan con ellos.' : undefined}
-              acciones={<>
-              {conPesos && !avisoVigente && recalcular}
-              <Resolver onClick={() => ajustar('plata', revision.plata)}>Ajustar a Contraloría</Resolver>
-            </>} />
+            <EstadoTotal r={revision.plata} unidad="plata" acciones={conPesos && !avisoVigente && recalcular} />
           )}
         </Box>
         {sinPesos > 0 && (
@@ -296,10 +301,7 @@ const TotalesDialog = ({ totales, sugerencia, objetivo, aviso, onCerrar }: {
       <DialogActions sx={{ px: 3, pb: 2, gap: 1, flexWrap: 'wrap' }}>
         {revision && !(kilosListos && pesosListos && sinPesos === 0) && (
           <Typography variant="body2" color="text.secondary" sx={{ mr: 'auto' }}>
-            {!kilosListos && (sinPesos > 0 || !pesosListos) ? 'Kilos y pesos no cierran con Contraloría.'
-              : !kilosListos ? 'Los kilos no cierran con Contraloría.'
-                : sinPesos > 0 ? 'Faltan pesos.' : 'Los pesos no cierran con Contraloría.'}
-            {' '}Podés guardar igual: queda en Para revisar.
+            Si guardás así, queda pendiente en Para revisar.
           </Typography>
         )}
         <Button onClick={onCerrar}>Cancelar</Button>
