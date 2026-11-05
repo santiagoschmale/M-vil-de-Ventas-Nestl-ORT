@@ -41,7 +41,7 @@ const BaseDialog = ({ canal, entidad, porcentaje, nueva, onCerrar }: {
       <DialogContent>
         <DialogContentText sx={{ mb: 1 }}>
           Vale para todos los SKUs de {canal}, en kilos y en pesos. Con % manual se lleva ese % de lo que hay para
-          repartir en cada celda (lo fijado a mano queda aparte) y el resto se reparte por histórico entre los demás.
+          repartir en cada celda y el resto se reparte por histórico entre los demás.
           {asignado && ` Hoy en ${canal} hay ${formatear(asignado)}% asignado a mano; no puede pasar de 100.`}
         </DialogContentText>
         {nueva ? (

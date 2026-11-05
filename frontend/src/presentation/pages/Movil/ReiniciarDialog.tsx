@@ -21,7 +21,7 @@ export const ReiniciarDialog = ({ onCerrar }: { onCerrar: () => void }) => {
           actual vacío. No se puede deshacer.
         </DialogContentText>
         <DialogContentText sx={{ mt: 1 }}>
-          Existe solo en la instalación local, para practicar.
+          Existe solo en la instalación local o en un entorno de prueba, para practicar.
         </DialogContentText>
         {error && <Box sx={{ mt: 2 }}><Alerta tono="frena">{error}</Alerta></Box>}
       </DialogContent>

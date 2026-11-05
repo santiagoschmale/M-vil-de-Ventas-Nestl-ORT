@@ -81,7 +81,8 @@ const ReglaDialog = ({ regla, estado, onCerrar }: Formulario & { estado: Estado;
             </FormGroup>
           ) : (
             <Typography variant="body2" color="text.secondary">
-              Las categorías salen del objetivo de Contraloría: cargalo para elegirlas.
+              Las categorías salen del objetivo de Contraloría y, si vienen vacías, del mes anterior: cargalos para
+              elegirlas.
             </Typography>
           )}
         </Box>
