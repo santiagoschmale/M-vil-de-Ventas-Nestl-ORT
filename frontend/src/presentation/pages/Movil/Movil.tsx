@@ -253,7 +253,7 @@ const TotalesDialog = ({ totales, sugerencia, objetivo, onCerrar }: {
             </Alerta>
           </Box>
         )}
-        {error && <Box sx={{ mt: 2 }}><Alerta tono="frena" titulo="No se pudo guardar">{error}</Alerta></Box>}
+        {error && <Box sx={{ mt: 2 }}><Alerta tono="frena">{error}</Alerta></Box>}
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2 }}>
         <Button onClick={onCerrar}>Cancelar</Button>
