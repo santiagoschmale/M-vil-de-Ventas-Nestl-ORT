@@ -286,6 +286,21 @@ describe('MovilPage', { timeout: 15000 }, () => {
     expect(within(dialogo).getByRole('button', { name: 'Completar con los sugeridos' })).toBeEnabled();
   });
 
+  it('un problema que está en kilos y en pesos se muestra una sola vez', async () => {
+    const sinHistoria = inconsistenciaFactory.build({ tipo: 'sku_sin_canal', skus: ['900'], canales: [], mensaje: 'Sin historia.' });
+    const otro = inconsistenciaFactory.build({ tipo: 'totales_distintos', skus: [], canales: ['Catering'], mensaje: 'Solo en pesos.' });
+    server.use(http.get('*/api/movil', () => HttpResponse.json(estado({
+      cierra: { kilos: false, plata: false }, inconsistencias: { kilos: [sinHistoria], plata: [sinHistoria] } }))));
+    const { unmount } = render(<MovilPage />);
+    expect(await screen.findByText('Sin historia.')).toBeInTheDocument();
+    expect(screen.queryByText(/para resolver en pesos/)).not.toBeInTheDocument();
+    unmount();
+    server.use(http.get('*/api/movil', () => HttpResponse.json(estado({
+      cierra: { kilos: false, plata: false }, inconsistencias: { kilos: [sinHistoria], plata: [sinHistoria, otro] } }))));
+    render(<MovilPage />);
+    expect(await screen.findByText('Hay 1 cosa para resolver en pesos.')).toBeInTheDocument();
+  });
+
   it('se pueden agregar y sacar canales al armar los totales, aun sin mes anterior', async () => {
     server.use(http.get('*/api/movil', () => HttpResponse.json(estado({
       faltan: ['totales por canal', 'mes anterior'], entradas: { ...estado().entradas, input2: null, base: null } }))));

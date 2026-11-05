@@ -468,7 +468,12 @@ const Pendientes = ({ estado, unidad, enMatriz }: { estado: Estado; unidad: Unid
   // Lo de esta lista es de la unidad elegida en "Ver en": si la otra no cierra, se avisa acá para que no pase de largo.
   const otra: Unidad = unidad === 'kilos' ? 'plata' : 'kilos';
   const sinPesos = otra === 'plata' && !!estado.entradas.input2?.detalle.some(t => t.plata == null);
-  const cuantasOtra = estado.inconsistencias[otra].length;
+  // Un mismo problema (un SKU sin historia, p. ej.) suele estar en las dos unidades: el de la otra se cuenta
+  // solo si no está ya en esta lista, que se resuelve con el mismo botón.
+  const clave = (i: Estado['inconsistencias']['kilos'][number]) => `${i.tipo}|${(i.skus ?? []).join()}|${(i.canales ?? []).join()}`;
+  const yaVistas = new Set(estado.inconsistencias[unidad].map(clave));
+  const cuantasOtra = estado.inconsistencias[otra].filter(i => !yaVistas.has(clave(i))).length;
+  const mismoProblema = !sinPesos && estado.inconsistencias[otra].length > 0 && cuantasOtra === 0;
   // Kilos cerrados y pesos no: los pesos se pueden proponer según los kilos (lo pidieron: armarlos a mano "es un chino").
   const proponer = estado.cierra.kilos && !estado.cierra.plata && !estado.faltan.length && !soloLectura;
   const avisoPesos = proponer && (
@@ -480,7 +485,7 @@ const Pendientes = ({ estado, unidad, enMatriz }: { estado: Estado; unidad: Unid
       La herramienta los puede proponer: cada canal se lleva lo que facturan sus kilos, al precio de Contraloría de cada SKU.
     </Alerta>
   );
-  const avisoOtra = proponer ? (unidad === 'kilos' && avisoPesos) : !estado.cierra[otra] && !estado.faltan.length && (
+  const avisoOtra = proponer ? (unidad === 'kilos' && avisoPesos) : !estado.cierra[otra] && !estado.faltan.length && !mismoProblema && (
     <Alerta tono="frena" titulo={`${UNIDADES[otra].nombre} no cierra`} acciones={!sinPesos && (
       <Principal onClick={() => elegirUnidad(otra)}>Ver en {UNIDADES[otra].nombre.toLowerCase()}</Principal>
     )}>
