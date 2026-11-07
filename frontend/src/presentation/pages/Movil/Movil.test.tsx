@@ -470,8 +470,11 @@ describe('MovilPage', { timeout: 15000 }, () => {
     server.use(http.get('*/api/movil/exportar', ({ request }) => { pedido = request.url; return new HttpResponse(new Blob(['x'])); }));
     URL.createObjectURL = vi.fn(() => 'blob:x');
     URL.revokeObjectURL = vi.fn();
+    const descarga = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {}); // jsdom no navega
+    onTestFinished(() => descarga.mockRestore());
     await user.click(within(dialogo).getByRole('button', { name: 'Exportar igual' }));
     await waitFor(() => expect(new URL(pedido).searchParams.get('mes')).toBe('2026-10'));
+    await waitFor(() => expect(descarga).toHaveBeenCalled());
   });
 
   it('un SKU sin historia se resuelve diciendo dónde se vende', async () => {

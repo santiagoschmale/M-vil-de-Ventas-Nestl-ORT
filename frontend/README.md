@@ -51,12 +51,6 @@ npm run test            # run tests with coverage
 npm run test:watch      # run tests in watch mode
 ```
 
-### Linting
-
-```bash
-npm run lint
-```
-
 ## Docker
 
 The Dockerfile uses a multi-stage build to produce a lightweight nginx image that serves the compiled static assets.

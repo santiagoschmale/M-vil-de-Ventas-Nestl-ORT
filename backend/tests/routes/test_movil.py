@@ -6,6 +6,7 @@ exportar. Cada test arranca una app con una sesión vacía.
 from decimal import Decimal as D
 from io import BytesIO
 from pathlib import Path
+from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 from openpyxl import Workbook, load_workbook
@@ -17,7 +18,8 @@ NUEVO = "90020900"
 
 
 def _cliente():
-    return TestClient(crear_app())
+    with patch("app.logger"):  # sin Entra la app avisa al armarse; se prueba en test_app
+        return TestClient(crear_app())
 
 
 def _cargado(input2="input2_canales.tsv"):
@@ -349,7 +351,7 @@ def test_cerrar_y_abrir_la_apertura_de_un_canal():
 
 
 def test_muestra_solo_objetivo():
-    r = TestClient(crear_app()).post("/api/movil/muestra?solo_objetivo=true").json()
+    r = _cliente().post("/api/movil/muestra?solo_objetivo=true").json()
     assert r["faltan"] == ["mes anterior", "totales por canal"]
 
 
