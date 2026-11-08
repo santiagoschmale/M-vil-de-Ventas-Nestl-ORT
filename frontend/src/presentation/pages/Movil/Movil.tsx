@@ -53,9 +53,14 @@ const Dato = ({ children }: { children: React.ReactNode }) => (
   <Typography variant="body2" color="text.secondary" sx={{ fontVariantNumeric: 'tabular-nums' }}>{children}</Typography>
 );
 
-const Tarjeta = ({ titulo, children }: { titulo: string; children: React.ReactNode }) => (
+const Tarjeta = ({ titulo, ayuda, children }: {
+  titulo: string; ayuda?: string; children: React.ReactNode;
+}) => (
   <Paper variant="outlined" sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-    <Typography fontWeight={700}>{titulo}</Typography>
+    <Box>
+      <Typography fontWeight={700}>{titulo}</Typography>
+      {ayuda && <Typography variant="body2" color="text.secondary">{ayuda}</Typography>}
+    </Box>
     {children}
   </Paper>
 );
@@ -316,7 +321,7 @@ const Entradas = ({ estado }: { estado: Estado }) => {
   return (
     <>
       <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 2 }}>
-        <Tarjeta titulo="Objetivo de Contraloría">
+          <Tarjeta titulo="Objetivo de Contraloría" ayuda="El .xlsb del móvil (hoja Móvil Mes) o el template SKU | kg | NNS">
           <Box><Subir cargado={!!input1} etiqueta="Excel del objetivo de Contraloría" alElegir={cargarInput1} /></Box>
           {input1 && (
             <Box>
@@ -326,7 +331,7 @@ const Entradas = ({ estado }: { estado: Estado }) => {
           )}
         </Tarjeta>
 
-        <Tarjeta titulo="Totales por canal">
+          <Tarjeta titulo="Totales por canal" ayuda="Sin Excel: Armar en pantalla">
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
             {/* Editar (o armar en la pantalla) es lo de todos los meses; subir otro Excel, lo raro. */}
             <Button size="small" variant="outlined" startIcon={<EditRoundedIcon />} onClick={() => setEditar(true)}
@@ -345,7 +350,7 @@ const Entradas = ({ estado }: { estado: Estado }) => {
           )}
         </Tarjeta>
 
-        <Tarjeta titulo="Mes anterior">
+          <Tarjeta titulo="Mes anterior" ayuda="El mismo .xlsb">
           <Box><Subir cargado={!!base} etiqueta="Excel del mes anterior" alElegir={cargarBase} /></Box>
           {base && (
             <Box>
