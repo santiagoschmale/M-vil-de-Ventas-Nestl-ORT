@@ -37,7 +37,7 @@ def test_sin_las_tres_entradas_no_hay_recorrido():
     assert s.recorrido is None
     s.cargar_input1(MUESTRA / "input1_objetivo.xlsx", "input1.xlsx", P, CUANDO)
     assert s.recorrido is None
-    assert s.faltan() == ["totales por canal", "mes anterior"]
+    assert s.faltan() == ["mes anterior", "totales por canal"]
 
 
 def test_el_flujo_del_planner_hasta_que_cierra():

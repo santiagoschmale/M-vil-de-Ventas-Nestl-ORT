@@ -321,7 +321,7 @@ const Entradas = ({ estado }: { estado: Estado }) => {
   return (
     <>
       <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 2 }}>
-          <Tarjeta titulo="Objetivo de Contraloría" ayuda="El .xlsb del móvil (hoja Móvil Mes) o el template SKU | kg | NNS">
+        <Tarjeta titulo="Objetivo de Contraloría" ayuda="El .xlsb del móvil (hoja Móvil Mes) o el template SKU | kg | NNS">
           <Box><Subir cargado={!!input1} etiqueta="Excel del objetivo de Contraloría" alElegir={cargarInput1} /></Box>
           {input1 && (
             <Box>
@@ -331,31 +331,32 @@ const Entradas = ({ estado }: { estado: Estado }) => {
           )}
         </Tarjeta>
 
-          <Tarjeta titulo="Totales por canal" ayuda="Sin Excel: Armar en pantalla">
+        <Tarjeta titulo="Mes anterior" ayuda="El mismo .xlsb">
+          <Box><Subir cargado={!!base} etiqueta="Excel del mes anterior" alElegir={cargarBase} /></Box>
+          {base && (
+            <Box>
+              <Dato>{base.archivo}</Dato>
+              <Dato>{base.celdas} celdas · {base.aperturas} aperturas</Dato>
+            </Box>
+          )}
+        </Tarjeta>
+
+        <Tarjeta titulo="Totales por canal" ayuda="Sin Excel: Armar en pantalla">
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
             {/* Editar (o armar en la pantalla) es lo de todos los meses; subir otro Excel, lo raro. */}
             <Button size="small" variant="outlined" startIcon={<EditRoundedIcon />} onClick={() => setEditar(true)}
-              disabled={ocupado || soloLectura}
+              disabled={ocupado || soloLectura || (!input2 && !base)}
               aria-label={input2 ? 'Editar totales por canal' : 'Armar totales por canal en la pantalla'}>
               {input2 ? 'Editar' : 'Armar en pantalla'}
             </Button>
             <Subir cargado={!!input2} etiqueta="Excel de totales por canal" alElegir={cargarInput2} secundario
               texto={input2 ? 'Subir otro Excel' : 'Subir Excel'} />
           </Box>
+          {!input2 && !base && <Dato>Para armarlos en la pantalla, cargá primero el mes anterior: de ahí salen los canales.</Dato>}
           {input2 && (
             <Box>
               <Dato>{input2.archivo ?? 'Editados a mano'}</Dato>
               <Dato>{input2.canales} canales · {conUnidad(input2.kilos, 'kilos')} · {conUnidad(input2.plata, 'plata')}</Dato>
-            </Box>
-          )}
-        </Tarjeta>
-
-          <Tarjeta titulo="Mes anterior" ayuda="El mismo .xlsb">
-          <Box><Subir cargado={!!base} etiqueta="Excel del mes anterior" alElegir={cargarBase} /></Box>
-          {base && (
-            <Box>
-              <Dato>{base.archivo}</Dato>
-              <Dato>{base.celdas} celdas · {base.aperturas} aperturas</Dato>
             </Box>
           )}
         </Tarjeta>

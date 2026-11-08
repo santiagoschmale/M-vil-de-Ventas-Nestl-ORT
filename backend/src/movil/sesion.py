@@ -147,8 +147,8 @@ class Sesion:
     # --- entradas -----------------------------------------------------------
 
     def faltan(self) -> list[str]:
-        return [n for n, v in (("objetivo de Contraloría", self._e.objetivos), ("totales por canal", self._e.canales),
-                               ("mes anterior", self._e.base)) if v is None]
+        return [n for n, v in (("objetivo de Contraloría", self._e.objetivos), ("mes anterior", self._e.base),
+                               ("totales por canal", self._e.canales)) if v is None]
 
     @property
     def entradas(self) -> _Entradas:
