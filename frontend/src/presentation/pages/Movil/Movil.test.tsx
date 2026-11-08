@@ -698,6 +698,19 @@ describe('MovilPage', { timeout: 15000 }, () => {
     await waitFor(() => expect(pedidosMes[pedidosMes.length - 1]).toBe('último'));
   });
 
+  it('las alertas de canales llevan a editar los totales por canal', async () => {
+    server.use(http.get('*/api/movil', () => HttpResponse.json(estado({
+      inconsistencias: { kilos: [inconsistenciaFactory.build({ tipo: 'canales_sin_volumen' })], plata: [] },
+    }))));
+    const user = userEvent.setup({ delay: null });
+    render(<MovilPage />);
+    // El botón de Entradas tiene el mismo nombre, así que se busca dentro de la alerta.
+    const alertas = await screen.findAllByRole('alert');
+    const alerta = alertas.find(a => within(a).queryByRole('button', { name: 'Editar totales por canal' }))!;
+    await user.click(within(alerta).getByRole('button', { name: 'Editar totales por canal' }));
+    expect(screen.getByRole('dialog', { name: 'Editar totales por canal' })).toBeInTheDocument();
+  });
+
   it('si los totales no suman lo que pide Contraloría, se corrigen en Totales por canal', async () => {
     const distintos = estado({ cierra: { kilos: false, plata: true }, inconsistencias: { kilos: [inconsistenciaFactory.build({
       tipo: 'totales_distintos', mensaje: 'A los totales por canal les faltan 100,000 kg para llegar a lo que pide Contraloría (1.000,000 kg).',
