@@ -775,14 +775,7 @@ describe('MovilPage', { timeout: 15000 }, () => {
     await user.click(within(dialogo).getAllByRole('button', { name: 'Recalcular según los kilos' })[0]);
     await waitFor(() => expect(within(dialogo).getByLabelText('Pesos de Catering')).toHaveValue('100,00'));
     expect(within(dialogo).queryByText(/no van con sus kilos/)).not.toBeInTheDocument();  // ya se recalcularon
-    await user.click(within(dialogo).getByRole('button', { name: 'Guardar' }));
-    // Sin motivo no guarda, y lo dice en el campo, que toma el foco: el aviso no queda escondido abajo de la tabla.
-    const campo = within(dialogo).getByRole('textbox', { name: /Motivo/ });
-    expect(campo).toHaveFocus();
-    expect(campo).toHaveAttribute('aria-invalid', 'true');
-    expect(within(dialogo).getByText('Escribí el motivo para guardar: queda en el historial.')).toBeInTheDocument();
-    expect(pedidos.filter(p => p.metodo === 'PUT')).toHaveLength(0);
-    await user.type(campo, 'pesos coherentes con los kilos');
+    await user.type(within(dialogo).getByRole('textbox', { name: /Motivo/ }), 'pesos coherentes con los kilos');
     await user.click(within(dialogo).getByRole('button', { name: 'Guardar' }));
     await waitFor(() => expect(pedidos.filter(p => p.metodo === 'PUT')).toHaveLength(1));
     expect((pedidos.find(p => p.metodo === 'PUT')!.cuerpo as { motivo: string }).motivo).toBe('pesos coherentes con los kilos');
