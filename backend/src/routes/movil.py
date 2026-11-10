@@ -9,7 +9,6 @@ pasa por float en JavaScript. El front muestra, el backend calcula.
 from __future__ import annotations
 
 import re
-from collections import defaultdict
 from datetime import datetime
 from decimal import Decimal
 from io import BytesIO
