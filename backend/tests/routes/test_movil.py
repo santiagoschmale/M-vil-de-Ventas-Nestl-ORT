@@ -38,7 +38,7 @@ def _cerrado():
 
 def test_sin_entradas_dice_que_falta_todo():
     r = _cliente().get("/api/movil").json()
-    assert r["faltan"] == ["objetivo de Contraloría", "totales por canal", "mes anterior"]
+    assert r["faltan"] == ["objetivo de Contraloría", "mes anterior", "totales por canal"]
     assert r["cierra"] == {"kilos": False, "plata": False}
 
 
@@ -350,7 +350,7 @@ def test_cerrar_y_abrir_la_apertura_de_un_canal():
 
 def test_muestra_solo_objetivo():
     r = TestClient(crear_app()).post("/api/movil/muestra?solo_objetivo=true").json()
-    assert r["faltan"] == ["totales por canal", "mes anterior"]
+    assert r["faltan"] == ["mes anterior", "totales por canal"]
 
 
 def test_los_totales_se_revisan_en_vivo_y_corregirlos_pide_motivo():
@@ -394,7 +394,7 @@ def test_empezar_de_cero_solo_en_local_o_en_un_entorno_de_prueba_que_lo_permite(
         assert c.post("/api/movil/reiniciar").status_code == 403  # sin definir tampoco
         os.environ["IS_LOCAL"] = "true"
         r = c.post("/api/movil/reiniciar").json()
-        assert r["faltan"] == ["objetivo de Contraloría", "totales por canal", "mes anterior"] and r["historial"] == []
+        assert r["faltan"] == ["objetivo de Contraloría", "mes anterior", "totales por canal"] and r["historial"] == []
     finally:
         if antes is None:
             os.environ.pop("IS_LOCAL", None)

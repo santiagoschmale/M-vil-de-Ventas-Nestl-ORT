@@ -343,21 +343,12 @@ describe('MovilPage', { timeout: 15000 }, () => {
     await waitFor(() => expect(tablas).toBeGreaterThan(antes));
   });
 
-  it('se pueden agregar y sacar canales al armar los totales, aun sin mes anterior', async () => {
+  it('no se pueden armar los totales en la pantalla hasta cargar el mes anterior', async () => {
     server.use(http.get('*/api/movil', () => HttpResponse.json(estado({
-      faltan: ['totales por canal', 'mes anterior'], entradas: { ...estado().entradas, input2: null, base: null } }))));
-    const user = userEvent.setup({ delay: null });
+      faltan: ['mes anterior', 'totales por canal'], entradas: { ...estado().entradas, input2: null, base: null } }))));
     render(<MovilPage />);
-    await user.click(await screen.findByRole('button', { name: 'Armar totales por canal en la pantalla' }));
-    const dialogo = screen.getByRole('dialog', { name: 'Armar totales por canal' });
-    await user.type(within(dialogo).getByLabelText('Canal 1'), 'Vending');
-    await user.type(within(dialogo).getByLabelText('Kilos de Vending'), '100');
-    await user.click(within(dialogo).getByRole('button', { name: 'Agregar canal' }));
-    await user.type(within(dialogo).getByLabelText('Canal 2'), 'Borrar');
-    await user.click(within(dialogo).getByRole('button', { name: 'Sacar Borrar' }));
-    await user.click(within(dialogo).getByRole('button', { name: 'Guardar' }));
-    await waitFor(() => expect(pedidos).toEqual([{ metodo: 'PUT', url: '/api/movil/input2',
-      cuerpo: { texto: 'Canal\tKilos\tPlata\nVending\t100\t' } }]));
+    expect(await screen.findByRole('button', { name: 'Armar totales por canal en la pantalla' })).toBeDisabled();
+    expect(screen.getByText('Para armarlos en la pantalla, cargá primero el mes anterior: de ahí salen los canales.')).toBeInTheDocument();
   });
 
   it('al armar o editar los totales, el diálogo avisa lo que va a pasar antes de guardar', async () => {
@@ -705,6 +696,18 @@ describe('MovilPage', { timeout: 15000 }, () => {
     expect(within(screen.getByRole('banner')).getByText('Solo lectura')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Volver a noviembre 2026' }));
     await waitFor(() => expect(pedidosMes[pedidosMes.length - 1]).toBe('último'));
+  });
+
+  it('las alertas de canales llevan a editar los totales por canal', async () => {
+    server.use(http.get('*/api/movil', () => HttpResponse.json(estado({
+      inconsistencias: { kilos: [inconsistenciaFactory.build({ tipo: 'canales_sin_volumen' })], plata: [] },
+    }))));
+    const user = userEvent.setup({ delay: null });
+    render(<MovilPage />);
+    const alertas = await screen.findAllByRole('alert');
+    const alerta = alertas.find(a => within(a).queryByRole('button', { name: 'Corregir en Totales por canal' }))!;
+    await user.click(within(alerta).getByRole('button', { name: 'Corregir en Totales por canal' }));
+    expect(screen.getByRole('dialog', { name: 'Editar totales por canal' })).toBeInTheDocument();
   });
 
   it('si los totales no suman lo que pide Contraloría, se corrigen en Totales por canal', async () => {
