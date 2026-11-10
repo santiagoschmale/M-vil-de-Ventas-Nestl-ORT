@@ -554,6 +554,9 @@ const Pendientes = ({ estado, unidad, enMatriz }: { estado: Estado; unidad: Unid
             {i.tipo === 'totales_distintos' && !soloLectura && (
               <Principal onClick={() => setCorrigiendo({})}>Corregir en Totales por canal</Principal>
             )}
+            {(i.tipo === 'canales_sin_volumen' || i.tipo === 'canal_sin_sku') && !soloLectura && (
+              <Principal onClick={() => setCorrigiendo({})}>Corregir en Totales por canal</Principal>
+            )}
             {i.tipo === 'sku_sin_canal' && i.skus[0] && (
               <Principal aria-label={`Elegir canales de SKU ${i.skus[0]}`} onClick={() => setCanalesDe(i.skus[0])}>
                 Elegir canales
