@@ -49,6 +49,17 @@ def autor(request: Request) -> str:
     return request.app.state.autenticacion.usuario_actual(request)
 
 
+def solo_admin(request: Request) -> None:
+    """
+    Aprobar, reabrir, empezar el mes siguiente y empezar de cero cambian el mes para todos: solo con
+    rol Admin (supuesto B3: quien aprueba no es el mismo planner que armó el móvil). Un Planner sigue
+    cargando y ajustando. Sin Entra (desarrollo), el usuario de prueba es Admin.
+    """
+    if "Admin" not in request.app.state.autenticacion.perfil(request).get("roles", []):
+        raise HTTPException(403, "Aprobar, reabrir, empezar el mes siguiente y empezar de cero los hace solo un "
+                                 "usuario con rol Admin.")
+
+
 def _ahora() -> datetime:
     return datetime.now().astimezone()
 
@@ -475,13 +486,15 @@ def deshacer(s: Sesion = Depends(sesion), quien: str = Depends(autor)):
     return _estado(s)
 
 
-@router.post("/aprobar", summary="Aprobar el móvil: solo si kilos y pesos cierran. Queda de solo lectura")
+@router.post("/aprobar", summary="Aprobar el móvil (solo Admin): si kilos y pesos cierran. Queda de solo lectura",
+             dependencies=[Depends(solo_admin)])
 def aprobar(s: Sesion = Depends(sesion), quien: str = Depends(autor)):
     _aplicar(s.aprobar, autor=quien, cuando=_ahora())
     return _estado(s)
 
 
-@router.post("/reabrir", summary="Volver el móvil aprobado a borrador, con motivo")
+@router.post("/reabrir", summary="Volver el móvil aprobado a borrador, con motivo (solo Admin)",
+             dependencies=[Depends(solo_admin)])
 def reabrir(cuerpo: MotivoIn, s: Sesion = Depends(sesion), quien: str = Depends(autor)):
     _aplicar(s.reabrir, autor=quien, cuando=_ahora(), motivo=cuerpo.motivo)
     return _estado(s)
@@ -522,8 +535,9 @@ def listar_meses(request: Request):
     return [{"mes": m["mes"], "aprobado": m["aprobado"] is not None} for m in request.app.state.repositorio.meses()]
 
 
-@router.post("/meses/siguiente", summary="Empezar el mes siguiente desde el último aprobado: hereda su reparto como "
-                                         "base, los totales por canal, las reglas y los ajustes de la apertura")
+@router.post("/meses/siguiente", summary="Empezar el mes siguiente desde el último aprobado (solo Admin): hereda su "
+                                         "reparto como base, los totales por canal, las reglas y los ajustes de la "
+                                         "apertura", dependencies=[Depends(solo_admin)])
 def empezar_siguiente(request: Request, quien: str = Depends(autor)):
     mes = _aplicar(request.app.state.repositorio.empezar_siguiente, quien, _ahora())
     with request.app.state.repositorio.usar(mes) as s:
@@ -568,13 +582,11 @@ def sugerir_pesos(cuerpo: ValoresIn, s: Sesion = Depends(sesion)):
     return {"pesos": _aplicar(s.pesos_para, cuerpo.valores)}
 
 
-@router.post("/reiniciar", summary="Empezar de cero: borra todos los meses (en local o en un entorno de prueba con "
-                                   "PERMITIR_REINICIAR=true)")
+@router.post("/reiniciar", summary="Empezar de cero (solo Admin): borra todos los meses (en local o en un entorno de "
+                                   "prueba con PERMITIR_REINICIAR=true)", dependencies=[Depends(solo_admin)])
 def reiniciar(request: Request):
     if not puede_reiniciar():
         raise HTTPException(403, "Empezar de cero solo se puede en un entorno de prueba.")
-    if "Admin" not in request.app.state.autenticacion.perfil(request).get("roles", []):
-        raise HTTPException(403, "Empezar de cero borra todos los meses: lo puede hacer solo un usuario con rol Admin.")
     request.app.state.repositorio.reiniciar()
     with request.app.state.repositorio.usar() as s:
         return _estado(s)
