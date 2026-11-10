@@ -69,6 +69,9 @@ export type Estado = {
     // canales: kilos por canal del mes anterior, para arrancar los totales en la pantalla.
     base: { archivo: string; celdas: number; aperturas: number; canales: { canal: string; kilos: Monto; plata: Monto | null }[] } | null;
   };
+  // Sin totales por canal: cómo dan los del mes anterior contra Contraloría. Si cierran, ya se armaron solos.
+  // falta: en negativo, sobra; sin_pesos: canales cuyo mes anterior no trae pesos. plata: null sin pesos en el objetivo.
+  precarga: Record<Unidad, { falta: Monto | null; cierra: boolean; sin_pesos: string[] } | null> | null;
   cierra: Record<Unidad, boolean>;
   inconsistencias: Record<Unidad, Inconsistencia[]>;
   avisos: Record<Unidad, string[]>;

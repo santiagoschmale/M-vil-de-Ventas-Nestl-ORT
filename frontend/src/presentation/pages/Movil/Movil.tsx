@@ -53,17 +53,46 @@ const Dato = ({ children }: { children: React.ReactNode }) => (
   <Typography variant="body2" color="text.secondary" sx={{ fontVariantNumeric: 'tabular-nums' }}>{children}</Typography>
 );
 
-const Tarjeta = ({ titulo, ayuda, children }: {
-  titulo: string; ayuda?: string; children: React.ReactNode;
+// `frena`: lo que no cierra y se arregla dentro de esta tarjeta; la marca en rojo y lo dice.
+const Tarjeta = ({ titulo, ayuda, frena = [], children }: {
+  titulo: string; ayuda?: string; frena?: string[]; children: React.ReactNode;
 }) => (
-  <Paper variant="outlined" sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+  <Paper variant="outlined" sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 1.5,
+    ...(frena.length && { borderColor: 'error.main', borderWidth: 2 }) }}>
     <Box>
       <Typography fontWeight={700}>{titulo}</Typography>
       {ayuda && <Typography variant="body2" color="text.secondary">{ayuda}</Typography>}
     </Box>
     {children}
+    {frena.length > 0 && (
+      <Box>{frena.map(f => <Typography key={f} variant="body2" color="error.main" fontWeight={600}>{f}</Typography>)}</Box>
+    )}
   </Paper>
 );
+
+// Lo que solo se corrige en el diálogo de Totales por canal.
+const SE_CORRIGEN_EN_TOTALES = ['totales_distintos', 'canales_sin_volumen', 'canal_sin_sku'];
+const pendientesDeTotales = (estado: Estado): string[] => {
+  const { precarga } = estado;
+  if (!estado.entradas.input2) {
+    if (!precarga) return [];
+    return (['kilos', 'plata'] as Unidad[]).flatMap(u => {
+      const r = precarga[u];
+      if (!r || r.cierra) return [];
+      const nombre = UNIDADES[u].nombre;
+      if (r.sin_pesos.length) {
+        return [`${nombre}: el mes anterior no los trae para ${r.sin_pesos.length === 1 ? '1 canal' : `${r.sin_pesos.length} canales`}`];
+      }
+      if (r.falta == null) return [];
+      const sobra = r.falta.startsWith('-');
+      return [`${nombre}: ${sobra ? 'sobran' : 'faltan'} ${conUnidad(r.falta.replace('-', ''), u)} para Contraloría`];
+    });
+  }
+  const titulos = [...estado.inconsistencias.kilos, ...estado.inconsistencias.plata]
+    .filter(i => SE_CORRIGEN_EN_TOTALES.includes(i.tipo)).map(i => TITULO_INCONSISTENCIA[i.tipo]);
+  if (estado.cierra.kilos && !estado.cierra.plata && !estado.faltan.length) titulos.push('Pesos no cierra');
+  return [...new Set(titulos)];
+};
 
 type Totales = NonNullable<Estado['entradas']['input2']>;
 type Objetivo = Estado['entradas']['input1'];
@@ -341,7 +370,7 @@ const Entradas = ({ estado }: { estado: Estado }) => {
           )}
         </Tarjeta>
 
-        <Tarjeta titulo="Totales por canal" ayuda="Sin Excel: Armar en pantalla">
+        <Tarjeta titulo="Totales por canal" ayuda="Sin Excel: Armar en pantalla" frena={pendientesDeTotales(estado)}>
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
             {/* Editar (o armar en la pantalla) es lo de todos los meses; subir otro Excel, lo raro. */}
             <Button size="small" variant="outlined" startIcon={<EditRoundedIcon />} onClick={() => setEditar(true)}

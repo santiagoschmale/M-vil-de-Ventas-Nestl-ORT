@@ -701,6 +701,33 @@ describe('MovilPage', { timeout: 15000 }, () => {
     await waitFor(() => expect(pedidosMes[pedidosMes.length - 1]).toBe('último'));
   });
 
+  it('si los totales del mes anterior no cierran, la tarjeta de Totales lo dice antes de abrirla', async () => {
+    server.use(http.get('*/api/movil', () => HttpResponse.json(estado({
+      faltan: ['totales por canal'], entradas: { ...estado().entradas, input2: null },
+      precarga: { kilos: { falta: '-1200.000', cierra: false, sin_pesos: [] },
+                  plata: { falta: null, cierra: false, sin_pesos: ['Catering', 'Vending'] } },
+    }))));
+    const user = userEvent.setup({ delay: null });
+    render(<MovilPage />);
+    const entradas = await screen.findByRole('button', { name: /^Entradas/ });
+    if (entradas.getAttribute('aria-expanded') === 'false') await user.click(entradas);
+    expect(await screen.findByText('Kilos: sobran 1.200,000 kg para Contraloría')).toBeInTheDocument();
+    expect(screen.getByText('Pesos: el mes anterior no los trae para 2 canales')).toBeInTheDocument();
+  });
+
+  it('si los totales cargados no coinciden con Contraloría, la tarjeta de Totales queda marcada', async () => {
+    server.use(http.get('*/api/movil', () => HttpResponse.json(estado({
+      cierra: { kilos: false, plata: true },
+      inconsistencias: { kilos: [inconsistenciaFactory.build({ tipo: 'totales_distintos' })], plata: [] },
+    }))));
+    const user = userEvent.setup({ delay: null });
+    render(<MovilPage />);
+    const entradas = await screen.findByRole('button', { name: /^Entradas/ });
+    if (entradas.getAttribute('aria-expanded') === 'false') await user.click(entradas);
+    const tarjeta = (await screen.findByText('Totales por canal', { selector: 'p' })).closest('.MuiPaper-root')!;
+    expect(within(tarjeta as HTMLElement).getByText('No coincide con Contraloría')).toBeInTheDocument();
+  });
+
   it('las alertas de canales llevan a editar los totales por canal', async () => {
     server.use(http.get('*/api/movil', () => HttpResponse.json(estado({
       inconsistencias: { kilos: [inconsistenciaFactory.build({ tipo: 'canales_sin_volumen' })], plata: [] },

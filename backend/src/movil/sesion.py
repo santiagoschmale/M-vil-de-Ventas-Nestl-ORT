@@ -352,7 +352,6 @@ class Sesion:
         if self._e.objetivos is None:
             raise ErrorDeAjuste("Cargá el objetivo de Contraloría para comparar los totales.")
         decimales = self._unidad(unidad)
-        pide = self._pide_objetivo(unidad)
         validos, errores = {}, {}
         for canal, texto in valores.items():
             v, error = _monto(texto, decimales)
@@ -360,6 +359,11 @@ class Sesion:
                 errores[canal] = error
             else:
                 validos[canal] = v
+        return self._comparar(unidad, validos, errores)
+
+    def _comparar(self, unidad: str, validos: dict[str, Decimal], errores: dict[str, str]) -> dict:
+        decimales = self._unidad(unidad)
+        pide = self._pide_objetivo(unidad)
         suman = sum(validos.values(), Decimal(0))
         falta = pide - suman
         ajustados = {}
@@ -370,6 +374,54 @@ class Sesion:
                 "cierra": not errores and falta == 0,
                 "se_reparte_solo": not errores and 0 < abs(falta) <= TOPE_DIFERENCIA[decimales],
                 "ajustados": ajustados, "errores": errores}
+
+    def totales_del_mes_anterior(self) -> dict[str, TotalCanal]:
+        """
+        Kilos y pesos de cada canal en el mes anterior, en el orden del archivo: de donde arrancan los totales.
+        Redondeados a los decimales de cada unidad, como se muestran: el archivo trae celdas con más.
+        """
+        kilos: dict[str, Decimal] = {}
+        for (_, canal), k in (self._e.base or {}).items():
+            kilos[canal] = kilos.get(canal, Decimal(0)) + k
+        plata = {normalizar(c): p for c, p in (self._e.base_plata or {}).items()}
+
+        def redondeo(v, unidad):
+            return None if v is None else v.quantize(Decimal(1).scaleb(-UNIDADES[unidad]))
+        return {c: TotalCanal(redondeo(k, "kilos"), redondeo(plata.get(normalizar(c)), "plata")) for c, k in kilos.items()}
+
+    def precarga_de_totales(self) -> dict | None:
+        """
+        Sin totales por canal, con el objetivo y el mes anterior cargados: cómo dan los totales del mes anterior
+        contra Contraloría, en kilos y en pesos. `plata` es None si el objetivo no trae pesos; `sin_pesos`, los
+        canales cuyo mes anterior no trae pesos. Solo lee.
+        """
+        if self._e.objetivos is None or self._e.base is None or self._e.canales is not None:
+            return None
+        totales = self.totales_del_mes_anterior()
+        kilos = self._comparar("kilos", {c: t.kilos for c, t in totales.items()}, {})
+        if self._pide_objetivo("plata") <= 0:
+            return {"kilos": kilos, "plata": None}
+        sin_pesos = [c for c, t in totales.items() if t.plata is None]
+        plata = self._comparar("plata", {c: t.plata for c, t in totales.items() if t.plata is not None},
+                               {c: "sin pesos en el mes anterior" for c in sin_pesos})
+        return {"kilos": kilos, "plata": {**plata, "sin_pesos": sin_pesos}}
+
+    def armar_totales_del_mes_anterior(self, autor: str, cuando: datetime) -> bool:
+        """
+        Si los totales del mes anterior ya cierran con Contraloría (o solo difieren en el redondeo, que el cruce
+        reparte solo), quedan como totales por canal: no hay nada que decidir. Si no cierran, no toca nada y la
+        pantalla muestra qué falta.
+        """
+        precarga = self.precarga_de_totales()
+        if precarga is None or not all(r is None or r["cierra"] or r["se_reparte_solo"] for r in precarga.values()):
+            return False
+        totales = self.totales_del_mes_anterior()
+
+        def cambio():
+            self._e.canales, self._e.problemas2, self._e.archivo2 = totales, [], "Armados desde el mes anterior"
+            return Ajuste("cargar_input2", f"{len(totales)} canales, armados desde el mes anterior", autor, cuando)
+        self._aplicar(cambio)
+        return True
 
     def _pide(self, unidad: str) -> Decimal:
         """Lo que el cruce compara contra los totales por canal: los SKUs que se reparten."""

@@ -53,6 +53,16 @@ def _ahora() -> datetime:
     return datetime.now().astimezone()
 
 
+def _precarga(p: dict | None) -> dict | None:
+    if p is None:
+        return None
+    def unidad(r, u):
+        return None if r is None else {"falta": None if r["falta"] is None else _texto(Decimal(r["falta"]), u),
+                                       "cierra": r["cierra"] or r["se_reparte_solo"],
+                                       "sin_pesos": r.get("sin_pesos", [])}
+    return {"kilos": unidad(p["kilos"], "kilos"), "plata": unidad(p["plata"], "plata")}
+
+
 def _aplicar(fn, *args, **kwargs):
     try:
         return fn(*args, **kwargs)
@@ -196,14 +206,10 @@ def _estado(s: Sesion) -> dict:
                   "detalle": [{"canal": c, "kilos": _texto(t.kilos, "kilos"), "plata": _texto(t.plata, "plata")}
                               for c, t in e.canales.items()]}
     if e.base is not None:
-        # Kilos por canal del mes anterior: el punto de partida para armar los totales en la pantalla.
-        por_canal: dict[str, Decimal] = defaultdict(Decimal)  # en el orden del archivo
-        for (_, canal), kilos in e.base.items():
-            por_canal[canal] += kilos
+        # Kilos y pesos por canal del mes anterior: el punto de partida para armar los totales en la pantalla.
         base = {"archivo": e.archivo_base, "celdas": len(e.base), "aperturas": len(e.apertura),
-                "canales": [{"canal": c, "kilos": _texto(k, "kilos"),
-                             "plata": _texto(e.base_plata.get(c), "plata") if e.base_plata else None}
-                            for c, k in por_canal.items()]}
+                "canales": [{"canal": c, "kilos": _texto(t.kilos, "kilos"), "plata": _texto(t.plata, "plata")}
+                            for c, t in s.totales_del_mes_anterior().items()]}
     cruces = {"kilos": r.kilos if r else None, "plata": r.plata if r else None}
     return {
         "mes": s.mes,
@@ -212,6 +218,8 @@ def _estado(s: Sesion) -> dict:
         "siguiente": mes_siguiente(s.mes),
         "faltan": s.faltan(),
         "entradas": {"input1": input1, "input2": input2, "base": base},
+        # Sin totales por canal: cómo dan los del mes anterior contra Contraloría (si no cierran, no se armaron solos).
+        "precarga": _precarga(s.precarga_de_totales()),
         "cierra": {u: _cierra(c) for u, c in cruces.items()},
         "inconsistencias": {u: [_inconsistencia(i, descripciones) for i in (c.inconsistencias if c else [])]
                             for u, c in cruces.items()},
@@ -282,6 +290,7 @@ def obtener_estado(s: Sesion = Depends(sesion)):
 @router.post("/input1", summary="Cargar el objetivo de Contraloría (Excel)")
 def cargar_input1(archivo: UploadFile = File(...), s: Sesion = Depends(sesion), quien: str = Depends(autor)):
     _aplicar(s.cargar_input1, _archivo(archivo), archivo.filename or "input1.xlsx", quien, _ahora())
+    _aplicar(s.armar_totales_del_mes_anterior, quien, _ahora())
     return _estado(s)
 
 
@@ -300,6 +309,7 @@ def cargar_input2(cuerpo: TextoIn, s: Sesion = Depends(sesion), quien: str = Dep
 @router.post("/base", summary="Cargar la base del mes anterior (Excel con reparto y apertura)")
 def cargar_base(archivo: UploadFile = File(...), s: Sesion = Depends(sesion), quien: str = Depends(autor)):
     _aplicar(s.cargar_base, _archivo(archivo), archivo.filename or "base.xlsx", quien, _ahora())
+    _aplicar(s.armar_totales_del_mes_anterior, quien, _ahora())
     return _estado(s)
 
 

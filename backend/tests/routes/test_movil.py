@@ -303,6 +303,26 @@ def test_la_muestra_sin_totales_deja_armarlos_en_la_pantalla():
     assert r["faltan"] == ["totales por canal"]
     assert r["entradas"]["input2"] is None and r["entradas"]["base"]["canales"]
     assert "quitar_input2" in [a["accion"] for a in r["historial"]]
+    # Los del mes anterior no cierran con este objetivo: la pantalla dice qué falta en vez de armarlos.
+    assert r["precarga"]["kilos"] == {"falta": "-27065.410", "cierra": False, "sin_pesos": []}
+    assert r["precarga"]["plata"]["sin_pesos"]
+
+
+def test_subir_el_mes_anterior_arma_los_totales_si_ya_cierran():
+    from datetime import datetime
+
+    from src.movil.sesion import Sesion
+    from tests.movil.test_sesion import _objetivo_como_el_mes_anterior
+
+    aparte = Sesion()
+    aparte.cargar_base(MUESTRA / "base_mes_anterior.xlsx", "base.xlsx", "p", datetime(2026, 11, 1))
+    c = _cliente()
+    c.post("/api/movil/input1", files={"archivo": ("objetivo.xlsx", _objetivo_como_el_mes_anterior(aparte))})
+    with (MUESTRA / "base_mes_anterior.xlsx").open("rb") as f:
+        r = c.post("/api/movil/base", files={"archivo": ("base.xlsx", f)}).json()
+    assert r["faltan"] == [] and r["precarga"] is None
+    assert r["entradas"]["input2"]["archivo"] == "Armados desde el mes anterior" and r["entradas"]["input2"]["canales"] == 9
+    assert r["historial"][-1]["detalle"] == "9 canales, armados desde el mes anterior"
 
 
 def test_un_movil_por_mes_y_el_siguiente_desde_el_aprobado():
