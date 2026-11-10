@@ -313,12 +313,25 @@ class Sesion:
         # Cada SKU reparte su objetivo en pesos entre sus canales según kilos × precio: así cada SKU, y por
         # lo tanto cada segmento, suma exacto lo suyo (escalar todos los canales juntos los mezcla).
         precio = self._precios()
+        # Dónde se vende cada SKU según el planner, como lo usa el cruce: fuera de sus canales elegidos no va
+        # nada, y en un canal nuevo para él se parte de su objetivo × kilos del canal / total del mes. Sin esto,
+        # los pesos de un SKU sin historia se desparraman en canales donde no se vende y el cruce los rechaza.
+        elegidos = {sku: {normalizar(c) for c in cs} for sku, (cs, _) in self.canales_sku.items() if sku in activos}
         por_sku: dict[str, dict[str, Decimal]] = {}
         for (sku, canal), k in (self._e.base or {}).items():
             o, n = activos.get(sku), normalizar(canal)
+            if sku in elegidos and n not in elegidos[sku]:
+                continue
             if o and k and factor.get(n):
                 celdas = por_sku.setdefault(sku, {})
                 celdas[n] = celdas.get(n, Decimal(0)) + k * factor[n] * precio(sku, canal, o)
+        total_mes = sum((o.kilos for o in activos.values()), Decimal(0))
+        for sku, canales in elegidos.items():
+            for n in canales - set(por_sku.get(sku, {})):
+                if n in escritos:
+                    nombre, k = escritos[n]
+                    celdas = por_sku.setdefault(sku, {})
+                    celdas[n] = activos[sku].kilos * k / total_mes * precio(sku, nombre, activos[sku])
         pesos = {n: Decimal(0) for n in escritos}
         for sku, celdas in por_sku.items():
             total = sum(celdas.values())

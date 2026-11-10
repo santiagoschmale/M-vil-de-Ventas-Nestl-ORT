@@ -289,3 +289,14 @@ def test_los_totales_del_mes_anterior_salen_con_los_decimales_de_cada_unidad():
     s.entradas.base_plata = {canal.upper(): D("10.555")}  # y los pesos, con otro formato de nombre
     t = s.totales_del_mes_anterior()[canal]
     assert t.kilos.as_tuple().exponent == -3 and t.plata == D("10.56")
+
+
+def test_los_pesos_sugeridos_de_un_sku_sin_historia_van_solo_a_sus_canales_elegidos():
+    """Si no, se desparraman en canales donde no se vende y el cruce los rechaza: recalcular no sale nunca."""
+    s = _sesion()
+    s.elegir_canales(NUEVO, ["Catering", "Vending"], autor=P, cuando=CUANDO, motivo="SKU nuevo")
+    kilos = {c: str(t.kilos) for c, t in s.entradas.canales.items()}
+    pesos = s.pesos_para(kilos)
+    s.cargar_input2("Canal\tKilos\tPlata\n" + "\n".join(f"{c}\t{a_texto(D(k))}\t{a_texto(D(pesos[c]))}"
+                                                         for c, k in kilos.items()), P, CUANDO)
+    assert not [i.tipo for i in s.recorrido.plata.inconsistencias if i.tipo in ("canales_sin_volumen", "totales_distintos")]
