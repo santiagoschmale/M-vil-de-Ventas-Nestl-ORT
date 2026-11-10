@@ -234,3 +234,69 @@ def test_una_diferencia_grande_sigue_frenando():
     s = _sesion()
     s.cambiar_sku(NUEVO, activo=False, autor=P, cuando=CUANDO, motivo="nuevo")
     assert [i.tipo for i in s.recorrido.kilos.inconsistencias] == ["totales_distintos"]  # 10 kg: más que el tope
+
+
+def _objetivo_como_el_mes_anterior(s: Sesion, de_mas: D = D(0)):
+    """Un objetivo en kilos, sin pesos, que suma por SKU lo mismo que el mes anterior (más `de_mas` en uno)."""
+    from io import BytesIO
+
+    from openpyxl import Workbook
+
+    por_sku: dict[str, D] = {}
+    for (sku, _), k in s.entradas.base.items():
+        por_sku[sku] = por_sku.get(sku, D(0)) + k
+    wb = Workbook()
+    wb.active.append(["SKU", "Kilos"])
+    for i, (sku, k) in enumerate(por_sku.items()):
+        wb.active.append([sku, float(k + (de_mas if i == 0 else 0))])
+    datos = BytesIO()
+    wb.save(datos)
+    datos.seek(0)
+    return datos
+
+
+def test_si_los_totales_del_mes_anterior_cierran_se_arman_solos():
+    s = Sesion()
+    s.cargar_base(MUESTRA / "base_mes_anterior.xlsx", "base.xlsx", P, CUANDO)
+    s.cargar_input1(_objetivo_como_el_mes_anterior(s, D("0.001")), "objetivo.xlsx", P, CUANDO)  # 1 g: redondeo
+    assert s.precarga_de_totales()["kilos"]["se_reparte_solo"]
+
+    assert s.armar_totales_del_mes_anterior(P, CUANDO)
+    assert s.faltan() == [] and s.precarga_de_totales() is None
+    assert s.entradas.canales == s.totales_del_mes_anterior()
+    assert s.historial[-1].detalle.endswith("armados desde el mes anterior")
+    assert not s.armar_totales_del_mes_anterior(P, CUANDO)  # ya hay totales: no los pisa
+
+
+def test_si_los_totales_del_mes_anterior_no_cierran_no_se_tocan():
+    s = Sesion()
+    s.cargar_input1(MUESTRA / "input1_objetivo.xlsx", "objetivo.xlsx", P, CUANDO)
+    assert s.precarga_de_totales() is None  # sin mes anterior no hay de dónde
+    s.cargar_base(MUESTRA / "base_mes_anterior.xlsx", "base.xlsx", P, CUANDO)
+
+    precarga = s.precarga_de_totales()
+    assert precarga["kilos"]["falta"] == "-27065.410"  # sobran
+    assert precarga["plata"]["sin_pesos"]  # la muestra no trae pesos por canal
+    assert not s.armar_totales_del_mes_anterior(P, CUANDO)
+    assert s.faltan() == ["totales por canal"] and [a.accion for a in s.historial] == ["cargar_input1", "cargar_base"]
+
+
+def test_los_totales_del_mes_anterior_salen_con_los_decimales_de_cada_unidad():
+    s = Sesion()
+    s.cargar_base(MUESTRA / "base_mes_anterior.xlsx", "base.xlsx", P, CUANDO)
+    sku, canal = next(iter(s.entradas.base))
+    s.entradas.base[(sku, canal)] += D("0.0014990497")  # un móvil real trae celdas con más de 3 decimales
+    s.entradas.base_plata = {canal.upper(): D("10.555")}  # y los pesos, con otro formato de nombre
+    t = s.totales_del_mes_anterior()[canal]
+    assert t.kilos.as_tuple().exponent == -3 and t.plata == D("10.56")
+
+
+def test_los_pesos_sugeridos_de_un_sku_sin_historia_van_solo_a_sus_canales_elegidos():
+    """Si no, se desparraman en canales donde no se vende y el cruce los rechaza: recalcular no sale nunca."""
+    s = _sesion()
+    s.elegir_canales(NUEVO, ["Catering", "Vending"], autor=P, cuando=CUANDO, motivo="SKU nuevo")
+    kilos = {c: str(t.kilos) for c, t in s.entradas.canales.items()}
+    pesos = s.pesos_para(kilos)
+    s.cargar_input2("Canal\tKilos\tPlata\n" + "\n".join(f"{c}\t{a_texto(D(k))}\t{a_texto(D(pesos[c]))}"
+                                                         for c, k in kilos.items()), P, CUANDO)
+    assert not [i.tipo for i in s.recorrido.plata.inconsistencias if i.tipo in ("canales_sin_volumen", "totales_distintos")]

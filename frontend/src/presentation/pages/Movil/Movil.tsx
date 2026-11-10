@@ -53,17 +53,46 @@ const Dato = ({ children }: { children: React.ReactNode }) => (
   <Typography variant="body2" color="text.secondary" sx={{ fontVariantNumeric: 'tabular-nums' }}>{children}</Typography>
 );
 
-const Tarjeta = ({ titulo, ayuda, children }: {
-  titulo: string; ayuda?: string; children: React.ReactNode;
+// `frena`: lo que no cierra y se arregla dentro de esta tarjeta; la marca en rojo y lo dice.
+const Tarjeta = ({ titulo, ayuda, frena = [], children }: {
+  titulo: string; ayuda?: string; frena?: string[]; children: React.ReactNode;
 }) => (
-  <Paper variant="outlined" sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+  <Paper variant="outlined" sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 1.5,
+    ...(frena.length && { borderColor: 'error.main', borderWidth: 2 }) }}>
     <Box>
       <Typography fontWeight={700}>{titulo}</Typography>
       {ayuda && <Typography variant="body2" color="text.secondary">{ayuda}</Typography>}
     </Box>
     {children}
+    {frena.length > 0 && (
+      <Box>{frena.map(f => <Typography key={f} variant="body2" color="error.main" fontWeight={600}>{f}</Typography>)}</Box>
+    )}
   </Paper>
 );
+
+// Lo que solo se corrige en el diálogo de Totales por canal.
+const SE_CORRIGEN_EN_TOTALES = ['totales_distintos', 'canales_sin_volumen', 'canal_sin_sku'];
+const pendientesDeTotales = (estado: Estado): string[] => {
+  const { precarga } = estado;
+  if (!estado.entradas.input2) {
+    if (!precarga) return [];
+    return (['kilos', 'plata'] as Unidad[]).flatMap(u => {
+      const r = precarga[u];
+      if (!r || r.cierra) return [];
+      const nombre = UNIDADES[u].nombre;
+      if (r.sin_pesos.length) {
+        return [`${nombre}: el mes anterior no los trae para ${r.sin_pesos.length === 1 ? '1 canal' : `${r.sin_pesos.length} canales`}`];
+      }
+      if (r.falta == null) return [];
+      const sobra = r.falta.startsWith('-');
+      return [`${nombre}: ${sobra ? 'sobran' : 'faltan'} ${conUnidad(r.falta.replace('-', ''), u)} para Contraloría`];
+    });
+  }
+  const titulos = [...estado.inconsistencias.kilos, ...estado.inconsistencias.plata]
+    .filter(i => SE_CORRIGEN_EN_TOTALES.includes(i.tipo)).map(i => TITULO_INCONSISTENCIA[i.tipo]);
+  if (estado.cierra.kilos && !estado.cierra.plata && !estado.faltan.length) titulos.push('Pesos no cierra');
+  return [...new Set(titulos)];
+};
 
 type Totales = NonNullable<Estado['entradas']['input2']>;
 type Objetivo = Estado['entradas']['input1'];
@@ -178,7 +207,7 @@ const TotalesDialog = ({ totales, sugerencia, objetivo, aviso, onCerrar }: {
       <Principal onClick={() => sugerirPesos(true)} disabled={sugiriendo || !kilosListos}>Recalcular según los kilos</Principal>
     </ConAyuda>
   );
-  // Corregir totales ya cargados es un ajuste: queda en el historial con su motivo.
+  // Cada guardado queda en el historial; el motivo, si lo escribe, también.
   const [motivo, setMotivo] = useState('');
   const antes = (f: Fila, campo: Campo) => {
     const original = originales.get(f.id);
@@ -201,11 +230,7 @@ const TotalesDialog = ({ totales, sugerencia, objetivo, aviso, onCerrar }: {
     // La misma tabla que lee el backend, con los números como se escriben acá (1.234,5).
     const texto = ['Canal\tKilos\tPlata', ...conCanal.map(f => `${f.canal.trim()}\t${f.kilos.trim()}\t${f.plata.trim()}`)]
       .join('\n');
-    if (totales && !motivo.trim()) {
-      setError('Escribí el motivo: queda en el historial.');
-      return;
-    }
-    const falla = await editarTotales(texto, totales ? motivo.trim() : undefined);
+    const falla = await editarTotales(texto, motivo.trim() || undefined);
     if (falla) setError(falla);
     else onCerrar();
   };
@@ -298,7 +323,7 @@ const TotalesDialog = ({ totales, sugerencia, objetivo, aviso, onCerrar }: {
           </Box>
         )}
         {totales && (
-          <TextField label="Motivo" value={motivo} onChange={e => { setMotivo(e.target.value); setError(null); }}
+          <TextField label="Motivo (opcional)" value={motivo} onChange={e => { setMotivo(e.target.value); setError(null); }}
             fullWidth sx={{ mt: 2 }} placeholder="Contraloría ajustó el objetivo del mes"
             helperText="Queda en el historial, con tu nombre y la hora." />
         )}
@@ -341,7 +366,7 @@ const Entradas = ({ estado }: { estado: Estado }) => {
           )}
         </Tarjeta>
 
-        <Tarjeta titulo="Totales por canal" ayuda="Sin Excel: Armar en pantalla">
+        <Tarjeta titulo="Totales por canal" ayuda="Sin Excel: Armar en pantalla" frena={pendientesDeTotales(estado)}>
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
             {/* Editar (o armar en la pantalla) es lo de todos los meses; subir otro Excel, lo raro. */}
             <Button size="small" variant="outlined" startIcon={<EditRoundedIcon />} onClick={() => setEditar(true)}
