@@ -9,12 +9,14 @@ router = APIRouter(prefix="/api", tags=["Cuenta"])
 
 @router.get("/config", summary="Cómo inicia sesión la pantalla: con Entra ID (tenant y app) o sin login (desarrollo)")
 def config(request: Request):
-    return {"entra": request.app.state.autenticacion.entra, "reiniciar": puede_reiniciar()}
+    return {"entra": request.app.state.autenticacion.entra, "reiniciar": puede_reiniciar(request)}
 
 
-def puede_reiniciar() -> bool:
-    """Empezar de cero borra todos los meses: en local (IS_LOCAL) o en un entorno de prueba que lo prende
-    con PERMITIR_REINICIAR=true. Nunca por default."""
+def puede_reiniciar(request: Request) -> bool:
+    """Empezar de cero borra todos los meses. Sin Entra (local o el entorno de prueba del cliente) está siempre;
+    con Entra, solo si se prende con PERMITIR_REINICIAR=true."""
+    if request.app.state.autenticacion.entra is None:
+        return True
     return any(environ.get(v, "").lower() == "true" for v in ("IS_LOCAL", "PERMITIR_REINICIAR"))
 
 

@@ -46,8 +46,8 @@ transacción: si el recálculo falla, vuelve al estado anterior.
   kilo de cada SKU en cada canal y lo que facturó cada entidad debajo del canal. La foto va dentro
   del comando: el mes nuevo no depende de cómo se recalcule el anterior.
 - **Empezar de cero** (menú del usuario): borra todos los meses y arranca el mes actual
-  vacío. Solo en local (`IS_LOCAL=true`) o en un entorno de prueba (`PERMITIR_REINICIAR=true`),
-  y solo para un usuario con rol Admin; si no, la API responde 403.
+  vacío. Sin Entra (local o el entorno de prueba del cliente) está siempre. Con Entra, solo si
+  se prende con `PERMITIR_REINICIAR=true` y para un usuario con rol Admin; si no, la API responde 403.
 - **Un mes anterior es de solo lectura** (`Sesion.es_ultimo`): el siguiente ya arrancó de
   su aprobado. La pantalla manda siempre el mes en cada pedido.
 - **Una acción nueva** se guarda sola si deja una entrada en el historial. Sus argumentos

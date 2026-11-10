@@ -6,6 +6,7 @@ exportar. Cada test arranca una app con una sesión vacía.
 from decimal import Decimal as D
 from io import BytesIO
 from pathlib import Path
+from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 from openpyxl import Workbook, load_workbook
@@ -17,7 +18,8 @@ NUEVO = "90020900"
 
 
 def _cliente():
-    return TestClient(crear_app())
+    with patch("app.logger"):  # sin Entra la app avisa al armarse; se prueba en test_app
+        return TestClient(crear_app())
 
 
 def _cargado(input2="input2_canales.tsv"):
@@ -349,7 +351,7 @@ def test_cerrar_y_abrir_la_apertura_de_un_canal():
 
 
 def test_muestra_solo_objetivo():
-    r = TestClient(crear_app()).post("/api/movil/muestra?solo_objetivo=true").json()
+    r = _cliente().post("/api/movil/muestra?solo_objetivo=true").json()
     assert r["faltan"] == ["mes anterior", "totales por canal"]
 
 
@@ -377,29 +379,20 @@ def test_las_alertas_dicen_la_descripcion_del_sku():
     assert con_sku and all(p["descripcion"] for p in con_sku)
 
 
-def test_empezar_de_cero_solo_en_local_o_en_un_entorno_de_prueba_que_lo_permite():
+def test_sin_entra_empezar_de_cero_esta_siempre():
     import os
     c = _cerrado()
-    antes = os.environ.get("IS_LOCAL")
+    antes = {v: os.environ.pop(v, None) for v in ("IS_LOCAL", "PERMITIR_REINICIAR")}
     try:
-        os.environ["IS_LOCAL"] = "false"
-        os.environ["PERMITIR_REINICIAR"] = "true"  # el entorno de prueba del cliente
+        os.environ["IS_LOCAL"] = "false"  # el entorno de prueba del cliente, sin nada más configurado
         assert c.get("/api/config").json()["reiniciar"] is True
-        assert c.post("/api/movil/reiniciar").status_code == 200
-        os.environ.pop("PERMITIR_REINICIAR")
-        assert c.get("/api/config").json()["reiniciar"] is False
-        os.environ["IS_LOCAL"] = "false"
-        assert c.post("/api/movil/reiniciar").status_code == 403
-        os.environ.pop("IS_LOCAL")
-        assert c.post("/api/movil/reiniciar").status_code == 403  # sin definir tampoco
-        os.environ["IS_LOCAL"] = "true"
         r = c.post("/api/movil/reiniciar").json()
         assert r["faltan"] == ["objetivo de Contraloría", "mes anterior", "totales por canal"] and r["historial"] == []
     finally:
-        if antes is None:
-            os.environ.pop("IS_LOCAL", None)
-        else:
-            os.environ["IS_LOCAL"] = antes
+        for v, valor in antes.items():
+            os.environ.pop(v, None)
+            if valor is not None:
+                os.environ[v] = valor
 
 
 def test_un_texto_que_empieza_con_igual_se_exporta_como_texto_no_como_formula():

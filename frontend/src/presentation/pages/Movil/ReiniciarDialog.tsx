@@ -3,7 +3,7 @@ import { Box, Button, Dialog, DialogActions, DialogContent, DialogContentText, D
 import { useMovil } from '../../../stores/useMovil';
 import { Alerta } from './Alerta';
 
-/** Empezar de cero: borra todos los meses guardados. Solo en la instalación local, para practicar. */
+/** Empezar de cero: borra todos los meses guardados, para arrancar limpio en un entorno de prueba. */
 export const ReiniciarDialog = ({ onCerrar }: { onCerrar: () => void }) => {
   const { reiniciar, ocupado } = useMovil();
   const [error, setError] = useState<string | null>(null);

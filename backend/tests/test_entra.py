@@ -101,6 +101,17 @@ def test_un_token_de_identidad_no_sirve_para_la_api():
     assert _entra().get("/api/whoami", headers=_con(_token(scp=None))).status_code == 401
 
 
+def test_con_entra_empezar_de_cero_hay_que_prenderlo():
+    import os
+    antes = os.environ.pop("PERMITIR_REINICIAR", None)
+    try:
+        r = _entra().post("/api/movil/reiniciar", headers=_con(_token(roles=["Admin"])))
+        assert r.status_code == 403
+    finally:
+        if antes is not None:
+            os.environ["PERMITIR_REINICIAR"] = antes
+
+
 def test_empezar_de_cero_solo_lo_hace_un_admin():
     import os
     antes = os.environ.get("PERMITIR_REINICIAR")
