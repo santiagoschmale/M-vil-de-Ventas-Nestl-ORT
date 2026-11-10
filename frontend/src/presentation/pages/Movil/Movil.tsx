@@ -209,6 +209,9 @@ const TotalesDialog = ({ totales, sugerencia, objetivo, aviso, onCerrar }: {
   );
   // Corregir totales ya cargados es un ajuste: queda en el historial con su motivo.
   const [motivo, setMotivo] = useState('');
+  // Sin motivo, Guardar lleva al campo: el aviso no puede quedar abajo de la tabla, fuera de la vista.
+  const [faltaMotivo, setFaltaMotivo] = useState(false);
+  const campoMotivo = useRef<HTMLInputElement>(null);
   const antes = (f: Fila, campo: Campo) => {
     const original = originales.get(f.id);
     return original && f[campo].trim() !== original[campo] ? `antes: ${original[campo] || 'vacío'}` : undefined;
@@ -231,7 +234,9 @@ const TotalesDialog = ({ totales, sugerencia, objetivo, aviso, onCerrar }: {
     const texto = ['Canal\tKilos\tPlata', ...conCanal.map(f => `${f.canal.trim()}\t${f.kilos.trim()}\t${f.plata.trim()}`)]
       .join('\n');
     if (totales && !motivo.trim()) {
-      setError('Escribí el motivo: queda en el historial.');
+      setFaltaMotivo(true);
+      campoMotivo.current?.focus();
+      campoMotivo.current?.scrollIntoView?.({ block: 'center' });
       return;
     }
     const falla = await editarTotales(texto, totales ? motivo.trim() : undefined);
@@ -327,9 +332,11 @@ const TotalesDialog = ({ totales, sugerencia, objetivo, aviso, onCerrar }: {
           </Box>
         )}
         {totales && (
-          <TextField label="Motivo" value={motivo} onChange={e => { setMotivo(e.target.value); setError(null); }}
+          <TextField label="Motivo" value={motivo} inputRef={campoMotivo} error={faltaMotivo}
+            onChange={e => { setMotivo(e.target.value); setError(null); setFaltaMotivo(false); }}
             fullWidth sx={{ mt: 2 }} placeholder="Contraloría ajustó el objetivo del mes"
-            helperText="Queda en el historial, con tu nombre y la hora." />
+            helperText={faltaMotivo ? 'Escribí el motivo para guardar: queda en el historial.'
+              : 'Queda en el historial, con tu nombre y la hora.'} />
         )}
         {error && <Box sx={{ mt: 2 }}><Alerta tono="frena">{error}</Alerta></Box>}
       </DialogContent>
