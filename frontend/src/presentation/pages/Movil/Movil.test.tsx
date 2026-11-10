@@ -704,10 +704,9 @@ describe('MovilPage', { timeout: 15000 }, () => {
     }))));
     const user = userEvent.setup({ delay: null });
     render(<MovilPage />);
-    // El botón de Entradas tiene el mismo nombre, así que se busca dentro de la alerta.
     const alertas = await screen.findAllByRole('alert');
-    const alerta = alertas.find(a => within(a).queryByRole('button', { name: 'Editar totales por canal' }))!;
-    await user.click(within(alerta).getByRole('button', { name: 'Editar totales por canal' }));
+    const alerta = alertas.find(a => within(a).queryByRole('button', { name: 'Corregir en Totales por canal' }))!;
+    await user.click(within(alerta).getByRole('button', { name: 'Corregir en Totales por canal' }));
     expect(screen.getByRole('dialog', { name: 'Editar totales por canal' })).toBeInTheDocument();
   });
 
