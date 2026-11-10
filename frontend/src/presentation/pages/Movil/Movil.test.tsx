@@ -221,6 +221,15 @@ describe('MovilPage', { timeout: 15000 }, () => {
     expect(cargarInput2).toHaveBeenCalledWith(archivo);
   });
 
+  it('cada tarjeta de entrada dice qué archivo va', async () => {
+    const user = userEvent.setup({ delay: null });
+    render(<MovilPage />);
+    await user.click(await screen.findByRole('button', { name: /^Entradas/ }));  // con todo cargado, arranca cerrada
+    expect(screen.getByText('El .xlsb del móvil (hoja Móvil Mes) o el template SKU | kg | NNS')).toBeInTheDocument();
+    expect(screen.getByText('El mismo .xlsb')).toBeInTheDocument();
+    expect(screen.getByText('Sin Excel: Armar en pantalla')).toBeInTheDocument();
+  });
+
   it('editar los totales manda la tabla con los números como se escriben en Argentina', async () => {
     const user = userEvent.setup({ delay: null });
     render(<MovilPage />);
