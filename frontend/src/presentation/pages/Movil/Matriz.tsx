@@ -17,6 +17,19 @@ export const Matriz = ({ cruce }: { cruce: Cruce }) => {
   const soloLectura = useSoloLectura();
   const [abierta, setAbierta] = useState<{ sku: Sku; canal: string; celda: Celda }>();
   const [prender, setPrender] = useState<Sku>();
+  // Con 6 a 9 canales y montos largos cuesta seguir en qué canal estás, sobre todo lejos del
+  // encabezado: la columna bajo el mouse (o bajo el foco de teclado) se resalta entera.
+  const [canalActivo, setCanalActivo] = useState<string>();
+  // Al moverse entre celdas de la misma columna el valor no cambia y React no vuelve a dibujar:
+  // con cien filas, redibujar en cada celda se notaría.
+  const activar = (canal: string) => setCanalActivo(previo => (previo === canal ? previo : canal));
+  const marcas = (canal: string) => ({
+    onMouseOver: () => activar(canal),
+    onMouseOut: () => setCanalActivo(undefined),
+    onFocus: () => activar(canal),
+    onBlur: () => setCanalActivo(undefined),
+    'data-columna-activa': canalActivo === canal ? 'true' : undefined,
+  });
   // "Ver celda" desde Para revisar: abre esa celda con su apertura.
   useEffect(() => {
     if (foco?.tipo !== 'celda') return;
@@ -38,7 +51,12 @@ export const Matriz = ({ cruce }: { cruce: Cruce }) => {
               {cruce.canales.map(c => {
                 const cuadra = c.pedido === c.repartido;
                 return (
-                  <TableCell key={c.nombre} sx={{ ...numeros, background: AVENA, verticalAlign: 'top' }}>
+                  <TableCell key={c.nombre} data-columna-activa={canalActivo === c.nombre ? 'true' : undefined}
+                    sx={{
+                      ...numeros, background: AVENA, verticalAlign: 'top',
+                      // Una línea por dentro: marca el encabezado sin correr nada ni cambiar el alto.
+                      ...(canalActivo === c.nombre && { boxShadow: `inset 0 -3px 0 ${TINTA}` }),
+                    }}>
                     <Typography variant="body2" fontWeight={700}>{c.nombre}</Typography>
                     <Typography variant="caption" display="block" color="text.secondary">
                       pedido {formatear(c.pedido)}
@@ -74,10 +92,17 @@ export const Matriz = ({ cruce }: { cruce: Cruce }) => {
                 <TableCell sx={numeros}>{formatear(s.objetivo)}</TableCell>
                 {cruce.canales.map(c => {
                   const celda = s.celdas[c.nombre];
-                  if (!celda) return <TableCell key={c.nombre} sx={{ ...numeros, color: APAGADO }}>·</TableCell>;
+                  const resaltada = canalActivo === c.nombre;
+                  if (!celda) {
+                    return (
+                      <TableCell key={c.nombre} {...marcas(c.nombre)}
+                        sx={{ ...numeros, color: APAGADO, ...(resaltada && { backgroundColor: AVENA }) }}>·</TableCell>
+                    );
+                  }
                   return (
                     <TableCell
                       key={c.nombre}
+                      {...marcas(c.nombre)}
                       onClick={() => setAbierta({ sku: s, canal: c.nombre, celda })}
                       onKeyDown={e => {
                         // Enter y Espacio, como cualquier botón; Espacio sin scrollear la página.
@@ -89,6 +114,7 @@ export const Matriz = ({ cruce }: { cruce: Cruce }) => {
                       aria-label={`${s.codigo} en ${c.nombre}: ${formatear(celda.monto)}${celda.fijada ? ', fijado' : ''}`}
                       sx={{
                         ...numeros, cursor: 'pointer',
+                        ...(resaltada && { backgroundColor: AVENA }),
                         '&:hover, &:focus-visible': { outline: `2px solid ${TINTA}`, outlineOffset: -2 },
                         ...(celda.fijada && {
                           color: `${TINTA} !important`, fontWeight: 700,
