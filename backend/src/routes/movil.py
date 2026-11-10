@@ -568,10 +568,10 @@ def sugerir_pesos(cuerpo: ValoresIn, s: Sesion = Depends(sesion)):
     return {"pesos": _aplicar(s.pesos_para, cuerpo.valores)}
 
 
-@router.post("/reiniciar", summary="Empezar de cero: borra todos los meses (en local o en un entorno de prueba con "
+@router.post("/reiniciar", summary="Empezar de cero: borra todos los meses (sin Entra, o con Entra y "
                                    "PERMITIR_REINICIAR=true)")
 def reiniciar(request: Request):
-    if not puede_reiniciar():
+    if not puede_reiniciar(request):
         raise HTTPException(403, "Empezar de cero solo se puede en un entorno de prueba.")
     if "Admin" not in request.app.state.autenticacion.perfil(request).get("roles", []):
         raise HTTPException(403, "Empezar de cero borra todos los meses: lo puede hacer solo un usuario con rol Admin.")

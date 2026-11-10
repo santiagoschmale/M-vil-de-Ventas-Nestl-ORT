@@ -66,7 +66,7 @@ const LeftMenu = () => {
           <IconMenu
             id="profile-menu"
             links={conEntra() ? [] : [{ name: 'Logout', location: '/signout' }]}
-            // Empezar de cero: en local o en un entorno de prueba que lo permite (PERMITIR_REINICIAR), y solo para Admin.
+            // Empezar de cero: sin Entra, siempre; con Entra, si lo permite PERMITIR_REINICIAR y solo para Admin.
             acciones={[
               ...(conEntra() ? [{ name: 'Cerrar sesión', onClick: () => cerrarSesion() }] : []),
               ...(puedeReiniciar() && isAdmin() ? [{ name: 'Empezar de cero', onClick: () => setReiniciando(true) }] : []),
