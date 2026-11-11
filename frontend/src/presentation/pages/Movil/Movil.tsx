@@ -17,7 +17,7 @@ import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
 import { alpha } from '@mui/material/styles';
 import { useMovil, useSoloLectura } from '../../../stores/useMovil';
 import { Estado, RevisionTotales, RevisionUnidad, Unidad } from '../../../stores/useMovil/useMovil.type';
-import { conUnidad, enMenores, formatear, nombreMes, UNIDADES } from './formato';
+import { clave as claveDeCanal, conUnidad, enMenores, formatear, nombreMes, UNIDADES } from './formato';
 import { AVENA, CIERRA, NO_CIERRA, numeros } from './estilo';
 import { Alerta, Principal, Resolver } from './Alerta';
 import { Subir } from './Subir';
@@ -96,9 +96,6 @@ const EstadoTotal = ({ r, unidad, acciones }: { r: RevisionUnidad; unidad: Unida
         Contraloría pide {conUnidad(r.pide, unidad)}.
       </Alerta>;
 };
-// La misma regla que `normalizar` del backend: sin tildes, mayúsculas ni espacios de más.
-const claveDeCanal = (canal: string) =>
-  canal.normalize('NFKD').replace(/\p{M}/gu, '').replace(/\s+/g, ' ').trim().toLowerCase();
 
 /**
  * Los totales por canal, en la pantalla: editar los cargados (una fila por canal) o
