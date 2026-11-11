@@ -385,6 +385,31 @@ describe('MovilPage', { timeout: 15000 }, () => {
     expect(celda).toHaveAttribute('data-columna-activa', 'true');
   });
 
+  it('el buscador filtra los SKUs por código', async () => {
+    const user = userEvent.setup({ delay: null });
+    render(<MovilPage />);
+    await user.type(await screen.findByLabelText('Buscar SKU'), '200');
+    expect(screen.getByText('SKU nuevo')).toBeInTheDocument();
+    expect(screen.queryByText('Café 1 kg')).not.toBeInTheDocument();
+  });
+
+  it('el buscador encuentra por descripción, sin tildes ni mayúsculas', async () => {
+    const user = userEvent.setup({ delay: null });
+    render(<MovilPage />);
+    await user.type(await screen.findByLabelText('Buscar SKU'), 'CAFE');
+    expect(screen.getByText('Café 1 kg')).toBeInTheDocument();
+    expect(screen.queryByText('SKU nuevo')).not.toBeInTheDocument();
+  });
+
+  it('si no coincide ningún SKU, se avisa y se puede limpiar la búsqueda', async () => {
+    const user = userEvent.setup({ delay: null });
+    render(<MovilPage />);
+    await user.type(await screen.findByLabelText('Buscar SKU'), 'zzz');
+    expect(screen.getByText(/Ningún SKU coincide con «zzz»/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Limpiar búsqueda' }));
+    expect(screen.getByText('Café 1 kg')).toBeInTheDocument();
+  });
+
   it('la tabla dice en qué unidad están los números', async () => {
     render(<MovilPage />);
     expect(await screen.findByRole('columnheader', { name: 'Objetivo (kg)' })).toBeInTheDocument();
