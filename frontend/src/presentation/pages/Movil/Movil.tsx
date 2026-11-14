@@ -30,6 +30,19 @@ import { CanalesDialog } from './CanalesDialog';
 import { CategoriasDialog } from './CategoriasDialog';
 import { MotivoDialog } from './MotivoDialog';
 import { Historial } from './Historial';
+import { EsqueletoMovil } from './EsqueletoMovil';
+
+// Cmd+Z en Mac, Ctrl+Z en el resto: el mismo atajo que el planner usa en cualquier otro programa.
+const ES_MAC = typeof navigator !== 'undefined'
+  && /Mac|iPhone|iPad/i.test((navigator as Navigator & { userAgentData?: { platform?: string } }).userAgentData?.platform ?? navigator.platform ?? '');
+const ATAJO_DESHACER = ES_MAC ? '⌘Z' : 'Ctrl+Z';
+
+// Dentro de un campo de texto, Cmd/Ctrl+Z es del campo (deshace lo escrito), no del móvil.
+const TIPOS_SIN_TEXTO = new Set(['checkbox', 'radio', 'button', 'submit', 'reset', 'range', 'file', 'color', 'image']);
+const enCampoDeTexto = (destino: EventTarget | null) => destino instanceof HTMLElement && (
+  destino.isContentEditable || destino.tagName === 'TEXTAREA' || destino.tagName === 'SELECT'
+  || (destino instanceof HTMLInputElement && !TIPOS_SIN_TEXTO.has(destino.type))
+);
 
 const ACCIONES: Record<string, string> = {
   agregar_regla: 'Agregó una regla', editar_regla: 'Editó una regla', eliminar_regla: 'Eliminó una regla',
@@ -777,6 +790,22 @@ export const MovilPage = () => {
   const [reabriendo, setReabriendo] = useState(false);
   const [arranco, setArranco] = useState<{ mes: string; de: string }>();
   useEffect(() => { refrescar(); }, []);
+  // Cmd/Ctrl+Z hace lo mismo que el botón Deshacer y solo cuando el botón estaría habilitado.
+  const soloLectura = useSoloLectura();
+  const puedeDeshacer = !!estado?.deshacer && !ocupado && !soloLectura;
+  useEffect(() => {
+    if (!puedeDeshacer) return;
+    const alTeclear = (e: KeyboardEvent) => {
+      if (e.key.toLowerCase() !== 'z' || e.shiftKey || e.altKey || e.repeat) return;  // Cmd+Shift+Z (rehacer) queda fuera
+      if (!(ES_MAC ? e.metaKey : e.ctrlKey)) return;
+      if (enCampoDeTexto(e.target)) return;
+      if (document.querySelector('[role="dialog"]')) return;  // con un diálogo abierto, el móvil no se toca
+      e.preventDefault();
+      deshacer();
+    };
+    window.addEventListener('keydown', alTeclear);
+    return () => window.removeEventListener('keydown', alTeclear);
+  }, [puedeDeshacer, deshacer]);
   // Llevar a la fila que se fue a ver, cuando la sección terminó de abrirse.
   useEffect(() => {
     if (!foco) return;
@@ -794,7 +823,7 @@ export const MovilPage = () => {
               acciones={<Resolver onClick={() => refrescar()}>Reintentar</Resolver>}>
               {errorDeCarga}
             </Alerta>
-          : <Dato>Cargando el móvil…</Dato>}
+          : <EsqueletoMovil />}
       </Box>
     );
   }
@@ -887,10 +916,11 @@ export const MovilPage = () => {
             <Typography variant="body2" color="text.secondary">{siguientePaso(estado)}</Typography>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'nowrap', ml: 'auto' }}>
               {/* Una sola vuelta atrás: después se deshabilita hasta el próximo cambio. */}
-              <Tooltip title={queDeshace ?? 'No hay un cambio para deshacer'}>
+              <Tooltip title={queDeshace ? `${queDeshace} (${ATAJO_DESHACER})` : 'No hay un cambio para deshacer'}>
                 <span>
                   <Button size="small" color="inherit" startIcon={<UndoRoundedIcon />} disabled={!queDeshace || ocupado}
-                    aria-label={queDeshace ?? 'Deshacer'} onClick={() => deshacer()}>
+                    aria-label={queDeshace ?? 'Deshacer'} aria-keyshortcuts={ES_MAC ? 'Meta+Z' : 'Control+Z'}
+                    onClick={() => deshacer()}>
                     Deshacer
                   </Button>
                 </span>

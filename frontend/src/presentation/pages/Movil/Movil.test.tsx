@@ -2,7 +2,7 @@ import React from 'react';
 import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
-import { http, HttpResponse } from 'msw';
+import { delay, http, HttpResponse } from 'msw';
 import { server } from '../../../mocks/server';
 import { MovilPage } from './Movil';
 import { MesesMenu } from './MesesMenu';
@@ -20,7 +20,7 @@ const cruce = cruceFactory.build();
 const pedidos: { metodo: string; url: string; cuerpo: unknown }[] = [];
 beforeEach(() => {
   pedidos.length = 0;
-  useMovil.setState({ foco: undefined, estado: undefined, cruce: undefined, unidad: 'kilos', mes: undefined, meses: [] });  // el store es global
+  useMovil.setState({ foco: undefined, estado: undefined, errorDeCarga: undefined, cruce: undefined, unidad: 'kilos', mes: undefined, meses: [] });  // el store es global
   const anotar = async ({ request }: { request: Request }) => {
     pedidos.push({ metodo: request.method, url: new URL(request.url).pathname, cuerpo: await request.json() });
     return HttpResponse.json(estado());
@@ -528,6 +528,140 @@ describe('MovilPage', { timeout: 15000 }, () => {
   it('sin un cambio para deshacer, el botón está deshabilitado', async () => {
     render(<MovilPage />);
     expect(await screen.findByRole('button', { name: 'Deshacer' })).toBeDisabled();
+  });
+
+  describe('atajo Ctrl+Z', () => {
+    const ultimo = { accion: 'apagar_sku', detalle: 'SKU 100', autor: 'planner-local', cuando: '2026-09-24T10:00:00', motivo: 'm' };
+    const atajo = '{Control>}z{/Control}';
+    // Un "no pasó nada" solo vale si se espera lo que tardaría en pasar: el pedido sale de forma asíncrona.
+    const nadaSePidio = async () => {
+      await act(async () => { await new Promise(r => setTimeout(r, 200)); });
+      expect(pedidos).toEqual([]);
+    };
+    const conCambio = (cambios: Partial<Estado> = {}) =>
+      server.use(http.get('*/api/movil', () => HttpResponse.json(estado({ deshacer: ultimo, ...cambios }))));
+
+    it('deshace el último cambio, igual que el botón', async () => {
+      conCambio();
+      const user = userEvent.setup({ delay: null });
+      render(<MovilPage />);
+      await screen.findByRole('button', { name: /^Deshacer:/ });
+      await user.keyboard(atajo);
+      await waitFor(() => expect(pedidos).toEqual([{ metodo: 'POST', url: '/api/movil/deshacer', cuerpo: {} }]));
+    });
+
+    it('el tooltip del botón muestra el atajo', async () => {
+      conCambio();
+      const user = userEvent.setup({ delay: null });
+      render(<MovilPage />);
+      await user.hover(await screen.findByRole('button', { name: /^Deshacer:/ }));
+      expect(await screen.findByRole('tooltip')).toHaveTextContent(/\((Ctrl\+Z|⌘Z)\)$/);
+    });
+
+    it('con el foco en un campo de texto no toca el móvil: el campo deshace su texto', async () => {
+      conCambio();
+      const user = userEvent.setup({ delay: null });
+      render(<MovilPage />);
+      await screen.findByRole('button', { name: /^Deshacer:/ });
+      const campo = document.body.appendChild(document.createElement('input'));
+      campo.focus();
+      await user.keyboard(atajo);
+      await nadaSePidio();
+      campo.remove();
+    });
+
+    it('con un diálogo abierto no hace nada', async () => {
+      server.use(http.get('*/api/movil', () => HttpResponse.json(estado({
+        deshacer: ultimo,
+        canales_sku: [{ sku: '200', canales: ['Directa (BA)'], accion: 'elegir_canales', detalle: '', autor: 'planner-local',
+                        cuando: '2026-09-28T10:00:00-03:00', motivo: 'lanzamiento' }],
+      }))));
+      const user = userEvent.setup({ delay: null });
+      render(<MovilPage />);
+      await user.click(await screen.findByRole('button', { name: /^Reglas/ }));
+      await user.click(screen.getByRole('button', { name: 'Quitar dónde se vende SKU 200' }));
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+      (document.activeElement as HTMLElement | null)?.blur();  // el foco fuera de los campos: solo el diálogo frena
+      await user.keyboard(atajo);
+      await nadaSePidio();
+    });
+
+    it('sin nada para deshacer no hace nada', async () => {
+      const user = userEvent.setup({ delay: null });
+      render(<MovilPage />);
+      await screen.findByRole('button', { name: 'Deshacer' });
+      await user.keyboard(atajo);
+      await nadaSePidio();
+    });
+
+    it('en un mes de solo lectura no hace nada', async () => {
+      conCambio({ es_ultimo: false });
+      const user = userEvent.setup({ delay: null });
+      render(<MovilPage />);
+      await screen.findByText(/Es un mes anterior, de solo lectura/);
+      await user.keyboard(atajo);
+      await nadaSePidio();
+    });
+
+    it('Ctrl+Shift+Z (rehacer) no deshace', async () => {
+      conCambio();
+      const user = userEvent.setup({ delay: null });
+      render(<MovilPage />);
+      await screen.findByRole('button', { name: /^Deshacer:/ });
+      await user.keyboard('{Control>}{Shift>}z{/Shift}{/Control}');
+      await nadaSePidio();
+    });
+  });
+
+  describe('esqueleto de carga', () => {
+    const esqueleto = () => screen.queryByRole('status', { name: 'Cargando el móvil' });
+
+    it('mientras el pedido no responde se ve el esqueleto, no un texto suelto', async () => {
+      server.use(http.get('*/api/movil', async () => { await delay('infinite'); }));
+      render(<MovilPage />);
+      expect(await screen.findByRole('status', { name: 'Cargando el móvil' })).toHaveAttribute('aria-busy', 'true');
+      expect(document.querySelectorAll('.MuiSkeleton-root').length).toBeGreaterThan(0);
+      expect(screen.queryByText('Cargando el móvil…')).not.toBeInTheDocument();
+    });
+
+    it('al responder, el esqueleto se reemplaza por la pantalla', async () => {
+      render(<MovilPage />);
+      expect(await screen.findByRole('button', { name: 'Deshacer' })).toBeInTheDocument();
+      expect(esqueleto()).not.toBeInTheDocument();
+      expect(document.querySelectorAll('.MuiSkeleton-root')).toHaveLength(0);
+    });
+
+    it('si la carga falla se ve el aviso con Reintentar, sin esqueleto', async () => {
+      server.use(http.get('*/api/movil', () => HttpResponse.json({ detail: 'no anda' }, { status: 500 })));
+      render(<MovilPage />);
+      expect(await screen.findByText('No se pudo cargar el móvil')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Reintentar' })).toBeInTheDocument();
+      expect(esqueleto()).not.toBeInTheDocument();
+    });
+
+    it('con prefers-reduced-motion el esqueleto no se anima', async () => {
+      const original = window.matchMedia;
+      window.matchMedia = ((query: string) => ({
+        matches: query.includes('prefers-reduced-motion'), media: query, onchange: null,
+        addEventListener: () => {}, removeEventListener: () => {}, addListener: () => {}, removeListener: () => {}, dispatchEvent: () => false,
+      })) as unknown as typeof window.matchMedia;
+      try {
+        server.use(http.get('*/api/movil', async () => { await delay('infinite'); }));
+        render(<MovilPage />);
+        await screen.findByRole('status', { name: 'Cargando el móvil' });
+        expect(document.querySelectorAll('.MuiSkeleton-root').length).toBeGreaterThan(0);
+        expect(document.querySelectorAll('.MuiSkeleton-pulse')).toHaveLength(0);
+      } finally {
+        window.matchMedia = original;
+      }
+    });
+
+    it('sin la preferencia, el esqueleto sí pulsa', async () => {
+      server.use(http.get('*/api/movil', async () => { await delay('infinite'); }));
+      render(<MovilPage />);
+      await screen.findByRole('status', { name: 'Cargando el móvil' });
+      expect(document.querySelectorAll('.MuiSkeleton-pulse').length).toBeGreaterThan(0);
+    });
   });
 
   it('aprobar pide confirmar y avisa que después no se puede cambiar', async () => {
