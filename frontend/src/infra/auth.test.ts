@@ -4,17 +4,17 @@ import { server } from '../mocks/server';
 // Microsoft no se toca en los tests: la librería se reemplaza por una con una sesión ya iniciada.
 const loginRedirect = vi.fn();
 vi.mock('@azure/msal-browser', () => ({
-  PublicClientApplication: vi.fn().mockImplementation(() => ({
+  PublicClientApplication: vi.fn().mockImplementation(function () { return {
     initialize: vi.fn(),
     handleRedirectPromise: vi.fn().mockResolvedValue(null),
     getAllAccounts: vi.fn().mockReturnValue(globalThis.__cuentas ?? []),
     setActiveAccount: vi.fn(),
     loginRedirect,
     acquireTokenSilent: vi.fn().mockResolvedValue({ accessToken: 'token-de-prueba' }),
-  })),
+  }; }),
 }));
 
-declare global { var __cuentas: unknown[] | undefined } // eslint-disable-line no-var
+declare global { var __cuentas: unknown[] | undefined }
 
 describe('iniciarSesion', () => {
   beforeEach(() => { vi.resetModules(); loginRedirect.mockClear(); globalThis.__cuentas = undefined; });

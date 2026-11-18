@@ -6,6 +6,7 @@ exportar. Cada test arranca una app con una sesión vacía.
 from decimal import Decimal as D
 from io import BytesIO
 from pathlib import Path
+from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 from openpyxl import Workbook, load_workbook
@@ -17,7 +18,8 @@ NUEVO = "90020900"
 
 
 def _cliente():
-    return TestClient(crear_app())
+    with patch("app.logger"):  # sin Entra la app avisa al armarse; se prueba en test_app
+        return TestClient(crear_app())
 
 
 def _cargado(input2="input2_canales.tsv"):
@@ -38,7 +40,7 @@ def _cerrado():
 
 def test_sin_entradas_dice_que_falta_todo():
     r = _cliente().get("/api/movil").json()
-    assert r["faltan"] == ["objetivo de Contraloría", "totales por canal", "mes anterior"]
+    assert r["faltan"] == ["objetivo de Contraloría", "mes anterior", "totales por canal"]
     assert r["cierra"] == {"kilos": False, "plata": False}
 
 
@@ -301,6 +303,26 @@ def test_la_muestra_sin_totales_deja_armarlos_en_la_pantalla():
     assert r["faltan"] == ["totales por canal"]
     assert r["entradas"]["input2"] is None and r["entradas"]["base"]["canales"]
     assert "quitar_input2" in [a["accion"] for a in r["historial"]]
+    # Los del mes anterior no cierran con este objetivo: la pantalla dice qué falta en vez de armarlos.
+    assert r["precarga"]["kilos"] == {"falta": "-27065.410", "cierra": False, "sin_pesos": []}
+    assert r["precarga"]["plata"]["sin_pesos"]
+
+
+def test_subir_el_mes_anterior_arma_los_totales_si_ya_cierran():
+    from datetime import datetime
+
+    from src.movil.sesion import Sesion
+    from tests.movil.test_sesion import _objetivo_como_el_mes_anterior
+
+    aparte = Sesion()
+    aparte.cargar_base(MUESTRA / "base_mes_anterior.xlsx", "base.xlsx", "p", datetime(2026, 11, 1))
+    c = _cliente()
+    c.post("/api/movil/input1", files={"archivo": ("objetivo.xlsx", _objetivo_como_el_mes_anterior(aparte))})
+    with (MUESTRA / "base_mes_anterior.xlsx").open("rb") as f:
+        r = c.post("/api/movil/base", files={"archivo": ("base.xlsx", f)}).json()
+    assert r["faltan"] == [] and r["precarga"] is None
+    assert r["entradas"]["input2"]["archivo"] == "Armados desde el mes anterior" and r["entradas"]["input2"]["canales"] == 9
+    assert r["historial"][-1]["detalle"] == "9 canales, armados desde el mes anterior"
 
 
 def test_un_movil_por_mes_y_el_siguiente_desde_el_aprobado():
@@ -349,8 +371,8 @@ def test_cerrar_y_abrir_la_apertura_de_un_canal():
 
 
 def test_muestra_solo_objetivo():
-    r = TestClient(crear_app()).post("/api/movil/muestra?solo_objetivo=true").json()
-    assert r["faltan"] == ["totales por canal", "mes anterior"]
+    r = _cliente().post("/api/movil/muestra?solo_objetivo=true").json()
+    assert r["faltan"] == ["mes anterior", "totales por canal"]
 
 
 def test_los_totales_se_revisan_en_vivo_y_corregirlos_pide_motivo():
@@ -377,29 +399,20 @@ def test_las_alertas_dicen_la_descripcion_del_sku():
     assert con_sku and all(p["descripcion"] for p in con_sku)
 
 
-def test_empezar_de_cero_solo_en_local_o_en_un_entorno_de_prueba_que_lo_permite():
+def test_sin_entra_empezar_de_cero_esta_siempre():
     import os
     c = _cerrado()
-    antes = os.environ.get("IS_LOCAL")
+    antes = {v: os.environ.pop(v, None) for v in ("IS_LOCAL", "PERMITIR_REINICIAR")}
     try:
-        os.environ["IS_LOCAL"] = "false"
-        os.environ["PERMITIR_REINICIAR"] = "true"  # el entorno de prueba del cliente
+        os.environ["IS_LOCAL"] = "false"  # el entorno de prueba del cliente, sin nada más configurado
         assert c.get("/api/config").json()["reiniciar"] is True
-        assert c.post("/api/movil/reiniciar").status_code == 200
-        os.environ.pop("PERMITIR_REINICIAR")
-        assert c.get("/api/config").json()["reiniciar"] is False
-        os.environ["IS_LOCAL"] = "false"
-        assert c.post("/api/movil/reiniciar").status_code == 403
-        os.environ.pop("IS_LOCAL")
-        assert c.post("/api/movil/reiniciar").status_code == 403  # sin definir tampoco
-        os.environ["IS_LOCAL"] = "true"
         r = c.post("/api/movil/reiniciar").json()
-        assert r["faltan"] == ["objetivo de Contraloría", "totales por canal", "mes anterior"] and r["historial"] == []
+        assert r["faltan"] == ["objetivo de Contraloría", "mes anterior", "totales por canal"] and r["historial"] == []
     finally:
-        if antes is None:
-            os.environ.pop("IS_LOCAL", None)
-        else:
-            os.environ["IS_LOCAL"] = antes
+        for v, valor in antes.items():
+            os.environ.pop(v, None)
+            if valor is not None:
+                os.environ[v] = valor
 
 
 def test_un_texto_que_empieza_con_igual_se_exporta_como_texto_no_como_formula():

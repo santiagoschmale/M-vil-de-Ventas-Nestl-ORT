@@ -5,6 +5,7 @@ inconsistencia.
 """
 
 from pathlib import Path
+from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
@@ -17,7 +18,8 @@ REGLA = {"canal": "Catering", "categorias": ["Café"], "limite": "tope", "kilos"
 
 
 def _cerrado():
-    c = TestClient(crear_app())
+    with patch("app.logger"):  # sin Entra la app avisa al armarse; se prueba en test_app
+        c = TestClient(crear_app())
     with (MUESTRA / "input1_objetivo.xlsx").open("rb") as f:
         c.post("/api/movil/input1", files={"archivo": ("input1.xlsx", f)})
     c.put("/api/movil/input2", json={"texto": (MUESTRA / "input2_sin_sku_nuevo.tsv").read_text(encoding="utf-8")})

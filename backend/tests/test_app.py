@@ -1,7 +1,9 @@
 import unittest
 from unittest.mock import patch, AsyncMock
 from fastapi.testclient import TestClient
-from app import app, lifespan
+from os import environ
+
+from app import app, crear_app, lifespan, logger
 
 
 class TestApp(unittest.TestCase):
@@ -38,6 +40,13 @@ class TestApp(unittest.TestCase):
         response = self.client.get("/health")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), "OK")
+
+    def test_sin_entra_fuera_de_local_avisa_que_no_hay_login(self):
+        sin_entra = {k: v for k, v in environ.items() if not k.startswith("ENTRA_") and k != "DATABASE_URL"}
+        with patch.dict(environ, {**sin_entra, "IS_LOCAL": "false"}, clear=True), \
+                self.assertLogs(logger, "WARNING") as avisos:
+            crear_app()
+        self.assertIn("no hay login", avisos.output[0])
 
 
 if __name__ == "__main__":

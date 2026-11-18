@@ -1,5 +1,5 @@
 import { server } from './mocks/server'
-import 'vitest-dom/extend-expect'
+import '@testing-library/jest-dom/vitest'
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))
 afterAll(() => server.close())

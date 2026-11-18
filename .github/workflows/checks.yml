@@ -15,13 +15,13 @@ concurrency:
 jobs:
   backend:
     name: Backend (tests)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: backend
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.11" # la de la imagen del template
       # Sin acceso al índice privado: todo menos las nbra-*, con sus reemplazos locales.
@@ -30,19 +30,17 @@ jobs:
 
   frontend:
     name: Frontend (tipos, tests, build)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
       # .npmrc apunta al registro privado de Nestlé; acá se usa el público.
       - run: npm ci --registry=https://registry.npmjs.org/
       - run: npx tsc --noEmit
-      # Un solo proceso de tests: el runner tiene 2 núcleos y, con varios en paralelo, el que los coordina se
-      # queda sin CPU y vitest corta con "Timeout calling onTaskUpdate" aunque todos los tests pasen.
-      - run: npx vitest run --coverage.enabled=false --silent --maxWorkers=1 --minWorkers=1
+      - run: npx vitest run --coverage.enabled=false --silent
       - run: npx vite build

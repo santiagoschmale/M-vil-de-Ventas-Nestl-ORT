@@ -36,6 +36,7 @@ export const estadoFactory = Factory.define<Estado>(() => ({
   es_ultimo: true,
   siguiente: '2026-11',
   faltan: [],
+  precarga: null,
   entradas: {
     input1: { archivo: 'objetivo_septiembre.xlsx', skus: 2, kilos: '1500.000', nns: '100.00' },
     input2: {

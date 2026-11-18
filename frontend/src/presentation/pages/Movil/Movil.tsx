@@ -30,6 +30,19 @@ import { CanalesDialog } from './CanalesDialog';
 import { CategoriasDialog } from './CategoriasDialog';
 import { MotivoDialog } from './MotivoDialog';
 import { Historial } from './Historial';
+import { EsqueletoMovil } from './EsqueletoMovil';
+
+// Cmd+Z en Mac, Ctrl+Z en el resto: el mismo atajo que el planner usa en cualquier otro programa.
+const ES_MAC = typeof navigator !== 'undefined'
+  && /Mac|iPhone|iPad/i.test((navigator as Navigator & { userAgentData?: { platform?: string } }).userAgentData?.platform ?? navigator.platform ?? '');
+const ATAJO_DESHACER = ES_MAC ? '⌘Z' : 'Ctrl+Z';
+
+// Dentro de un campo de texto, Cmd/Ctrl+Z es del campo (deshace lo escrito), no del móvil.
+const TIPOS_SIN_TEXTO = new Set(['checkbox', 'radio', 'button', 'submit', 'reset', 'range', 'file', 'color', 'image']);
+const enCampoDeTexto = (destino: EventTarget | null) => destino instanceof HTMLElement && (
+  destino.isContentEditable || destino.tagName === 'TEXTAREA' || destino.tagName === 'SELECT'
+  || (destino instanceof HTMLInputElement && !TIPOS_SIN_TEXTO.has(destino.type))
+);
 
 const ACCIONES: Record<string, string> = {
   agregar_regla: 'Agregó una regla', editar_regla: 'Editó una regla', eliminar_regla: 'Eliminó una regla',
@@ -53,12 +66,46 @@ const Dato = ({ children }: { children: React.ReactNode }) => (
   <Typography variant="body2" color="text.secondary" sx={{ fontVariantNumeric: 'tabular-nums' }}>{children}</Typography>
 );
 
-const Tarjeta = ({ titulo, children }: { titulo: string; children: React.ReactNode }) => (
-  <Paper variant="outlined" sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-    <Typography fontWeight={700}>{titulo}</Typography>
+// `frena`: lo que no cierra y se arregla dentro de esta tarjeta; la marca en rojo y lo dice.
+const Tarjeta = ({ titulo, ayuda, frena = [], children }: {
+  titulo: string; ayuda?: string; frena?: string[]; children: React.ReactNode;
+}) => (
+  <Paper variant="outlined" sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 1.5,
+    ...(frena.length && { borderColor: 'error.main', borderWidth: 2 }) }}>
+    <Box>
+      <Typography fontWeight={700}>{titulo}</Typography>
+      {ayuda && <Typography variant="body2" color="text.secondary">{ayuda}</Typography>}
+    </Box>
     {children}
+    {frena.length > 0 && (
+      <Box>{frena.map(f => <Typography key={f} variant="body2" color="error.main" fontWeight={600}>{f}</Typography>)}</Box>
+    )}
   </Paper>
 );
+
+// Lo que solo se corrige en el diálogo de Totales por canal.
+const SE_CORRIGEN_EN_TOTALES = ['totales_distintos', 'canales_sin_volumen', 'canal_sin_sku'];
+const pendientesDeTotales = (estado: Estado): string[] => {
+  const { precarga } = estado;
+  if (!estado.entradas.input2) {
+    if (!precarga) return [];
+    return (['kilos', 'plata'] as Unidad[]).flatMap(u => {
+      const r = precarga[u];
+      if (!r || r.cierra) return [];
+      const nombre = UNIDADES[u].nombre;
+      if (r.sin_pesos.length) {
+        return [`${nombre}: el mes anterior no los trae para ${r.sin_pesos.length === 1 ? '1 canal' : `${r.sin_pesos.length} canales`}`];
+      }
+      if (r.falta == null) return [];
+      const sobra = r.falta.startsWith('-');
+      return [`${nombre}: ${sobra ? 'sobran' : 'faltan'} ${conUnidad(r.falta.replace('-', ''), u)} para Contraloría`];
+    });
+  }
+  const titulos = [...estado.inconsistencias.kilos, ...estado.inconsistencias.plata]
+    .filter(i => SE_CORRIGEN_EN_TOTALES.includes(i.tipo)).map(i => TITULO_INCONSISTENCIA[i.tipo]);
+  if (estado.cierra.kilos && !estado.cierra.plata && !estado.faltan.length) titulos.push('Pesos no cierra');
+  return [...new Set(titulos)];
+};
 
 type Totales = NonNullable<Estado['entradas']['input2']>;
 type Objetivo = Estado['entradas']['input1'];
@@ -170,7 +217,7 @@ const TotalesDialog = ({ totales, sugerencia, objetivo, aviso, onCerrar }: {
       <Principal onClick={() => sugerirPesos(true)} disabled={sugiriendo || !kilosListos}>Recalcular según los kilos</Principal>
     </ConAyuda>
   );
-  // Corregir totales ya cargados es un ajuste: queda en el historial con su motivo.
+  // Cada guardado queda en el historial; el motivo, si lo escribe, también.
   const [motivo, setMotivo] = useState('');
   const antes = (f: Fila, campo: Campo) => {
     const original = originales.get(f.id);
@@ -193,11 +240,7 @@ const TotalesDialog = ({ totales, sugerencia, objetivo, aviso, onCerrar }: {
     // La misma tabla que lee el backend, con los números como se escriben acá (1.234,5).
     const texto = ['Canal\tKilos\tPlata', ...conCanal.map(f => `${f.canal.trim()}\t${f.kilos.trim()}\t${f.plata.trim()}`)]
       .join('\n');
-    if (totales && !motivo.trim()) {
-      setError('Escribí el motivo: queda en el historial.');
-      return;
-    }
-    const falla = await editarTotales(texto, totales ? motivo.trim() : undefined);
+    const falla = await editarTotales(texto, motivo.trim() || undefined);
     if (falla) setError(falla);
     else onCerrar();
   };
@@ -290,7 +333,7 @@ const TotalesDialog = ({ totales, sugerencia, objetivo, aviso, onCerrar }: {
           </Box>
         )}
         {totales && (
-          <TextField label="Motivo" value={motivo} onChange={e => { setMotivo(e.target.value); setError(null); }}
+          <TextField label="Motivo (opcional)" value={motivo} onChange={e => { setMotivo(e.target.value); setError(null); }}
             fullWidth sx={{ mt: 2 }} placeholder="Contraloría ajustó el objetivo del mes"
             helperText="Queda en el historial, con tu nombre y la hora." />
         )}
@@ -313,7 +356,7 @@ const Entradas = ({ estado }: { estado: Estado }) => {
   return (
     <>
       <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 2 }}>
-        <Tarjeta titulo="Objetivo de Contraloría">
+        <Tarjeta titulo="Objetivo de Contraloría" ayuda="El .xlsb del móvil (hoja Móvil Mes) o el template SKU | kg | NNS">
           <Box><Subir cargado={!!input1} etiqueta="Excel del objetivo de Contraloría" alElegir={cargarInput1} /></Box>
           {input1 && (
             <Box>
@@ -323,31 +366,32 @@ const Entradas = ({ estado }: { estado: Estado }) => {
           )}
         </Tarjeta>
 
-        <Tarjeta titulo="Totales por canal">
+        <Tarjeta titulo="Mes anterior" ayuda="El mismo .xlsb">
+          <Box><Subir cargado={!!base} etiqueta="Excel del mes anterior" alElegir={cargarBase} /></Box>
+          {base && (
+            <Box>
+              <Dato>{base.archivo}</Dato>
+              <Dato>{base.celdas} celdas · {base.aperturas} aperturas</Dato>
+            </Box>
+          )}
+        </Tarjeta>
+
+        <Tarjeta titulo="Totales por canal" ayuda="Sin Excel: Armar en pantalla" frena={pendientesDeTotales(estado)}>
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
             {/* Editar (o armar en la pantalla) es lo de todos los meses; subir otro Excel, lo raro. */}
             <Button size="small" variant="outlined" startIcon={<EditRoundedIcon />} onClick={() => setEditar(true)}
-              disabled={ocupado || soloLectura}
+              disabled={ocupado || soloLectura || (!input2 && !base)}
               aria-label={input2 ? 'Editar totales por canal' : 'Armar totales por canal en la pantalla'}>
               {input2 ? 'Editar' : 'Armar en pantalla'}
             </Button>
             <Subir cargado={!!input2} etiqueta="Excel de totales por canal" alElegir={cargarInput2} secundario
               texto={input2 ? 'Subir otro Excel' : 'Subir Excel'} />
           </Box>
+          {!input2 && !base && <Dato>Para armarlos en la pantalla, cargá primero el mes anterior: de ahí salen los canales.</Dato>}
           {input2 && (
             <Box>
               <Dato>{input2.archivo ?? 'Editados a mano'}</Dato>
               <Dato>{input2.canales} canales · {conUnidad(input2.kilos, 'kilos')} · {conUnidad(input2.plata, 'plata')}</Dato>
-            </Box>
-          )}
-        </Tarjeta>
-
-        <Tarjeta titulo="Mes anterior">
-          <Box><Subir cargado={!!base} etiqueta="Excel del mes anterior" alElegir={cargarBase} /></Box>
-          {base && (
-            <Box>
-              <Dato>{base.archivo}</Dato>
-              <Dato>{base.celdas} celdas · {base.aperturas} aperturas</Dato>
             </Box>
           )}
         </Tarjeta>
@@ -545,6 +589,9 @@ const Pendientes = ({ estado, unidad, enMatriz }: { estado: Estado; unidad: Unid
             {i.tipo === 'totales_distintos' && !soloLectura && (
               <Principal onClick={() => setCorrigiendo({})}>Corregir en Totales por canal</Principal>
             )}
+            {(i.tipo === 'canales_sin_volumen' || i.tipo === 'canal_sin_sku') && !soloLectura && (
+              <Principal onClick={() => setCorrigiendo({})}>Corregir en Totales por canal</Principal>
+            )}
             {i.tipo === 'sku_sin_canal' && i.skus[0] && (
               <Principal aria-label={`Elegir canales de SKU ${i.skus[0]}`} onClick={() => setCanalesDe(i.skus[0])}>
                 Elegir canales
@@ -740,6 +787,22 @@ export const MovilPage = () => {
   const [reabriendo, setReabriendo] = useState(false);
   const [arranco, setArranco] = useState<{ mes: string; de: string }>();
   useEffect(() => { refrescar(); }, []);
+  // Cmd/Ctrl+Z hace lo mismo que el botón Deshacer y solo cuando el botón estaría habilitado.
+  const soloLectura = useSoloLectura();
+  const puedeDeshacer = !!estado?.deshacer && !ocupado && !soloLectura;
+  useEffect(() => {
+    if (!puedeDeshacer) return;
+    const alTeclear = (e: KeyboardEvent) => {
+      if (e.key.toLowerCase() !== 'z' || e.shiftKey || e.altKey || e.repeat) return;  // Cmd+Shift+Z (rehacer) queda fuera
+      if (!(ES_MAC ? e.metaKey : e.ctrlKey)) return;
+      if (enCampoDeTexto(e.target)) return;
+      if (document.querySelector('[role="dialog"]')) return;  // con un diálogo abierto, el móvil no se toca
+      e.preventDefault();
+      deshacer();
+    };
+    window.addEventListener('keydown', alTeclear);
+    return () => window.removeEventListener('keydown', alTeclear);
+  }, [puedeDeshacer, deshacer]);
   // Llevar a la fila que se fue a ver, cuando la sección terminó de abrirse.
   useEffect(() => {
     if (!foco) return;
@@ -757,7 +820,7 @@ export const MovilPage = () => {
               acciones={<Resolver onClick={() => refrescar()}>Reintentar</Resolver>}>
               {errorDeCarga}
             </Alerta>
-          : <Dato>Cargando el móvil…</Dato>}
+          : <EsqueletoMovil />}
       </Box>
     );
   }
@@ -850,10 +913,11 @@ export const MovilPage = () => {
             <Typography variant="body2" color="text.secondary">{siguientePaso(estado)}</Typography>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'nowrap', ml: 'auto' }}>
               {/* Una sola vuelta atrás: después se deshabilita hasta el próximo cambio. */}
-              <Tooltip title={queDeshace ?? 'No hay un cambio para deshacer'}>
+              <Tooltip title={queDeshace ? `${queDeshace} (${ATAJO_DESHACER})` : 'No hay un cambio para deshacer'}>
                 <span>
                   <Button size="small" color="inherit" startIcon={<UndoRoundedIcon />} disabled={!queDeshace || ocupado}
-                    aria-label={queDeshace ?? 'Deshacer'} onClick={() => deshacer()}>
+                    aria-label={queDeshace ?? 'Deshacer'} aria-keyshortcuts={ES_MAC ? 'Meta+Z' : 'Control+Z'}
+                    onClick={() => deshacer()}>
                     Deshacer
                   </Button>
                 </span>

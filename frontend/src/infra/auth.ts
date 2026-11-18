@@ -12,7 +12,7 @@ let alcances: string[] = [];
 let reiniciable = false;
 
 export const conEntra = () => msal !== undefined;
-/** Empezar de cero: solo en local o en un entorno de prueba que lo permite (lo dice el backend). */
+/** Empezar de cero: sin Entra está siempre; con Entra, si el entorno lo permite (lo dice el backend). */
 export const puedeReiniciar = () => reiniciable;
 
 const token = async () => {

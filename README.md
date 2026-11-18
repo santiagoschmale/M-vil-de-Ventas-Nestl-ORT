@@ -111,7 +111,7 @@ Variables de la API:
 | `DATABASE_URL` | `postgresql://usuario:clave@host:5432/base`. Sin ella, todo vive en memoria y se pierde al reiniciar. La línea de `alembic` crea las tablas; se corre de nuevo con cada versión. | Sí |
 | `IS_LOCAL` | Sin definir vale como `true`: recarga automática y sin Key Vault. En un contenedor va `false`: sin recarga y, con las `nbra-*` reales, carga la configuración de Key Vault. `true` explícito habilita "Empezar de cero" (solo para Admin). | `false` |
 | `ENTRA_TENANT_ID`, `ENTRA_CLIENT_ID` | Login con Microsoft Entra ID (ver abajo). Sin ellas no hay login: todos entran como un usuario de prueba con rol Admin y, con `IS_LOCAL=false`, la API lo avisa en el log. Solo para un entorno de prueba detrás de otro control de acceso. | Sí |
-| `PERMITIR_REINICIAR` | `true` en un entorno de prueba: aparece "Empezar de cero", que borra todos los meses. Solo para un usuario con rol Admin. | No |
+| `PERMITIR_REINICIAR` | Con Entra, `true` hace aparecer "Empezar de cero", que borra todos los meses, para un usuario con rol Admin. Sin Entra no hace falta: aparece siempre. | No |
 
 - **El contenedor de la API se tiene que llamar `backend`**: la pantalla (nginx) le
   pasa `/api` a `http://backend:3000`.

@@ -2,7 +2,7 @@ import React from 'react';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
-import { http, HttpResponse } from 'msw';
+import { delay, http, HttpResponse } from 'msw';
 import { server } from '../../../mocks/server';
 import { MovilPage } from './Movil';
 import { MesesMenu } from './MesesMenu';
@@ -20,7 +20,7 @@ const cruce = cruceFactory.build();
 const pedidos: { metodo: string; url: string; cuerpo: unknown }[] = [];
 beforeEach(() => {
   pedidos.length = 0;
-  useMovil.setState({ foco: undefined, estado: undefined, cruce: undefined, unidad: 'kilos', mes: undefined, meses: [] });  // el store es global
+  useMovil.setState({ foco: undefined, estado: undefined, errorDeCarga: undefined, cruce: undefined, unidad: 'kilos', mes: undefined, meses: [] });  // el store es global
   const anotar = async ({ request }: { request: Request }) => {
     pedidos.push({ metodo: request.method, url: new URL(request.url).pathname, cuerpo: await request.json() });
     return HttpResponse.json(estado());
@@ -221,6 +221,15 @@ describe('MovilPage', { timeout: 15000 }, () => {
     expect(cargarInput2).toHaveBeenCalledWith(archivo);
   });
 
+  it('cada tarjeta de entrada dice qué archivo va', async () => {
+    const user = userEvent.setup({ delay: null });
+    render(<MovilPage />);
+    await user.click(await screen.findByRole('button', { name: /^Entradas/ }));  // con todo cargado, arranca cerrada
+    expect(screen.getByText('El .xlsb del móvil (hoja Móvil Mes) o el template SKU | kg | NNS')).toBeInTheDocument();
+    expect(screen.getByText('El mismo .xlsb')).toBeInTheDocument();
+    expect(screen.getByText('Sin Excel: Armar en pantalla')).toBeInTheDocument();
+  });
+
   it('editar los totales manda la tabla con los números como se escriben en Argentina', async () => {
     const user = userEvent.setup({ delay: null });
     render(<MovilPage />);
@@ -334,21 +343,12 @@ describe('MovilPage', { timeout: 15000 }, () => {
     await waitFor(() => expect(tablas).toBeGreaterThan(antes));
   });
 
-  it('se pueden agregar y sacar canales al armar los totales, aun sin mes anterior', async () => {
+  it('no se pueden armar los totales en la pantalla hasta cargar el mes anterior', async () => {
     server.use(http.get('*/api/movil', () => HttpResponse.json(estado({
-      faltan: ['totales por canal', 'mes anterior'], entradas: { ...estado().entradas, input2: null, base: null } }))));
-    const user = userEvent.setup({ delay: null });
+      faltan: ['mes anterior', 'totales por canal'], entradas: { ...estado().entradas, input2: null, base: null } }))));
     render(<MovilPage />);
-    await user.click(await screen.findByRole('button', { name: 'Armar totales por canal en la pantalla' }));
-    const dialogo = screen.getByRole('dialog', { name: 'Armar totales por canal' });
-    await user.type(within(dialogo).getByLabelText('Canal 1'), 'Vending');
-    await user.type(within(dialogo).getByLabelText('Kilos de Vending'), '100');
-    await user.click(within(dialogo).getByRole('button', { name: 'Agregar canal' }));
-    await user.type(within(dialogo).getByLabelText('Canal 2'), 'Borrar');
-    await user.click(within(dialogo).getByRole('button', { name: 'Sacar Borrar' }));
-    await user.click(within(dialogo).getByRole('button', { name: 'Guardar' }));
-    await waitFor(() => expect(pedidos).toEqual([{ metodo: 'PUT', url: '/api/movil/input2',
-      cuerpo: { texto: 'Canal\tKilos\tPlata\nVending\t100\t' } }]));
+    expect(await screen.findByRole('button', { name: 'Armar totales por canal en la pantalla' })).toBeDisabled();
+    expect(screen.getByText('Para armarlos en la pantalla, cargá primero el mes anterior: de ahí salen los canales.')).toBeInTheDocument();
   });
 
   it('al armar o editar los totales, el diálogo avisa lo que va a pasar antes de guardar', async () => {
@@ -510,8 +510,11 @@ describe('MovilPage', { timeout: 15000 }, () => {
     server.use(http.get('*/api/movil/exportar', ({ request }) => { pedido = request.url; return new HttpResponse(new Blob(['x'])); }));
     URL.createObjectURL = vi.fn(() => 'blob:x');
     URL.revokeObjectURL = vi.fn();
+    const descarga = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {}); // jsdom no navega
+    onTestFinished(() => descarga.mockRestore());
     await user.click(within(dialogo).getByRole('button', { name: 'Exportar igual' }));
     await waitFor(() => expect(new URL(pedido).searchParams.get('mes')).toBe('2026-10'));
+    await waitFor(() => expect(descarga).toHaveBeenCalled());
   });
 
   it('un SKU sin historia se resuelve diciendo dónde se vende', async () => {
@@ -565,6 +568,140 @@ describe('MovilPage', { timeout: 15000 }, () => {
   it('sin un cambio para deshacer, el botón está deshabilitado', async () => {
     render(<MovilPage />);
     expect(await screen.findByRole('button', { name: 'Deshacer' })).toBeDisabled();
+  });
+
+  describe('atajo Ctrl+Z', () => {
+    const ultimo = { accion: 'apagar_sku', detalle: 'SKU 100', autor: 'planner-local', cuando: '2026-09-24T10:00:00', motivo: 'm' };
+    const atajo = '{Control>}z{/Control}';
+    // Un "no pasó nada" solo vale si se espera lo que tardaría en pasar: el pedido sale de forma asíncrona.
+    const nadaSePidio = async () => {
+      await act(async () => { await new Promise(r => setTimeout(r, 200)); });
+      expect(pedidos).toEqual([]);
+    };
+    const conCambio = (cambios: Partial<Estado> = {}) =>
+      server.use(http.get('*/api/movil', () => HttpResponse.json(estado({ deshacer: ultimo, ...cambios }))));
+
+    it('deshace el último cambio, igual que el botón', async () => {
+      conCambio();
+      const user = userEvent.setup({ delay: null });
+      render(<MovilPage />);
+      await screen.findByRole('button', { name: /^Deshacer:/ });
+      await user.keyboard(atajo);
+      await waitFor(() => expect(pedidos).toEqual([{ metodo: 'POST', url: '/api/movil/deshacer', cuerpo: {} }]));
+    });
+
+    it('el tooltip del botón muestra el atajo', async () => {
+      conCambio();
+      const user = userEvent.setup({ delay: null });
+      render(<MovilPage />);
+      await user.hover(await screen.findByRole('button', { name: /^Deshacer:/ }));
+      expect(await screen.findByRole('tooltip')).toHaveTextContent(/\((Ctrl\+Z|⌘Z)\)$/);
+    });
+
+    it('con el foco en un campo de texto no toca el móvil: el campo deshace su texto', async () => {
+      conCambio();
+      const user = userEvent.setup({ delay: null });
+      render(<MovilPage />);
+      await screen.findByRole('button', { name: /^Deshacer:/ });
+      const campo = document.body.appendChild(document.createElement('input'));
+      campo.focus();
+      await user.keyboard(atajo);
+      await nadaSePidio();
+      campo.remove();
+    });
+
+    it('con un diálogo abierto no hace nada', async () => {
+      server.use(http.get('*/api/movil', () => HttpResponse.json(estado({
+        deshacer: ultimo,
+        canales_sku: [{ sku: '200', canales: ['Directa (BA)'], accion: 'elegir_canales', detalle: '', autor: 'planner-local',
+                        cuando: '2026-09-28T10:00:00-03:00', motivo: 'lanzamiento' }],
+      }))));
+      const user = userEvent.setup({ delay: null });
+      render(<MovilPage />);
+      await user.click(await screen.findByRole('button', { name: /^Reglas/ }));
+      await user.click(screen.getByRole('button', { name: 'Quitar dónde se vende SKU 200' }));
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+      (document.activeElement as HTMLElement | null)?.blur();  // el foco fuera de los campos: solo el diálogo frena
+      await user.keyboard(atajo);
+      await nadaSePidio();
+    });
+
+    it('sin nada para deshacer no hace nada', async () => {
+      const user = userEvent.setup({ delay: null });
+      render(<MovilPage />);
+      await screen.findByRole('button', { name: 'Deshacer' });
+      await user.keyboard(atajo);
+      await nadaSePidio();
+    });
+
+    it('en un mes de solo lectura no hace nada', async () => {
+      conCambio({ es_ultimo: false });
+      const user = userEvent.setup({ delay: null });
+      render(<MovilPage />);
+      await screen.findByText(/Es un mes anterior, de solo lectura/);
+      await user.keyboard(atajo);
+      await nadaSePidio();
+    });
+
+    it('Ctrl+Shift+Z (rehacer) no deshace', async () => {
+      conCambio();
+      const user = userEvent.setup({ delay: null });
+      render(<MovilPage />);
+      await screen.findByRole('button', { name: /^Deshacer:/ });
+      await user.keyboard('{Control>}{Shift>}z{/Shift}{/Control}');
+      await nadaSePidio();
+    });
+  });
+
+  describe('esqueleto de carga', () => {
+    const esqueleto = () => screen.queryByRole('status', { name: 'Cargando el móvil' });
+
+    it('mientras el pedido no responde se ve el esqueleto, no un texto suelto', async () => {
+      server.use(http.get('*/api/movil', async () => { await delay('infinite'); }));
+      render(<MovilPage />);
+      expect(await screen.findByRole('status', { name: 'Cargando el móvil' })).toHaveAttribute('aria-busy', 'true');
+      expect(document.querySelectorAll('.MuiSkeleton-root').length).toBeGreaterThan(0);
+      expect(screen.queryByText('Cargando el móvil…')).not.toBeInTheDocument();
+    });
+
+    it('al responder, el esqueleto se reemplaza por la pantalla', async () => {
+      render(<MovilPage />);
+      expect(await screen.findByRole('button', { name: 'Deshacer' })).toBeInTheDocument();
+      expect(esqueleto()).not.toBeInTheDocument();
+      expect(document.querySelectorAll('.MuiSkeleton-root')).toHaveLength(0);
+    });
+
+    it('si la carga falla se ve el aviso con Reintentar, sin esqueleto', async () => {
+      server.use(http.get('*/api/movil', () => HttpResponse.json({ detail: 'no anda' }, { status: 500 })));
+      render(<MovilPage />);
+      expect(await screen.findByText('No se pudo cargar el móvil')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Reintentar' })).toBeInTheDocument();
+      expect(esqueleto()).not.toBeInTheDocument();
+    });
+
+    it('con prefers-reduced-motion el esqueleto no se anima', async () => {
+      const original = window.matchMedia;
+      window.matchMedia = ((query: string) => ({
+        matches: query.includes('prefers-reduced-motion'), media: query, onchange: null,
+        addEventListener: () => {}, removeEventListener: () => {}, addListener: () => {}, removeListener: () => {}, dispatchEvent: () => false,
+      })) as unknown as typeof window.matchMedia;
+      try {
+        server.use(http.get('*/api/movil', async () => { await delay('infinite'); }));
+        render(<MovilPage />);
+        await screen.findByRole('status', { name: 'Cargando el móvil' });
+        expect(document.querySelectorAll('.MuiSkeleton-root').length).toBeGreaterThan(0);
+        expect(document.querySelectorAll('.MuiSkeleton-pulse')).toHaveLength(0);
+      } finally {
+        window.matchMedia = original;
+      }
+    });
+
+    it('sin la preferencia, el esqueleto sí pulsa', async () => {
+      server.use(http.get('*/api/movil', async () => { await delay('infinite'); }));
+      render(<MovilPage />);
+      await screen.findByRole('status', { name: 'Cargando el móvil' });
+      expect(document.querySelectorAll('.MuiSkeleton-pulse').length).toBeGreaterThan(0);
+    });
   });
 
   it('aprobar pide confirmar y avisa que después no se puede cambiar', async () => {
@@ -740,6 +877,45 @@ describe('MovilPage', { timeout: 15000 }, () => {
     await waitFor(() => expect(pedidosMes[pedidosMes.length - 1]).toBe('último'));
   });
 
+  it('si los totales del mes anterior no cierran, la tarjeta de Totales lo dice antes de abrirla', async () => {
+    server.use(http.get('*/api/movil', () => HttpResponse.json(estado({
+      faltan: ['totales por canal'], entradas: { ...estado().entradas, input2: null },
+      precarga: { kilos: { falta: '-1200.000', cierra: false, sin_pesos: [] },
+                  plata: { falta: null, cierra: false, sin_pesos: ['Catering', 'Vending'] } },
+    }))));
+    const user = userEvent.setup({ delay: null });
+    render(<MovilPage />);
+    const entradas = await screen.findByRole('button', { name: /^Entradas/ });
+    if (entradas.getAttribute('aria-expanded') === 'false') await user.click(entradas);
+    expect(await screen.findByText('Kilos: sobran 1.200,000 kg para Contraloría')).toBeInTheDocument();
+    expect(screen.getByText('Pesos: el mes anterior no los trae para 2 canales')).toBeInTheDocument();
+  });
+
+  it('si los totales cargados no coinciden con Contraloría, la tarjeta de Totales queda marcada', async () => {
+    server.use(http.get('*/api/movil', () => HttpResponse.json(estado({
+      cierra: { kilos: false, plata: true },
+      inconsistencias: { kilos: [inconsistenciaFactory.build({ tipo: 'totales_distintos' })], plata: [] },
+    }))));
+    const user = userEvent.setup({ delay: null });
+    render(<MovilPage />);
+    const entradas = await screen.findByRole('button', { name: /^Entradas/ });
+    if (entradas.getAttribute('aria-expanded') === 'false') await user.click(entradas);
+    const tarjeta = (await screen.findByText('Totales por canal', { selector: 'p' })).closest('.MuiPaper-root')!;
+    expect(within(tarjeta as HTMLElement).getByText('No coincide con Contraloría')).toBeInTheDocument();
+  });
+
+  it('las alertas de canales llevan a editar los totales por canal', async () => {
+    server.use(http.get('*/api/movil', () => HttpResponse.json(estado({
+      inconsistencias: { kilos: [inconsistenciaFactory.build({ tipo: 'canales_sin_volumen' })], plata: [] },
+    }))));
+    const user = userEvent.setup({ delay: null });
+    render(<MovilPage />);
+    const alertas = await screen.findAllByRole('alert');
+    const alerta = alertas.find(a => within(a).queryByRole('button', { name: 'Corregir en Totales por canal' }))!;
+    await user.click(within(alerta).getByRole('button', { name: 'Corregir en Totales por canal' }));
+    expect(screen.getByRole('dialog', { name: 'Editar totales por canal' })).toBeInTheDocument();
+  });
+
   it('si los totales no suman lo que pide Contraloría, se corrigen en Totales por canal', async () => {
     const distintos = estado({ cierra: { kilos: false, plata: true }, inconsistencias: { kilos: [inconsistenciaFactory.build({
       tipo: 'totales_distintos', mensaje: 'A los totales por canal les faltan 100,000 kg para llegar a lo que pide Contraloría (1.000,000 kg).',
@@ -775,8 +951,6 @@ describe('MovilPage', { timeout: 15000 }, () => {
     await user.click(within(dialogo).getAllByRole('button', { name: 'Recalcular según los kilos' })[0]);
     await waitFor(() => expect(within(dialogo).getByLabelText('Pesos de Catering')).toHaveValue('100,00'));
     expect(within(dialogo).queryByText(/no van con sus kilos/)).not.toBeInTheDocument();  // ya se recalcularon
-    await user.click(within(dialogo).getByRole('button', { name: 'Guardar' }));
-    expect(within(dialogo).getByText('Escribí el motivo: queda en el historial.')).toBeInTheDocument();
     await user.type(within(dialogo).getByRole('textbox', { name: /Motivo/ }), 'pesos coherentes con los kilos');
     await user.click(within(dialogo).getByRole('button', { name: 'Guardar' }));
     await waitFor(() => expect(pedidos.filter(p => p.metodo === 'PUT')).toHaveLength(1));
