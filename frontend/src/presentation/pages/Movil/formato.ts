@@ -50,3 +50,10 @@ export const nombreMes = (mes: string) => {
   const [anio, m] = mes.split('-').map(Number);
   return `${new Date(anio, m - 1, 1).toLocaleDateString('es-AR', { month: 'long' })} ${anio}`;
 };
+
+/**
+ * Clave para comparar texto escrito a mano: sin tildes, mayúsculas ni espacios de más.
+ * La misma regla que `normalizar` del backend.
+ */
+export const clave = (texto: string) =>
+  texto.normalize('NFKD').replace(/\p{M}/gu, '').replace(/\s+/g, ' ').trim().toLowerCase();

@@ -1,9 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { Box, Switch, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography } from '@mui/material';
+import {
+  Box, Button, IconButton, InputAdornment, Switch, Table, TableBody, TableCell, TableContainer,
+  TableHead, TableRow, TextField, Typography,
+} from '@mui/material';
 import PushPinRoundedIcon from '@mui/icons-material/PushPinRounded';
+import SearchRoundedIcon from '@mui/icons-material/SearchRounded';
+import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
 import { useMovil, useSoloLectura } from '../../../stores/useMovil';
 import { Celda, Cruce } from '../../../stores/useMovil/useMovil.type';
-import { formatear, UNIDADES } from './formato';
+import { clave, formatear, UNIDADES } from './formato';
 import { APAGADO, AVENA, CIERRA, ENFOCADA, NO_CIERRA, TINTA, numeros } from './estilo';
 import { CeldaDialog } from './CeldaDialog';
 import { MotivoDialog } from './MotivoDialog';
@@ -30,9 +35,18 @@ export const Matriz = ({ cruce }: { cruce: Cruce }) => {
     onBlur: () => setCanalActivo(undefined),
     'data-columna-activa': canalActivo === canal ? 'true' : undefined,
   });
+  // Con el móvil real son más de cien SKUs: el buscador filtra las filas que ya están en pantalla.
+  // No recalcula nada, así que los totales de cada canal no cambian.
+  const [busqueda, setBusqueda] = useState('');
+  const buscado = clave(busqueda);
+  const skus = buscado
+    ? cruce.skus.filter(s => clave(s.codigo).includes(buscado) || clave(s.descripcion).includes(buscado))
+    : cruce.skus;
   // "Ver celda" desde Para revisar: abre esa celda con su apertura.
   useEffect(() => {
-    if (foco?.tipo !== 'celda') return;
+    if (!foco) return;
+    setBusqueda('');  // el SKU al que se va puede estar filtrado, y entonces no se vería
+    if (foco.tipo !== 'celda') return;
     const [codigo, canal] = foco.id.split('|');
     const sku = cruce.skus.find(x => x.codigo === codigo);
     const celda = sku?.celdas[canal];
@@ -42,6 +56,25 @@ export const Matriz = ({ cruce }: { cruce: Cruce }) => {
 
   return (
     <>
+      <TextField
+        size="small" label="Buscar SKU" value={busqueda}
+        helperText="Por código o descripción"
+        onChange={e => setBusqueda(e.target.value)}
+        onKeyDown={e => { if (e.key === 'Escape') setBusqueda(''); }}
+        sx={{ mb: 1, width: 320, maxWidth: '100%' }}
+        InputProps={{
+          startAdornment: (
+            <InputAdornment position="start"><SearchRoundedIcon fontSize="small" /></InputAdornment>
+          ),
+          endAdornment: busqueda ? (
+            <InputAdornment position="end">
+              <IconButton size="small" aria-label="Limpiar el campo" onClick={() => setBusqueda('')}>
+                <CloseRoundedIcon fontSize="small" />
+              </IconButton>
+            </InputAdornment>
+          ) : undefined,
+        }}
+      />
       <TableContainer sx={{ maxHeight: '65vh', border: `1px solid ${AVENA}`, borderRadius: 1 }}>
         <Table stickyHeader size="small" aria-label={`Matriz SKU por canal en ${UNIDADES[cruce.unidad].nombre.toLowerCase()}`}>
           <TableHead>
@@ -70,7 +103,15 @@ export const Matriz = ({ cruce }: { cruce: Cruce }) => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {cruce.skus.map(s => (
+            {skus.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={2 + cruce.canales.length}>
+                  <Typography variant="body2" sx={{ mb: 1 }}>Ningún SKU coincide con «{busqueda}».</Typography>
+                  <Button size="small" onClick={() => setBusqueda('')}>Limpiar búsqueda</Button>
+                </TableCell>
+              </TableRow>
+            )}
+            {skus.map(s => (
               <TableRow key={s.codigo} id={`sku-${s.codigo}`} hover
                 aria-current={foco?.tipo === 'sku' && foco.id === s.codigo ? true : undefined}
                 sx={[{ '& td': { color: s.activo ? undefined : APAGADO } },
