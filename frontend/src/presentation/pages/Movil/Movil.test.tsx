@@ -1,5 +1,5 @@
 import React from 'react';
-import { act, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 import { http, HttpResponse } from 'msw';
@@ -368,6 +368,21 @@ describe('MovilPage', { timeout: 15000 }, () => {
     await user.click(within(dialogo).getByRole('button', { name: 'Sacar catering' }));
     await user.click(within(dialogo).getByRole('button', { name: 'Sacar Catering' }));
     expect(within(dialogo).getByRole('button', { name: 'Guardar' })).toBeDisabled();  // sin ningún canal
+  });
+
+  it('al pasar el mouse por una celda se resalta su columna, encabezado incluido', async () => {
+    render(<MovilPage />);
+    const celda = await screen.findByRole('button', { name: /^100 en Catering:/ });
+    // fireEvent y no user.hover: en jsdom el hover de userEvent no llega a disparar el mouseover.
+    fireEvent.mouseOver(celda);
+    expect(celda).toHaveAttribute('data-columna-activa', 'true');
+    expect(screen.getByRole('columnheader', { name: /^Catering/ })).toHaveAttribute('data-columna-activa', 'true');
+    expect(screen.getByRole('columnheader', { name: /^Directa \(BA\)/ })).not.toHaveAttribute('data-columna-activa');
+    fireEvent.mouseOut(celda);
+    expect(celda).not.toHaveAttribute('data-columna-activa');
+    // El criterio pide lo mismo con el foco de teclado.
+    fireEvent.focus(celda);
+    expect(celda).toHaveAttribute('data-columna-activa', 'true');
   });
 
   it('la tabla dice en qué unidad están los números', async () => {
