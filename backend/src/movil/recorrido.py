@@ -250,8 +250,9 @@ def _abrir(kilos, plata, apertura, apagadas, problemas, por_nombre, porcentajes,
     """
     Una raíz por celda del cruce en un canal que se abre: el valor del cruce se reparte entre sus entidades,
     los kilos según lo que vendió cada una de ese SKU el mes anterior y los pesos según lo que facturó. Si
-    nadie vendió ese SKU en el canal (un SKU nuevo, A4, o uno que el canal no tenía, A14), como se abrió el
-    canal entero: la suma de cada entidad en todos los SKUs del canal. Así cada celda llega a alguien.
+    ninguna entidad prendida vendió ese SKU en el canal (un SKU nuevo, A4, uno que el canal no tenía, A14, o
+    uno que solo vendieron entidades apagadas), como se abrió el canal entero: la suma de cada entidad en
+    todos los SKUs del canal. Así cada celda llega a alguien mientras quede alguien prendido en el canal.
     """
     if kilos.celdas is None:
         return {}
@@ -269,7 +270,7 @@ def _abrir(kilos, plata, apertura, apagadas, problemas, por_nombre, porcentajes,
         if canal not in del_canal or (valor_kilos == 0 and valor_plata == 0):
             continue
         pesos, facturado = apertura.get(k), apertura_plata.get(k)
-        if not pesos or not any(pesos.values()):
+        if not any(w for e, w in (pesos or {}).items() if e not in apagadas):
             pesos, facturado = del_canal[canal]
         raiz = Nodo(entidad=f"{sku}|{canal}", nombre=canal, peso=Decimal(1),
                     hijos=[Nodo(entidad=e, nombre=e, peso=w, porcentaje=porcentajes.get((canal, e)),

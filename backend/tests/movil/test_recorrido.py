@@ -367,3 +367,25 @@ def test_si_un_distribuidor_no_facturo_lo_que_vendio_los_pesos_de_la_celda_se_ab
     assert kilos == {"X": D("30.000"), "Y": D("10.000")}
     assert plata == {"X": D("750.00"), "Y": D("250.00")}
     assert sum(plata.values()) == r.plata.celdas[("1", "Distribuidores")]
+
+
+def test_si_estan_apagados_todos_los_que_vendieron_el_sku_la_celda_se_abre_como_el_canal_entre_los_prendidos():
+    # El SKU 2 solo lo vendió X (Y tenía 0) y X está apagado: entre los prendidos, como el canal entero.
+    from src.importer.entradas import ObjetivoSku, TotalCanal
+
+    objetivos = {s: ObjetivoSku(kilos=D(k), nns=D(n), descripcion=s, categoria=None, pais=None)
+                 for s, k, n in (("1", 40, 1000), ("2", 20, 700))}
+    r = armar(objetivos, {"Distribuidores": TotalCanal(kilos=D(60), plata=D(1700))},
+              {(s, "Distribuidores"): D(1) for s in objetivos},
+              apertura={("1", "Distribuidores"): {"X": D(10), "Y": D(10), "Z": D(30)},
+                        ("2", "Distribuidores"): {"X": D(5), "Y": D(0)}},
+              apertura_plata={("1", "Distribuidores"): {"X": D(100), "Y": D(100), "Z": D(100)},
+                              ("2", "Distribuidores"): {"X": D(50), "Y": D(0)}},
+              entidades_apagadas={"X"})
+    kilos, plata = _abierta(r, "2")
+    # Pesos del canal: Y 10 kg / $ 100, Z 30 kg / $ 100.
+    assert kilos == {"X": D("0.000"), "Y": D("5.000"), "Z": D("15.000")}
+    assert plata == {"X": D("0.00"), "Y": D("350.00"), "Z": D("350.00")}
+    assert sum(kilos.values()) == r.kilos.celdas[("2", "Distribuidores")]
+    assert sum(plata.values()) == r.plata.celdas[("2", "Distribuidores")]
+    assert not [p for p in r.problemas if p.bloque == "apertura"]

@@ -167,11 +167,12 @@ a las demás de la misma celda. El cruce no cambia al apagar un distribuidor.
 - **A2**: el input 2 cierra exacto. Si admite margen (±500 kg), es un parámetro
   nuevo del cruce: las columnas pasan a ser rangos.
 - **B6**: formato de la apertura (hoy formato largo en una hoja de la base; el real viene en bloques).
-- **A14**: una celda que cae donde ningún vendedor o distribuidor vendió ese SKU el mes
-  anterior (no está en la apertura, o todos tenían 0) se abre como se abrió el canal
-  entero: cada entidad pesa lo que vendió en el canal sumando todos los SKUs; en pesos,
-  lo que facturó en el canal, con la misma regla que cualquier celda (abajo). Entran
-  todas las entidades del canal. `movil/recorrido.py::_abrir`.
+- **A14**: una celda que cae donde ningún vendedor o distribuidor prendido vendió ese SKU
+  el mes anterior (no está en la apertura, todos tenían 0, o los que lo vendieron están
+  apagados) se abre como se abrió el canal entero: cada entidad pesa lo que vendió en el
+  canal sumando todos los SKUs; en pesos, lo que facturó en el canal, con la misma regla
+  que cualquier celda (abajo). Entran todas las entidades prendidas del canal; si están
+  todas apagadas, la celda no se abre y se avisa. `movil/recorrido.py::_abrir`.
 - **A10** (confirmado 07/10): los vendedores cuelgan de Directa y de cada territorio; KAM
   Sol cierra en el canal.
 - **A11** (2 SKUs en los dos segmentos): **lo resuelve el cruce**. Es una fila con
