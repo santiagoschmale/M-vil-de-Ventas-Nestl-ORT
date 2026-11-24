@@ -131,8 +131,9 @@ def armar(
 
     `precios`: lo que valió un kilo de cada SKU en cada canal el mes anterior. Los pesos arrancan de
     los kilos repartidos (fijados incluidos) a ese precio: un SKU no vale lo mismo en todos los
-    canales, y fijar kilos mueve los pesos. Sin precio, el de Contraloría. Si los kilos no cierran,
-    arrancan de la base del mes anterior a ese precio.
+    canales, y fijar kilos mueve los pesos. Sin precio, el de Contraloría. Si los kilos no cierran, o
+    los pesos no cierran desde los kilos pero sí desde la base, arrancan de la base del mes anterior a
+    ese precio (en el segundo caso, con un aviso).
     """
     problemas = list(problemas or [])
     apagados = frozenset(apagados)
@@ -171,16 +172,29 @@ def armar(
     plata = None
     if hay_plata:
         precio = {(s, por_nombre.get(normalizar(c), c)): p for (s, c), p in (precios or {}).items()}
-        desde = base if kilos.celdas is None else kilos.celdas
-        plata = cruzar(
-            filas={s: o.nns for s, o in activos.items() if o.nns > 0},
-            columnas={c: t.plata for c, t in canales.items()},
-            base={(s, c): w * (precio.get((s, c)) or (activos[s].nns / activos[s].kilos if s in activos else 1))
-                  for (s, c), w in desde.items()},
-            decimales=PLATA,
-            fijas=fijas_plata,
-            grupos=grupos_plata,
-        )
+
+        def cruzar_plata(desde: dict[Celda, Decimal]) -> ResultadoCruce:
+            return cruzar(
+                filas={s: o.nns for s, o in activos.items() if o.nns > 0},
+                columnas={c: t.plata for c, t in canales.items()},
+                base={(s, c): w * (precio.get((s, c)) or (activos[s].nns / activos[s].kilos if s in activos else 1))
+                      for (s, c), w in desde.items()},
+                decimales=PLATA,
+                fijas=fijas_plata,
+                grupos=grupos_plata,
+            )
+
+        plata = cruzar_plata(base if kilos.celdas is None else kilos.celdas)
+        # Un lugar con kilos en 0 no recibe pesos, y con pesos por canal escritos a mano eso puede no cerrar.
+        # Desde la base sí puede: un mes revisado con esos pesos tiene que volver a abrir.
+        if kilos.celdas is not None and plata.celdas is None:
+            desde_base = cruzar_plata(base)
+            if desde_base.celdas is not None:
+                plata = desde_base
+                problemas.append(Problema(
+                    "aviso", "Con estos pesos por canal, los pesos de algunos lugares no pueden seguir a sus kilos: "
+                             "arrancan de lo facturado el mes anterior. «Recalcular según los kilos», en Totales "
+                             "por canal, los vuelve a llevar a sus kilos.", bloque="input2"))
     entidades_apagadas = frozenset(entidades_apagadas)
     aperturas = _abrir(kilos, plata, apertura or {}, entidades_apagadas, problemas, por_nombre, porcentajes or {},
                        apertura_plata or {})

@@ -389,3 +389,19 @@ def test_si_estan_apagados_todos_los_que_vendieron_el_sku_la_celda_se_abre_como_
     assert sum(kilos.values()) == r.kilos.celdas[("2", "Distribuidores")]
     assert sum(plata.values()) == r.plata.celdas[("2", "Distribuidores")]
     assert not [p for p in r.problemas if p.bloque == "apertura"]
+
+
+def test_si_la_plata_no_puede_seguir_a_los_kilos_arranca_de_la_base_y_avisa():
+    # Los kilos de A en Sur quedan en 0 (fijados), pero los pesos escritos para Sur piden más de lo que
+    # C solo puede poner. Desde los kilos no cierra; desde la base del mes anterior, sí.
+    from src.importer.entradas import ObjetivoSku, TotalCanal
+
+    objetivos = {s: ObjetivoSku(kilos=D(10), nns=D(100), descripcion=s, categoria=None, pais=None) for s in "ABC"}
+    canales = {"Norte": TotalCanal(kilos=D(20), plata=D(150)), "Sur": TotalCanal(kilos=D(10), plata=D(150))}
+    base = {("A", "Norte"): D(1), ("A", "Sur"): D(1), ("B", "Norte"): D(1), ("C", "Sur"): D(1)}
+    r = armar(objetivos, canales, base, fijas_kilos={("A", "Sur"): D(0)})
+    assert r.kilos.celdas[("A", "Sur")] == 0
+    assert r.plata.celdas == {("A", "Norte"): D("50.00"), ("A", "Sur"): D("50.00"),
+                              ("B", "Norte"): D("100.00"), ("C", "Sur"): D("100.00")}
+    avisos = [p for p in r.problemas if p.bloque == "input2" and "Recalcular según los kilos" in p.mensaje]
+    assert len(avisos) == 1 and avisos[0].severidad == "aviso"

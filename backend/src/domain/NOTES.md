@@ -189,7 +189,12 @@ a las demás de la misma celda. El cruce no cambia al apagar un distribuidor.
   donde no se vendió, lo del período de Participaciones (solo sus tablas de canales); si
   no hay ninguno, el de Contraloría. Lo usan:
   - el punto de partida del cruce en pesos: los kilos repartidos (fijados incluidos) a ese
-    precio. Si los kilos no cierran, la base del mes anterior a ese precio.
+    precio. Si los kilos no cierran, la base del mes anterior a ese precio. También si los
+    pesos no cierran desde los kilos y sí desde la base: un lugar con kilos en 0 no recibe
+    pesos, y unos pesos por canal escritos a mano pueden necesitarlo. Ahí avisa (amarillo,
+    en Totales por canal) y "Recalcular según los kilos" los vuelve a llevar a sus kilos.
+    Gotcha: sin esto, un mes revisado con esos pesos no vuelve a abrir.
+    `recorrido.armar`.
   - "Completar con los sugeridos" y "Recalcular según los kilos", en Totales por canal: se
     reparten los kilos con los totales que escribe el planner (fijados, reglas y dónde se
     vende incluidos) y el objetivo en pesos de cada SKU se reparte entre sus canales según
