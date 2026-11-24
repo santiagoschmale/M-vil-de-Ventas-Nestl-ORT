@@ -8,9 +8,9 @@ kilos y en plata -> inconsistencias -> Excel.
         --base ../data/sample/base_mes_anterior.xlsx \\
         --apagar 90020900 --salida movil.xlsx
 
-Kilos y plata se cruzan por separado, cada uno contra su propio total ("cada unidad
-se reparte y cuadra por separado"). Los dos usan la misma base del mes anterior: el
-ajuste escala filas y columnas, así que el precio de cada canal lo absorbe solo.
+Primero los kilos, contra sus totales. La plata se cruza contra los suyos partiendo de
+los kilos ya repartidos, cada celda al precio de ese SKU en ese canal: la plata sigue a
+los kilos y, con los totales por canal sugeridos, cada celda queda a su precio.
 
 Esta capa arma las entradas y presenta el resultado; las cuentas son del dominio.
 """
@@ -130,8 +130,9 @@ def armar(
     ese % de cada celda del canal que se abre; el resto va por histórico (supuesto B1).
 
     `precios`: lo que valió un kilo de cada SKU en cada canal el mes anterior. Los pesos arrancan de
-    la base en kilos a ese precio (los pesos del mes anterior), no de los kilos: un SKU no vale lo
-    mismo en todos los canales. Sin precio, el de Contraloría, y los pesos siguen a los kilos.
+    los kilos repartidos (fijados incluidos) a ese precio: un SKU no vale lo mismo en todos los
+    canales, y fijar kilos mueve los pesos. Sin precio, el de Contraloría. Si los kilos no cierran,
+    arrancan de la base del mes anterior a ese precio.
     """
     problemas = list(problemas or [])
     apagados = frozenset(apagados)
@@ -170,11 +171,12 @@ def armar(
     plata = None
     if hay_plata:
         precio = {(s, por_nombre.get(normalizar(c), c)): p for (s, c), p in (precios or {}).items()}
+        desde = base if kilos.celdas is None else kilos.celdas
         plata = cruzar(
             filas={s: o.nns for s, o in activos.items() if o.nns > 0},
             columnas={c: t.plata for c, t in canales.items()},
             base={(s, c): w * (precio.get((s, c)) or (activos[s].nns / activos[s].kilos if s in activos else 1))
-                  for (s, c), w in base.items()},
+                  for (s, c), w in desde.items()},
             decimales=PLATA,
             fijas=fijas_plata,
             grupos=grupos_plata,

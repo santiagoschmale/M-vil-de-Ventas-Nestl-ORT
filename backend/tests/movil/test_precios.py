@@ -107,3 +107,12 @@ def test_los_pesos_sugeridos_cierran_en_cada_segmento():
     filas = "\n".join(f"{c}\t{kilos[c]}\t{pesos[c]}" for c in kilos)
     s.cargar_input2("Canal\tKilos\tPlata\n" + filas, P, CUANDO)
     assert s.recorrido.plata.celdas is not None
+
+
+def test_fijar_los_kilos_de_un_lugar_mueve_su_plata():
+    s = _cerrada()
+    s.proponer_pesos(P, CUANDO, "según los kilos")
+    sku, canal, _ = _un_sku_en_dos_canales(s)
+    kilos, plata = s.recorrido.kilos.celdas[(sku, canal)], s.recorrido.plata.celdas[(sku, canal)]
+    s.fijar("kilos", sku, canal, str(kilos * 2), autor=P, cuando=CUANDO, motivo="acuerdo con el cliente")
+    assert s.recorrido.plata.celdas[(sku, canal)] > plata

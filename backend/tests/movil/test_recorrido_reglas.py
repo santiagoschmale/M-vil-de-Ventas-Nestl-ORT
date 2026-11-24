@@ -4,7 +4,8 @@ para kilos y otro para NNS en la misma regla (respuesta 4 del negocio). Cada %
 se aplica en su cruce, independiente del otro.
 
 Con la muestra que cierra, el café de Catering se lleva hoy el 27,22% de los
-kilos y el 27,61% de la plata del canal.
+kilos y el 27,61% de la plata del canal. La plata sigue a los kilos: con el café topeado
+en 20% de los kilos, su plata en Catering baja a ~18,6%.
 """
 
 from decimal import Decimal as D
@@ -37,13 +38,13 @@ def _parte(cruce, recorrido, canal, categoria):
 
 
 def test_la_regla_se_cumple_en_kilos_y_en_plata_cada_una_con_su_porcentaje():
-    r = _recorrido(_regla())
+    r = _recorrido(_regla(nns="15"))
     assert r.kilos.inconsistencias == [] and r.plata.inconsistencias == []
     total_kilos, total_plata = r.canales["Catering"].kilos, r.canales["Catering"].plata
     # La regla muerde: el café queda en el tope (redondeado para abajo a la unidad); el
     # redondeo controlado lo puede dejar a lo sumo una unidad por debajo, nunca arriba.
     tope_kilos = (total_kilos * D("0.20")).quantize(D("0.001"), "ROUND_FLOOR")
-    tope_plata = (total_plata * D("0.25")).quantize(D("0.01"), "ROUND_FLOOR")
+    tope_plata = (total_plata * D("0.15")).quantize(D("0.01"), "ROUND_FLOOR")
     assert tope_kilos - D("0.001") <= _parte(r.kilos, r, "Catering", "Café") <= tope_kilos
     assert tope_plata - D("0.01") <= _parte(r.plata, r, "Catering", "Café") <= tope_plata
     # Y el resto sigue cerrando exacto.
@@ -51,11 +52,12 @@ def test_la_regla_se_cumple_en_kilos_y_en_plata_cada_una_con_su_porcentaje():
         assert sum((v for (_, k), v in r.kilos.celdas.items() if k == canal), D(0)) == t.kilos, canal
 
 
-def test_una_regla_solo_de_kilos_no_toca_la_plata():
+def test_una_regla_solo_de_kilos_mueve_la_plata_con_los_kilos():
     sin = _recorrido()
     con = _recorrido(_regla(nns=None))
-    assert con.plata.celdas == sin.plata.celdas
     assert con.kilos.celdas != sin.kilos.celdas
+    assert _parte(con.plata, con, "Catering", "Café") < _parte(sin.plata, sin, "Catering", "Café")
+    assert con.plata.inconsistencias == []
 
 
 def test_canal_y_categorias_se_cruzan_sin_importar_tildes_ni_mayusculas():
