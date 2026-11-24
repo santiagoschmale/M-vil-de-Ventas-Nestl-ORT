@@ -140,16 +140,18 @@ columnas, así que el precio distinto de cada canal lo absorbe solo.
 
 ## Debajo del canal
 
-Cada celda del cruce con apertura del mes anterior es la raíz de un árbol: el
-valor se reparte entre distribuidores o vendedores con `apertura.recalcular`. Las
-entidades apagadas salen en todas las celdas y su parte va a las demás de la misma
-celda. El cruce no cambia al apagar un distribuidor.
+Cada celda del cruce en un canal con apertura del mes anterior es la raíz de un
+árbol: el valor se reparte entre distribuidores o vendedores con
+`apertura.recalcular`, y los hijos suman la celda en kilos y en pesos (§6.3 del
+documento funcional). Las entidades apagadas salen en todas las celdas y su parte va
+a las demás de la misma celda. El cruce no cambia al apagar un distribuidor.
+`movil/recorrido.py::_abrir`.
 
 ## Supuestos (a confirmar con el cliente)
 
 - **A4 · SKU sin historia**: el planner elige dónde se vende ("Dónde se vende") y se
   reparte en proporción al total de cada canal elegido; debajo del canal, como se abrió
-  el canal entero el mes anterior. `movil/recorrido.py::_donde_se_vende`.
+  el canal entero el mes anterior (A14). `movil/recorrido.py::_donde_se_vende`.
 
 - **A1**: al apagar una entidad, su parte se reparte proporcional al histórico.
 - **B1 · % manual**: el % es de lo que hay para repartir en la celda (total menos lo
@@ -166,7 +168,10 @@ celda. El cruce no cambia al apagar un distribuidor.
   nuevo del cruce: las columnas pasan a ser rangos.
 - **B6**: formato de la apertura (hoy formato largo en una hoja de la base; el real viene en bloques).
 - **A14**: una celda que cae donde ningún vendedor o distribuidor vendió ese SKU el mes
-  anterior no se abre: se avisa (amarillo) y queda en el canal. No se inventa.
+  anterior (no está en la apertura, o todos tenían 0) se abre como se abrió el canal
+  entero: cada entidad pesa lo que vendió en el canal sumando todos los SKUs; en pesos,
+  lo que facturó en el canal, con la misma regla que cualquier celda (abajo). Entran
+  todas las entidades del canal. `movil/recorrido.py::_abrir`.
 - **A10** (confirmado 07/10): los vendedores cuelgan de Directa y de cada territorio; KAM
   Sol cierra en el canal.
 - **A11** (2 SKUs en los dos segmentos): **lo resuelve el cruce**. Es una fila con
@@ -193,9 +198,10 @@ celda. El cruce no cambia al apagar un distribuidor.
   precio del mes anterior o al de Contraloría.
 - **Debajo del canal, kilos y pesos con su propio histórico**: los kilos de cada celda se
   abren según lo que vendió cada distribuidor o vendedor; los pesos, según lo que
-  facturó (hoja Distribuidores y tabla de asesores de Soluciones). Si a alguna entidad de
-  la celda le falta lo facturado, los pesos de esa celda se abren como los kilos: no se
-  mezclan unidades. El mes siguiente hereda lo que facturó cada una en el aprobado.
+  facturó (hoja Distribuidores y tabla de asesores de Soluciones). Si alguna entidad de
+  la celda vendió kilos y no tiene lo facturado (vacío o cero), o es negativo, los pesos
+  de esa celda se abren como los kilos para todas: no se mezclan unidades y nadie recibe
+  kilos con $ 0. El mes siguiente hereda lo que facturó cada una en el aprobado.
   `domain/apertura.py::_peso`, `importer/movil_real.py::apertura_plata`.
 - **Categoría de cada SKU**: la del objetivo; si viene vacía, la asignada en la
   herramienta (en un mes heredado, ahí entran las del aprobado); si tampoco, la de la
