@@ -5,6 +5,7 @@ de su archivo (reparto del mes anterior y Participaciones); acá se cargan a man
 """
 
 from dataclasses import replace
+from decimal import Decimal as D
 
 from tests.movil.test_sesion import CUANDO, P, _sesion
 
@@ -116,3 +117,72 @@ def test_fijar_los_kilos_de_un_lugar_mueve_su_plata():
     kilos, plata = s.recorrido.kilos.celdas[(sku, canal)], s.recorrido.plata.celdas[(sku, canal)]
     s.fijar("kilos", sku, canal, str(kilos * 2), autor=P, cuando=CUANDO, motivo="acuerdo con el cliente")
     assert s.recorrido.plata.celdas[(sku, canal)] > plata
+
+
+def _con_los_pesos_sugeridos(s):
+    """Recalcular según los kilos, en Totales por canal, y guardar."""
+    kilos = {c: str(t.kilos) for c, t in s.entradas.canales.items()}
+    pesos = s.pesos_para(kilos)
+    s.cargar_input2("Canal\tKilos\tPlata\n" + "\n".join(f"{c}\t{kilos[c]}\t{pesos.get(c, '0')}" for c in kilos),
+                    P, CUANDO)
+    return s.recorrido
+
+
+def _lejos_del_precio(s):
+    """
+    Cuántos pesos le faltan o sobran a la celda más lejos de su precio. Cada SKU llega a su objetivo en
+    pesos con un mismo factor en todos sus canales: lo que queda (sin lo fijado) se reparte según kilos ×
+    lo que valió un kilo de ese SKU en ese canal el mes anterior.
+    """
+    r, precio, objetivos = s.recorrido, s._precios(), s.objetivos_vigentes()
+    fijas = {k: f.valor for k, f in s.fijas("plata").items()}
+    peor = D(0)
+    for sku in {x for x, _ in r.kilos.celdas}:
+        libres = {c: k * precio(sku, c, objetivos[sku]) for (x, c), k in r.kilos.celdas.items()
+                  if x == sku and k and (x, c) not in fijas}
+        resto = objetivos[sku].nns - sum((v for (x, _), v in fijas.items() if x == sku), D(0))
+        for c, v in libres.items():
+            peor = max(peor, abs(r.plata.celdas[(sku, c)] - resto * v / sum(libres.values())))
+    return peor
+
+
+def test_con_los_pesos_sugeridos_cada_lugar_queda_al_precio_de_su_canal():
+    s = _cerrada()
+    sku, caro, barato = _un_sku_en_dos_canales(s)
+    _con_precios(s, sku, caro, barato)
+    r = _con_los_pesos_sugeridos(s)
+    assert _lejos_del_precio(s) <= D("0.01")  # salvo el redondeo al centavo
+    por_kilo = {c: r.plata.celdas[(sku, c)] / r.kilos.celdas[(sku, c)] for c in (caro, barato)}
+    assert abs(por_kilo[caro] / por_kilo[barato] - 2) < D("0.0001")  # vale el doble, como el mes anterior
+
+
+def test_fijar_kilos_y_recalcular_los_pesos_vuelve_cada_lugar_a_su_precio():
+    s = _cerrada()
+    sku, caro, barato = _un_sku_en_dos_canales(s)
+    _con_precios(s, sku, caro, barato)
+    _con_los_pesos_sugeridos(s)
+    fijado = s.recorrido.kilos.celdas[(sku, caro)] * 2
+    s.fijar("kilos", sku, caro, str(fijado), autor=P, cuando=CUANDO, motivo="acuerdo con el cliente")
+    r = _con_los_pesos_sugeridos(s)
+    assert r.kilos.celdas[(sku, caro)] == fijado
+    assert _lejos_del_precio(s) <= D("0.01")
+
+
+def test_la_plata_fijada_se_respeta_y_el_resto_del_sku_sigue_su_precio():
+    s = _cerrada()
+    sku, caro, barato = _un_sku_en_dos_canales(s)
+    _con_precios(s, sku, caro, barato)
+    r = _con_los_pesos_sugeridos(s)
+    fijado = (r.plata.celdas[(sku, caro)] / 2).quantize(D("0.01"))
+    s.fijar("plata", sku, caro, str(fijado), autor=P, cuando=CUANDO, motivo="acuerdo con el cliente")
+    r = _con_los_pesos_sugeridos(s)
+    assert r.plata.celdas[(sku, caro)] == fijado
+    assert _lejos_del_precio(s) <= D("0.01")
+
+
+def test_un_sku_nuevo_va_solo_a_sus_canales_elegidos_y_a_su_precio():
+    s = _sesion()
+    s.elegir_canales(NUEVO, ["Catering", "Vending"], autor=P, cuando=CUANDO, motivo="SKU nuevo")
+    r = _con_los_pesos_sugeridos(s)
+    assert {c for (x, c), v in r.plata.celdas.items() if x == NUEVO and v} == {"Catering", "Vending"}
+    assert _lejos_del_precio(s) <= D("0.01")

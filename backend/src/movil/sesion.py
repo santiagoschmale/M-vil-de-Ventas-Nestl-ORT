@@ -245,27 +245,44 @@ class Sesion:
         por_celda = {(s, normalizar(c)): p for (s, c), p in self._e.precios.items()}
         return lambda sku, canal, o: por_celda.get((sku, normalizar(canal))) or o.nns / o.kilos
 
-    def _por_canal(self, kilos: dict[Celda, Decimal], objetivos: dict) -> dict[str, tuple[Decimal, Decimal]]:
-        """
-        El objetivo de cada SKU repartido entre sus canales según `kilos` (SKU × canal): los kilos en
-        proporción a los kilos y los pesos en proporción a lo que facturan, kilos × precio de ese SKU en ese
-        canal. Cada SKU suma exacto su objetivo, así que cada segmento también. {canal: (kilos, pesos)}.
-        """
-        precio = self._precios()
-        por_sku: dict[str, dict[str, tuple[Decimal, Decimal]]] = {}
+    def _kilos_por_canal(self, kilos: dict[Celda, Decimal], objetivos: dict) -> dict[str, Decimal]:
+        """El objetivo en kilos de cada SKU repartido entre sus canales en proporción a `kilos` (SKU × canal)."""
+        por_sku: dict[str, dict[str, Decimal]] = {}
         for (sku, canal), k in kilos.items():
             o = objetivos.get(sku)
             if k and o and o.kilos and o.nns:
-                por_sku.setdefault(sku, {})[canal] = (k, k * precio(sku, canal, o))
-        canales: dict[str, tuple[Decimal, Decimal]] = {}
+                por_sku.setdefault(sku, {})[canal] = k
+        canales: dict[str, Decimal] = {}
         for sku, celdas in por_sku.items():
-            o = objetivos[sku]
-            total_k = sum(k for k, _ in celdas.values())
-            total_p = sum(p for _, p in celdas.values())
-            for canal, (k, p) in celdas.items():
-                antes_k, antes_p = canales.get(canal, (Decimal(0), Decimal(0)))
-                canales[canal] = (antes_k + o.kilos * k / total_k, antes_p + o.nns * p / total_p)
+            total = sum(celdas.values())
+            for canal, k in celdas.items():
+                canales[canal] = canales.get(canal, Decimal(0)) + objetivos[sku].kilos * k / total
         return canales
+
+    def _pesos_por_canal(self, kilos: dict[Celda, Decimal], objetivos: dict,
+                         fijas: dict[Celda, Decimal]) -> dict[str, Decimal]:
+        """
+        Los pesos de cada canal que van con `kilos` (SKU × canal, ya repartidos): cada SKU reparte su objetivo
+        en pesos entre sus canales según kilos × precio de ese SKU en ese canal; una celda fijada en pesos
+        pone lo suyo y el resto va a las demás. Con estos totales, el cruce en pesos deja cada celda al precio
+        de su canal (salvo el factor de su SKU, igual en todos sus canales, para llegar a su objetivo).
+        """
+        precio = self._precios()
+        por_sku: dict[str, dict[str, Decimal]] = {}
+        for (sku, canal), k in kilos.items():
+            o = objetivos.get(sku)
+            if o and o.kilos and o.nns and o.nns > 0 and (k or (sku, canal) in fijas):
+                por_sku.setdefault(sku, {})[canal] = k * precio(sku, canal, o)
+        pesos: dict[str, Decimal] = {}
+        for sku, celdas in por_sku.items():
+            fijado = {c: fijas[(sku, c)] for c in celdas if (sku, c) in fijas}
+            libres = {c: v for c, v in celdas.items() if c not in fijado}
+            resto, total = objetivos[sku].nns - sum(fijado.values(), Decimal(0)), sum(libres.values(), Decimal(0))
+            for c, v in fijado.items():
+                pesos[c] = pesos.get(c, Decimal(0)) + v
+            for c, v in libres.items():
+                pesos[c] = pesos.get(c, Decimal(0)) + (resto * v / total if total else Decimal(0))
+        return pesos
 
     def pesos_segun_kilos(self) -> dict[str, Decimal]:
         """
@@ -276,9 +293,9 @@ class Sesion:
         r = self._exigir_recorrido()
         if r.kilos.celdas is None:
             raise ErrorDeAjuste("Primero tienen que cerrar los kilos: los pesos se proponen según cómo se repartieron.")
-        objetivos = self.objetivos_vigentes()
         pesos = {c: Decimal(0) for c in self._e.canales}
-        for canal, (_, plata) in self._por_canal(r.kilos.celdas, objetivos).items():
+        for canal, plata in self._pesos_por_canal(r.kilos.celdas, self.objetivos_vigentes(),
+                                                  self._fijas_vigentes("plata")).items():
             pesos[canal] += plata
         pide = self._pide("plata")
         if pide <= 0 or not any(pesos.values()):
@@ -287,10 +304,15 @@ class Sesion:
 
     def pesos_para(self, kilos: dict[str, str]) -> dict[str, str]:
         """
-        Pesos sugeridos para totales por canal que todavía no los tienen (al armarlos en la pantalla): el
-        objetivo en pesos de cada SKU repartido entre sus canales como el mes anterior, ajustado a los kilos
-        que escribió el planner en cada canal y al precio de ese SKU en ese canal. Cada segmento suma lo
-        suyo y el total, lo que pide Contraloría. Un canal sin mes anterior va al precio promedio. Solo lee.
+        Pesos sugeridos para los kilos que escribió el planner en cada canal (al armar los totales en la
+        pantalla): se reparten los kilos con esos totales, como el cruce, y cada SKU reparte su objetivo en
+        pesos según sus kilos × el precio de ese SKU en ese canal (`_pesos_por_canal`). Así, con estos
+        totales, cada celda queda a su precio. Cada segmento suma lo suyo y el total, lo que pide
+        Contraloría. Solo lee.
+
+        Si esos kilos no se pueden repartir (un canal o un SKU sin historia, un fijado que no entra), el
+        objetivo en pesos de cada SKU se reparte como el mes anterior, ajustado a los kilos de cada canal;
+        un canal sin mes anterior va al precio promedio.
         """
         if self._e.objetivos is None:
             raise ErrorDeAjuste("Cargá el objetivo de Contraloría: los pesos salen de sus precios.")
@@ -307,8 +329,17 @@ class Sesion:
                 escritos[normalizar(canal)] = (canal, k)
         if not escritos:
             return {}
+        canales = {nombre: TotalCanal(kilos=k, plata=None) for nombre, k in escritos.values()}
+        try:
+            r = self._recalcular(canales)
+        except ErrorDeAjuste:
+            r = None
+        if r is not None and r.kilos.celdas is not None:
+            pesos = self._pesos_por_canal(r.kilos.celdas, activos, self._fijas_vigentes("plata", canales))
+            valores = {nombre: pesos[nombre] for nombre, _ in escritos.values() if pesos.get(nombre)}
+            return {c: str(v) for c, v in repartir(pide, valores, UNIDADES["plata"]).items()} if valores else {}
         # El objetivo repartido como el mes anterior, y cuánto lo agrandó o achicó el planner en cada canal.
-        hubo = {normalizar(c): k for c, (k, _) in self._por_canal(self._e.base or {}, activos).items()}
+        hubo = {normalizar(c): k for c, k in self._kilos_por_canal(self._e.base or {}, activos).items()}
         factor = {n: k / hubo[n] for n, (_, k) in escritos.items() if hubo.get(n)}
         # Cada SKU reparte su objetivo en pesos entre sus canales según kilos × precio: así cada SKU, y por
         # lo tanto cada segmento, suma exacto lo suyo (escalar todos los canales juntos los mezcla).
@@ -1047,7 +1078,7 @@ class Sesion:
         self._invalidar_etapas(ajuste.accion)
         self._antes_del_ultimo, self.ultimo_cambio = respaldo, ajuste
 
-    def _fijas_vigentes(self, unidad: str) -> dict[Celda, Decimal]:
+    def _fijas_vigentes(self, unidad: str, canales: dict | None = None) -> dict[Celda, Decimal]:
         """
         Las celdas fijadas que aplican con las entradas y el ON/OFF actuales. Las de un
         SKU apagado o que ya no está quedan en espera: vuelven si el SKU se prende.
@@ -1056,11 +1087,13 @@ class Sesion:
         return {
             (sku, canal): f.valor for (sku, canal), f in self._fijas[unidad].items()
             if sku in objetivos and sku not in self.apagados_skus and objetivos[sku].kilos > 0
-            and canal in e.canales and self._se_vende(sku, canal)
+            and canal in (e.canales if canales is None else canales) and self._se_vende(sku, canal)
         }
 
-    def _recalcular(self) -> Recorrido | None:
-        if self.faltan():
+    def _recalcular(self, canales: dict[str, TotalCanal] | None = None) -> Recorrido | None:
+        """El recorrido con las entradas de la sesión; `canales` reemplaza los totales por canal (solo lee)."""
+        canales = self._e.canales if canales is None else canales
+        if self._e.objetivos is None or self._e.base is None or canales is None:
             return None
         try:
             # Un repetido ya resuelto no se vuelve a informar: la decisión quedó en el historial.
@@ -1075,11 +1108,11 @@ class Sesion:
                     bloque="input1", tipo="sin_categoria"))
             return armar(
                 self.objetivos_vigentes(),
-                self._e.canales,
+                canales,
                 self._e.base,
                 apagados=set(self.apagados_skus),
-                fijas_kilos=self._fijas_vigentes("kilos"),
-                fijas_plata=self._fijas_vigentes("plata"),
+                fijas_kilos=self._fijas_vigentes("kilos", canales),
+                fijas_plata=self._fijas_vigentes("plata", canales),
                 problemas=problemas1 + self._e.problemas2 + self._e.problemas_base + avisos,
                 apertura={k: v for k, v in self._e.apertura.items() if normalizar(k[1]) not in cerrados},
                 entidades_apagadas=set(self.entidades_apagadas),
