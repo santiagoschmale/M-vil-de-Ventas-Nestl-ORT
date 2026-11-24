@@ -191,33 +191,24 @@ def test_en_el_excel_cada_problema_de_apertura_dice_su_canal():
     assert apertura and all(f[3] == "Rosario" for f in apertura)
 
 
-def test_cada_celda_abierta_suma_exacto_o_queda_reportada():
+def test_cada_celda_de_un_canal_que_se_abre_suma_exacto_en_kilos_y_en_plata():
     """
-    Cada celda con apertura: o sus entidades suman exacto el valor del cruce (en kilos
-    y en plata, con los decimales de cada unidad), o no cierra y está reportada con
-    su motivo. Nunca una apertura que no suma sin que nadie lo diga.
-
-    En la muestra hay celdas cuyas entidades tenían todas 0 el mes anterior (entidad
-    sin histórico, A4): no hay base para repartir y tiene que quedar reportado.
+    Cada celda del cruce en un canal con apertura se abre, y sus entidades suman exacto
+    el valor del cruce (en kilos y en plata, con los decimales de cada unidad). Incluye
+    las celdas cuyas entidades tenían todas 0 el mes anterior: se abren como el canal.
     """
     r, apertura = _con_apertura()
-    cierran = reportadas = 0
+    abren = {c for _, c in apertura}
+    esperadas = {k for k in set(r.kilos.celdas) | set(r.plata.celdas)
+                 if k[1] in abren and (r.kilos.celdas.get(k, D(0)) > 0 or r.plata.celdas.get(k, D(0)) > 0)}
+    assert set(r.aperturas) == esperadas and len(esperadas) > 20
     for (sku, canal), raiz in r.aperturas.items():
         for unidad, cruce, decimales in (("kilos", r.kilos, 3), ("nns", r.plata, 2)):
             total = cruce.celdas.get((sku, canal), D(0))
             partes = [h.valores[unidad].monto for h in raiz.hijos]
-            assert raiz.valores[unidad].monto == total
             assert all(p.as_tuple().exponent == -decimales for p in partes), (sku, canal, unidad, partes)
-            if raiz.cuadra[unidad]:
-                assert sum(partes, D(0)) == total, (sku, canal, unidad)
-                cierran += 1
-            else:
-                assert raiz.aviso[unidad]
-                assert any(p.sku == sku and canal in p.mensaje for p in r.problemas), (sku, canal)
-                reportadas += 1
-    assert cierran > 40 and reportadas > 0
-    esperadas = {k for k in apertura if r.kilos.celdas.get(k, D(0)) > 0 or r.plata.celdas.get(k, D(0)) > 0}
-    assert set(r.aperturas) == esperadas
+            assert sum(partes, D(0)) == total, (sku, canal, unidad)
+    assert not [p for p in r.problemas if p.bloque == "apertura"]
 
 
 def test_los_canales_sin_apertura_cierran_en_el_canal():
@@ -276,7 +267,7 @@ def test_por_que_no_abre_habla_en_terminos_del_planner():
 
 
 def test_una_celda_que_no_se_abre_es_un_solo_aviso_y_dice_su_canal():
-    r, _ = _con_apertura()
+    r, _ = _con_apertura(apagados_entidades={"Joaquín Ledesma", "Nicolás Paz", "Sofía Correa"})  # Córdoba
     avisos = [p for p in r.problemas if p.bloque == "apertura"]
     assert avisos
     celdas = [(p.sku, p.canal) for p in avisos]
@@ -335,3 +326,44 @@ def test_un_canal_o_una_descripcion_que_empiezan_con_igual_salen_como_texto_en_t
     assert vistas["Plata"] == {trampa, "=1+1"}
     assert trampa in vistas["Apertura"]
     assert trampa in vistas["Problemas"]
+
+
+def _distribuidores(apertura, apertura_plata):
+    """Un mes con un solo canal que se abre: cada celda del cruce es el objetivo de su SKU."""
+    from src.importer.entradas import ObjetivoSku, TotalCanal
+
+    objetivos = {s: ObjetivoSku(kilos=D(k), nns=D(n), descripcion=s, categoria=None, pais=None)
+                 for s, k, n in (("1", 40, 1000), ("2", 20, 700), ("3", 20, 400))}
+    canales = {"Distribuidores": TotalCanal(kilos=D(80), plata=D(2100))}
+    base = {(s, "Distribuidores"): D(1) for s in objetivos}
+    return armar(objetivos, canales, base, apertura=apertura, apertura_plata=apertura_plata)
+
+
+def _abierta(r, sku):
+    raiz = r.aperturas[(sku, "Distribuidores")]
+    return ({h.entidad: h.valores["kilos"].monto for h in raiz.hijos},
+            {h.entidad: h.valores["nns"].monto for h in raiz.hijos})
+
+
+def test_un_sku_que_ningun_distribuidor_tuvo_se_abre_como_el_canal_entero():
+    # El SKU 2 no lo vendió ningún distribuidor. En el canal, X e Y vendieron 30 kg cada uno; X facturó el doble.
+    r = _distribuidores(apertura={("1", "Distribuidores"): {"X": D(30), "Y": D(10)},
+                                  ("3", "Distribuidores"): {"Y": D(20)}},
+                        apertura_plata={("1", "Distribuidores"): {"X": D(600), "Y": D(100)},
+                                        ("3", "Distribuidores"): {"Y": D(200)}})
+    kilos, plata = _abierta(r, "2")
+    assert kilos == {"X": D("10.000"), "Y": D("10.000")}
+    assert plata == {"X": D("466.67"), "Y": D("233.33")}
+    assert sum(kilos.values()) == r.kilos.celdas[("2", "Distribuidores")]
+    assert sum(plata.values()) == r.plata.celdas[("2", "Distribuidores")]
+    assert not [p for p in r.problemas if p.bloque == "apertura"]
+
+
+def test_si_un_distribuidor_no_facturo_lo_que_vendio_los_pesos_de_la_celda_se_abren_como_los_kilos():
+    # Y vendió 10 kg del SKU 1 y no tiene nada facturado: no recibe kilos con $ 0.
+    r = _distribuidores(apertura={(s, "Distribuidores"): {"X": D(30), "Y": D(10)} for s in "123"},
+                        apertura_plata={(s, "Distribuidores"): {"X": D(600)} for s in "123"})
+    kilos, plata = _abierta(r, "1")
+    assert kilos == {"X": D("30.000"), "Y": D("10.000")}
+    assert plata == {"X": D("750.00"), "Y": D("250.00")}
+    assert sum(plata.values()) == r.plata.celdas[("1", "Distribuidores")]
