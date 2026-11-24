@@ -135,8 +135,12 @@ fechas y horas internas del zip fijas, así que regenerar da los mismos bytes.
    costo mínimo para que filas y columnas cierren exacto, prefiriendo las de mayor
    resto (largest remainder en dos dimensiones).
 
-Kilos y plata se cruzan por separado, con la misma base: el ajuste escala filas y
-columnas, así que el precio distinto de cada canal lo absorbe solo.
+Primero los kilos. La plata se cruza contra sus propios totales (objetivo en pesos de
+cada SKU, pesos de cada canal) partiendo de los kilos ya repartidos, cada celda al
+precio de ese SKU en ese canal: fijar kilos mueve la plata. Con los pesos por canal
+sugeridos, cada celda queda a su precio por el factor de su SKU, el mismo en todos
+sus canales (el que lleva sus kilos a su objetivo en pesos). Con otros pesos por
+canal, el ajuste suma un factor por canal y el precio se corre.
 
 ## Debajo del canal
 
@@ -178,14 +182,21 @@ celda. El cruce no cambia al apagar un distribuidor.
   valió ese SKU en ese canal en el reparto del mes anterior (NNS / kilos de la celda);
   donde no se vendió, lo del período de Participaciones (solo sus tablas de canales); si
   no hay ninguno, el de Contraloría. Lo usan:
-  - el punto de partida del cruce en pesos: la base en kilos a ese precio (donde se
-    vendió el mes anterior, sus pesos). Kilos y pesos siguen cada uno su historia.
-  - "Completar con los sugeridos" y "Recalcular según los kilos", en Totales por canal: el
-    objetivo en pesos de cada SKU se reparte entre sus canales según kilos × precio, con
-    los kilos del mes anterior ajustados a los que escribe el planner en cada canal. Cada
-    SKU y cada segmento suman exacto. Un canal sin mes anterior va al precio promedio de
-    Contraloría. (`proponer_pesos`, con los kilos ya repartidos, queda solo para
-    reconstruir meses guardados.)
+  - el punto de partida del cruce en pesos: los kilos repartidos (fijados incluidos) a ese
+    precio. Si los kilos no cierran, la base del mes anterior a ese precio.
+  - "Completar con los sugeridos" y "Recalcular según los kilos", en Totales por canal: se
+    reparten los kilos con los totales que escribe el planner (fijados, reglas y dónde se
+    vende incluidos) y el objetivo en pesos de cada SKU se reparte entre sus canales según
+    esos kilos × precio; una celda fijada en pesos pone lo suyo y el resto va a las demás.
+    Cada SKU y cada segmento suman exacto. Si esos kilos no se pueden repartir (un canal
+    nuevo, un SKU sin canales elegidos), se escalan los kilos del mes anterior a los de
+    cada canal, y un canal sin mes anterior va al precio promedio de Contraloría.
+    `Sesion.pesos_para`, `Sesion._pesos_por_canal`. (`proponer_pesos`, con los kilos ya
+    repartidos, queda solo para reconstruir meses guardados.)
+
+  Los pesos por canal son una entrada: fijar kilos o cambiar una regla después de
+  guardarlos no los recalcula. Hasta "Recalcular según los kilos", el precio de cada
+  celda se corre en silencio.
 
   El mes siguiente hereda lo que valió cada kilo en el aprobado.
   `importer/movil_real.py::precios`, `Sesion._precios`, `Sesion._por_canal`.
