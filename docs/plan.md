@@ -164,7 +164,7 @@ Córdoba, el resto se reparte por histórico y todo cuadra.
 
 Hecho el 29/09 con el supuesto B2: se da de alta en la herramienta. Una nueva se puede
 eliminar; las del mes anterior no, se apagan. El nombre tiene que ser único en todos los canales (el ON/OFF
-es por nombre). En las celdas del canal que no se abren (A14), la nueva no entra.
+es por nombre).
 
 - **Se agrega a un canal** con nombre y un %. No tiene historia, así que sin % no
   recibe nada.

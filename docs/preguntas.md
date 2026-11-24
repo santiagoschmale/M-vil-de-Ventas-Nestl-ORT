@@ -35,7 +35,7 @@ código: no se renumeran.
 | # | Pregunta | Qué hacemos hoy |
 |---|---|---|
 | A5 | ¿La entidad es la persona o la persona más el sistema de origen? En el móvil de septiembre los asesores siguen apareciendo con dos sufijos (-ACQUA y -SAP) | Cada columna es una entidad |
-| A14 | Un SKU que cae donde ningún vendedor o distribuidor lo vendió: ¿se reparte como el canal entero, se le asigna a alguien o se saca del canal? | Se avisa y queda sin abrir |
+| A14 | Un SKU que cae donde ningún vendedor o distribuidor lo vendió: ¿se reparte como el canal entero, se le asigna a alguien o se saca del canal? | Se reparte como el canal entero |
 | A17 | **Estructura de Soluciones.** En el móvil de septiembre: primer corte Call Center contra Distribuidores; canales BS.As, KAM SAP, Córdoba, Rosario y KAM Córdoba; Córdoba y Rosario se abren en Directa y KAM con su propio %. ¿Qué es cada uno, y cómo se relacionan con "Directa (BA)" y "KAM Sol"? | Cada canal es una columna de los totales por canal |
 | A11 | Los SKUs que están en Ingredientes y en Soluciones: ¿se parten como cualquier otro? | Supuesto: los parte el cruce según los totales de cada canal |
 

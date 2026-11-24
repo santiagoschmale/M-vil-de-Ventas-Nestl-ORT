@@ -167,3 +167,24 @@ def test_lo_facturado_negativo_no_se_replica_se_avisa():
     plata, problemas = movil_real.apertura_plata(hojas)
     assert plata == {}
     assert len(problemas) == 1 and "negativo" in problemas[0].mensaje and problemas[0].sku == "2001"
+
+
+def test_un_distribuidor_sin_lo_facturado_no_recibe_kilos_con_cero_pesos():
+    from src.importer.entradas import ObjetivoSku, TotalCanal
+    from src.movil.recorrido import armar
+
+    def tabla(titulos, filas):
+        arriba, encabezado = [None] * 3, [None, "SKU", "Descripción"]
+        for t in titulos:
+            arriba += [t, None, None]
+            encabezado += KG3
+        return [arriba, encabezado, *[[None, sku, "x", *valores] for sku, valores in filas]]
+    # Y vendió 5 kg y su NNS está vacío.
+    hojas = {"Distribuidores": tabla(["Distribuidor X", "Distribuidor Y"], [("2001", [10, 900, 0, 5, None, 0])]),
+             "Soluciones": [], "Ingredientes": []}
+    r = armar({"2001": ObjetivoSku(kilos=D(15), nns=D(300), descripcion="x", categoria=None, pais=None)},
+              {"Distribuidores": TotalCanal(kilos=D(15), plata=D(300))}, {("2001", "Distribuidores"): D(15)},
+              apertura=movil_real.apertura(hojas)[0], apertura_plata=movil_real.apertura_plata(hojas)[0])
+    hijos = {h.entidad: (h.valores["kilos"].monto, h.valores["nns"].monto)
+             for h in r.aperturas[("2001", "Distribuidores")].hijos}
+    assert hijos == {"Distribuidor X": (D("10.000"), D("200.00")), "Distribuidor Y": (D("5.000"), D("100.00"))}
