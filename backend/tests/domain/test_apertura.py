@@ -287,6 +287,12 @@ def test_si_nadie_facturo_la_celda_los_pesos_se_abren_como_los_kilos():
     assert [_monto(raiz, e, "nns") for e in "AB"] == [D("500.00"), D("500.00")]
 
 
+def test_si_una_entidad_vendio_kilos_y_no_facturo_la_celda_los_pesos_se_abren_como_los_kilos():
+    """Abrir por lo facturado le daría kilos con $ 0 a B."""
+    raiz = _celda(D(300), D(0))
+    assert [_monto(raiz, e, "nns") for e in "AB"] == [D("500.00"), D("500.00")]
+
+
 def test_con_un_porcentaje_manual_el_resto_se_abre_con_lo_facturado():
     raiz = Nodo(entidad="celda", nombre="Distribuidores", peso=D(1), hijos=[
         Nodo(entidad="A", nombre="A", peso=D(50), peso_nns=D(300)),

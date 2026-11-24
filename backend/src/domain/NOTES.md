@@ -135,21 +135,27 @@ fechas y horas internas del zip fijas, así que regenerar da los mismos bytes.
    costo mínimo para que filas y columnas cierren exacto, prefiriendo las de mayor
    resto (largest remainder en dos dimensiones).
 
-Kilos y plata se cruzan por separado, con la misma base: el ajuste escala filas y
-columnas, así que el precio distinto de cada canal lo absorbe solo.
+Primero los kilos. La plata se cruza contra sus propios totales (objetivo en pesos de
+cada SKU, pesos de cada canal) partiendo de los kilos ya repartidos, cada celda al
+precio de ese SKU en ese canal: fijar kilos mueve la plata. Con los pesos por canal
+sugeridos, cada celda queda a su precio por el factor de su SKU, el mismo en todos
+sus canales (el que lleva sus kilos a su objetivo en pesos). Con otros pesos por
+canal, el ajuste suma un factor por canal y el precio se corre.
 
 ## Debajo del canal
 
-Cada celda del cruce con apertura del mes anterior es la raíz de un árbol: el
-valor se reparte entre distribuidores o vendedores con `apertura.recalcular`. Las
-entidades apagadas salen en todas las celdas y su parte va a las demás de la misma
-celda. El cruce no cambia al apagar un distribuidor.
+Cada celda del cruce en un canal con apertura del mes anterior es la raíz de un
+árbol: el valor se reparte entre distribuidores o vendedores con
+`apertura.recalcular`, y los hijos suman la celda en kilos y en pesos (§6.3 del
+documento funcional). Las entidades apagadas salen en todas las celdas y su parte va
+a las demás de la misma celda. El cruce no cambia al apagar un distribuidor.
+`movil/recorrido.py::_abrir`.
 
 ## Supuestos (a confirmar con el cliente)
 
 - **A4 · SKU sin historia**: el planner elige dónde se vende ("Dónde se vende") y se
   reparte en proporción al total de cada canal elegido; debajo del canal, como se abrió
-  el canal entero el mes anterior. `movil/recorrido.py::_donde_se_vende`.
+  el canal entero el mes anterior (A14). `movil/recorrido.py::_donde_se_vende`.
 
 - **A1**: al apagar una entidad, su parte se reparte proporcional al histórico.
 - **B1 · % manual**: el % es de lo que hay para repartir en la celda (total menos lo
@@ -165,8 +171,12 @@ celda. El cruce no cambia al apagar un distribuidor.
 - **A2**: el input 2 cierra exacto. Si admite margen (±500 kg), es un parámetro
   nuevo del cruce: las columnas pasan a ser rangos.
 - **B6**: formato de la apertura (hoy formato largo en una hoja de la base; el real viene en bloques).
-- **A14**: una celda que cae donde ningún vendedor o distribuidor vendió ese SKU el mes
-  anterior no se abre: se avisa (amarillo) y queda en el canal. No se inventa.
+- **A14**: una celda que cae donde ningún vendedor o distribuidor prendido vendió ese SKU
+  el mes anterior (no está en la apertura, todos tenían 0, o los que lo vendieron están
+  apagados) se abre como se abrió el canal entero: cada entidad pesa lo que vendió en el
+  canal sumando todos los SKUs; en pesos, lo que facturó en el canal, con la misma regla
+  que cualquier celda (abajo). Entran todas las entidades prendidas del canal; si están
+  todas apagadas, la celda no se abre y se avisa. `movil/recorrido.py::_abrir`.
 - **A10** (confirmado 07/10): los vendedores cuelgan de Directa y de cada territorio; KAM
   Sol cierra en el canal.
 - **A11** (2 SKUs en los dos segmentos): **lo resuelve el cruce**. Es una fila con
@@ -178,14 +188,26 @@ celda. El cruce no cambia al apagar un distribuidor.
   valió ese SKU en ese canal en el reparto del mes anterior (NNS / kilos de la celda);
   donde no se vendió, lo del período de Participaciones (solo sus tablas de canales); si
   no hay ninguno, el de Contraloría. Lo usan:
-  - el punto de partida del cruce en pesos: la base en kilos a ese precio (donde se
-    vendió el mes anterior, sus pesos). Kilos y pesos siguen cada uno su historia.
-  - "Completar con los sugeridos" y "Recalcular según los kilos", en Totales por canal: el
-    objetivo en pesos de cada SKU se reparte entre sus canales según kilos × precio, con
-    los kilos del mes anterior ajustados a los que escribe el planner en cada canal. Cada
-    SKU y cada segmento suman exacto. Un canal sin mes anterior va al precio promedio de
-    Contraloría. (`proponer_pesos`, con los kilos ya repartidos, queda solo para
-    reconstruir meses guardados.)
+  - el punto de partida del cruce en pesos: los kilos repartidos (fijados incluidos) a ese
+    precio. Si los kilos no cierran, la base del mes anterior a ese precio. También si los
+    pesos no cierran desde los kilos y sí desde la base: un lugar con kilos en 0 no recibe
+    pesos, y unos pesos por canal escritos a mano pueden necesitarlo. Ahí avisa (amarillo,
+    en Totales por canal) y "Recalcular según los kilos" los vuelve a llevar a sus kilos.
+    Gotcha: sin esto, un mes revisado con esos pesos no vuelve a abrir.
+    `recorrido.armar`.
+  - "Completar con los sugeridos" y "Recalcular según los kilos", en Totales por canal: se
+    reparten los kilos con los totales que escribe el planner (fijados, reglas y dónde se
+    vende incluidos) y el objetivo en pesos de cada SKU se reparte entre sus canales según
+    esos kilos × precio; una celda fijada en pesos pone lo suyo y el resto va a las demás.
+    Cada SKU y cada segmento suman exacto. Si esos kilos no se pueden repartir (un canal
+    nuevo, un SKU sin canales elegidos), se escalan los kilos del mes anterior a los de
+    cada canal, y un canal sin mes anterior va al precio promedio de Contraloría.
+    `Sesion.pesos_para`, `Sesion._pesos_por_canal`. (`proponer_pesos`, con los kilos ya
+    repartidos, queda solo para reconstruir meses guardados.)
+
+  Los pesos por canal son una entrada: fijar kilos o cambiar una regla después de
+  guardarlos no los recalcula. Hasta "Recalcular según los kilos", el precio de cada
+  celda se corre en silencio.
 
   El mes siguiente hereda lo que valió cada kilo en el aprobado.
   `importer/movil_real.py::precios`, `Sesion._precios`, `Sesion._por_canal`.
@@ -193,9 +215,10 @@ celda. El cruce no cambia al apagar un distribuidor.
   precio del mes anterior o al de Contraloría.
 - **Debajo del canal, kilos y pesos con su propio histórico**: los kilos de cada celda se
   abren según lo que vendió cada distribuidor o vendedor; los pesos, según lo que
-  facturó (hoja Distribuidores y tabla de asesores de Soluciones). Si a alguna entidad de
-  la celda le falta lo facturado, los pesos de esa celda se abren como los kilos: no se
-  mezclan unidades. El mes siguiente hereda lo que facturó cada una en el aprobado.
+  facturó (hoja Distribuidores y tabla de asesores de Soluciones). Si alguna entidad de
+  la celda vendió kilos y no tiene lo facturado (vacío o cero), o es negativo, los pesos
+  de esa celda se abren como los kilos para todas: no se mezclan unidades y nadie recibe
+  kilos con $ 0. El mes siguiente hereda lo que facturó cada una en el aprobado.
   `domain/apertura.py::_peso`, `importer/movil_real.py::apertura_plata`.
 - **Categoría de cada SKU**: la del objetivo; si viene vacía, la asignada en la
   herramienta (en un mes heredado, ahí entran las del aprobado); si tampoco, la de la

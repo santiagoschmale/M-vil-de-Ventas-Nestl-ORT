@@ -8,9 +8,9 @@ kilos y en plata -> inconsistencias -> Excel.
         --base ../data/sample/base_mes_anterior.xlsx \\
         --apagar 90020900 --salida movil.xlsx
 
-Kilos y plata se cruzan por separado, cada uno contra su propio total ("cada unidad
-se reparte y cuadra por separado"). Los dos usan la misma base del mes anterior: el
-ajuste escala filas y columnas, así que el precio de cada canal lo absorbe solo.
+Primero los kilos, contra sus totales. La plata se cruza contra los suyos partiendo de
+los kilos ya repartidos, cada celda al precio de ese SKU en ese canal: la plata sigue a
+los kilos y, con los totales por canal sugeridos, cada celda queda a su precio.
 
 Esta capa arma las entradas y presenta el resultado; las cuentas son del dominio.
 """
@@ -130,8 +130,10 @@ def armar(
     ese % de cada celda del canal que se abre; el resto va por histórico (supuesto B1).
 
     `precios`: lo que valió un kilo de cada SKU en cada canal el mes anterior. Los pesos arrancan de
-    la base en kilos a ese precio (los pesos del mes anterior), no de los kilos: un SKU no vale lo
-    mismo en todos los canales. Sin precio, el de Contraloría, y los pesos siguen a los kilos.
+    los kilos repartidos (fijados incluidos) a ese precio: un SKU no vale lo mismo en todos los
+    canales, y fijar kilos mueve los pesos. Sin precio, el de Contraloría. Si los kilos no cierran, o
+    los pesos no cierran desde los kilos pero sí desde la base, arrancan de la base del mes anterior a
+    ese precio (en el segundo caso, con un aviso).
     """
     problemas = list(problemas or [])
     apagados = frozenset(apagados)
@@ -140,7 +142,7 @@ def armar(
     base = {(s, por_nombre.get(normalizar(c), c)): w for (s, c), w in base.items()}
     activos = {s: o for s, o in objetivos.items() if s not in apagados and o.kilos > 0}
     if canales_sku:
-        base, apertura = _donde_se_vende(canales_sku, activos, canales, base, apertura or {}, por_nombre, problemas)
+        base = _donde_se_vende(canales_sku, activos, canales, base, por_nombre, problemas)
 
     for s in sorted({s for s, _ in base} - set(objetivos)):
         problemas.append(Problema("aviso", f"El SKU {s} está en la base del mes anterior pero no en el objetivo de Contraloría: "
@@ -170,15 +172,29 @@ def armar(
     plata = None
     if hay_plata:
         precio = {(s, por_nombre.get(normalizar(c), c)): p for (s, c), p in (precios or {}).items()}
-        plata = cruzar(
-            filas={s: o.nns for s, o in activos.items() if o.nns > 0},
-            columnas={c: t.plata for c, t in canales.items()},
-            base={(s, c): w * (precio.get((s, c)) or (activos[s].nns / activos[s].kilos if s in activos else 1))
-                  for (s, c), w in base.items()},
-            decimales=PLATA,
-            fijas=fijas_plata,
-            grupos=grupos_plata,
-        )
+
+        def cruzar_plata(desde: dict[Celda, Decimal]) -> ResultadoCruce:
+            return cruzar(
+                filas={s: o.nns for s, o in activos.items() if o.nns > 0},
+                columnas={c: t.plata for c, t in canales.items()},
+                base={(s, c): w * (precio.get((s, c)) or (activos[s].nns / activos[s].kilos if s in activos else 1))
+                      for (s, c), w in desde.items()},
+                decimales=PLATA,
+                fijas=fijas_plata,
+                grupos=grupos_plata,
+            )
+
+        plata = cruzar_plata(base if kilos.celdas is None else kilos.celdas)
+        # Un lugar con kilos en 0 no recibe pesos, y con pesos por canal escritos a mano eso puede no cerrar.
+        # Desde la base sí puede: un mes revisado con esos pesos tiene que volver a abrir.
+        if kilos.celdas is not None and plata.celdas is None:
+            desde_base = cruzar_plata(base)
+            if desde_base.celdas is not None:
+                plata = desde_base
+                problemas.append(Problema(
+                    "aviso", "Con estos pesos por canal, los pesos de algunos lugares no pueden seguir a sus kilos: "
+                             "arrancan de lo facturado el mes anterior. «Recalcular según los kilos», en Totales "
+                             "por canal, los vuelve a llevar a sus kilos.", bloque="input2"))
     entidades_apagadas = frozenset(entidades_apagadas)
     aperturas = _abrir(kilos, plata, apertura or {}, entidades_apagadas, problemas, por_nombre, porcentajes or {},
                        apertura_plata or {})
@@ -186,19 +202,18 @@ def armar(
                      aperturas=aperturas, entidades_apagadas=entidades_apagadas)
 
 
-def _donde_se_vende(canales_sku, activos, canales, base, apertura, por_nombre, problemas):
+def _donde_se_vende(canales_sku, activos, canales, base, por_nombre, problemas):
     """
     El planner dice en qué canales se vende un SKU: resuelve el SKU nuevo sin historia
-    (A4) y restringe uno que ya tenía ("solo se vende en ..."). Devuelve base y apertura
-    nuevas; no toca las de entrada.
+    (A4) y restringe uno que ya tenía ("solo se vende en ..."). Devuelve una base nueva;
+    no toca la de entrada.
 
     SUPUESTO (A4, a confirmar con el cliente): en un canal nuevo para el SKU se parte de
     objetivo del SKU × total del canal / total del mes (la tabla de independencia: un
     peso neutral, proporcional al canal), y el ajuste de siempre hace el resto. Debajo
-    del canal, se abre como se abrió el canal entero el mes anterior (la suma de los
-    pesos de cada entidad en ese canal); si no, esos kilos no llegarían a nadie.
+    del canal, ver `_abrir`.
     """
-    base, apertura = dict(base), dict(apertura)
+    base = dict(base)
     total = sum(o.kilos for o in activos.values())
     for sku in sorted(canales_sku):
         if sku not in activos or not total:
@@ -217,14 +232,7 @@ def _donde_se_vende(canales_sku, activos, canales, base, apertura, por_nombre, p
             del base[celda]  # "solo se vende en": los demás canales pasan a no aplica
         for canal in sorted(elegidos - {k for s, k in base if s == sku}):
             base[(sku, canal)] = activos[sku].kilos * canales[canal].kilos / total
-            pesos: dict[str, Decimal] = {}
-            for (x, k), entidades in apertura.items():
-                if por_nombre.get(normalizar(k), k) == canal:
-                    for e, w in entidades.items():
-                        pesos[e] = pesos.get(e, Decimal(0)) + w
-            if pesos:
-                apertura[(sku, canal)] = pesos
-    return base, apertura
+    return base
 
 
 def _grupos(reglas, activos, por_nombre, problemas) -> tuple[list[Grupo], list[Grupo]]:
@@ -255,20 +263,31 @@ def _grupos(reglas, activos, por_nombre, problemas) -> tuple[list[Grupo], list[G
 
 
 def _abrir(kilos, plata, apertura, apagadas, problemas, por_nombre, porcentajes, apertura_plata) -> dict[Celda, Nodo]:
-    """Una raíz por celda del cruce con apertura: el valor del cruce se reparte entre sus entidades."""
+    """
+    Una raíz por celda del cruce en un canal que se abre: el valor del cruce se reparte entre sus entidades,
+    los kilos según lo que vendió cada una de ese SKU el mes anterior y los pesos según lo que facturó. Si
+    ninguna entidad prendida vendió ese SKU en el canal (un SKU nuevo, A4, uno que el canal no tenía, A14, o
+    uno que solo vendieron entidades apagadas), como se abrió el canal entero: la suma de cada entidad en
+    todos los SKUs del canal. Así cada celda llega a alguien mientras quede alguien prendido en el canal.
+    """
     if kilos.celdas is None:
         return {}
+    # La apertura viene con los nombres de canal del archivo del mes anterior; el cruce, con los de este mes.
+    apertura = {(s, por_nombre.get(normalizar(c), c)): p for (s, c), p in apertura.items()}
+    apertura_plata = {(s, por_nombre.get(normalizar(c), c)): p for (s, c), p in apertura_plata.items()}
+    del_canal = {c: (_sumar(apertura, c), _sumar(apertura_plata, c) or None) for c in {c for _, c in apertura}}
+    celdas_plata = {} if plata is None or plata.celdas is None else plata.celdas
     aperturas = {}
     inactivas = {e: True for e in apagadas}
-    for (sku, canal_base), pesos in sorted(apertura.items()):
-        canal = por_nombre.get(normalizar(canal_base), canal_base)
-        k = (sku, canal)
+    for k in sorted(set(kilos.celdas) | set(celdas_plata)):
+        sku, canal = k
         valor_kilos = kilos.celdas.get(k, Decimal(0))
-        valor_plata = Decimal(0) if plata is None or plata.celdas is None else plata.celdas.get(k, Decimal(0))
-        if valor_kilos == 0 and valor_plata == 0:
+        valor_plata = celdas_plata.get(k, Decimal(0))
+        if canal not in del_canal or (valor_kilos == 0 and valor_plata == 0):
             continue
-        # Lo que facturó cada entidad en esta celda el mes anterior: abre los pesos (si no hay, abren los kilos).
-        facturado = apertura_plata.get((sku, canal_base))
+        pesos, facturado = apertura.get(k), apertura_plata.get(k)
+        if not any(w for e, w in (pesos or {}).items() if e not in apagadas):
+            pesos, facturado = del_canal[canal]
         raiz = Nodo(entidad=f"{sku}|{canal}", nombre=canal, peso=Decimal(1),
                     hijos=[Nodo(entidad=e, nombre=e, peso=w, porcentaje=porcentajes.get((canal, e)),
                                 peso_nns=None if facturado is None else facturado.get(e, Decimal(0)))
@@ -281,6 +300,16 @@ def _abrir(kilos, plata, apertura, apagadas, problemas, por_nombre, porcentajes,
                                       canal=canal))
         aperturas[k] = raiz
     return aperturas
+
+
+def _sumar(apertura: dict[Celda, dict[str, Decimal]], canal: str) -> dict[str, Decimal]:
+    """Lo de cada entidad en todos los SKUs del canal."""
+    total: dict[str, Decimal] = {}
+    for (_, c), entidades in apertura.items():
+        if c == canal:
+            for e, w in entidades.items():
+                total[e] = total.get(e, Decimal(0)) + w
+    return total
 
 
 def _con_porcentaje(pesos: dict[str, Decimal], canal: str, porcentajes) -> dict[str, Decimal]:
